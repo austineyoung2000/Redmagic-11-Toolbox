@@ -179,6 +179,12 @@ object NativeTgkDiagnostics {
             appendLine("L target: ${rectText(mapping?.left)}")
             appendLine("R target: ${rectText(mapping?.right)}")
             appendLine(
+                "L behavior: ${profile?.effectiveLeftBehavior() ?: "None"}"
+            )
+            appendLine(
+                "R behavior: ${profile?.effectiveRightBehavior() ?: "None"}"
+            )
+            appendLine(
                 "L rapid fire: ${profile?.effectiveLeftRapidFireCount() ?: 0}"
             )
             appendLine(

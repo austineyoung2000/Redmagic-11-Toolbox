@@ -36,8 +36,6 @@ object NativeTgkBridge {
     const val LEFT_KEY_CODE = 137
     const val RIGHT_KEY_CODE = 138
 
-    private const val MODE_SINGLE_TOUCH = 0
-    private const val MODE_MULTI_CLICKS = 6
     private const val CONFIG_SETTLE_MS = 2_000L
     private const val ENABLE_SETTLE_MS = 1_000L
 
@@ -92,6 +90,10 @@ object NativeTgkBridge {
         displayWidth: Int,
         displayHeight: Int,
         hapticsEnabled: Boolean,
+        leftBehavior: NativeTgkTriggerBehavior =
+            NativeTgkTriggerBehavior.SINGLE_TOUCH,
+        rightBehavior: NativeTgkTriggerBehavior =
+            NativeTgkTriggerBehavior.SINGLE_TOUCH,
         leftRapidFireCount: Int = 0,
         rightRapidFireCount: Int = 0
     ): NativeTgkApplyResult {
@@ -143,10 +145,16 @@ object NativeTgkBridge {
                     left
                 )
                 backend.setMode(
-                    modeForRapidFire(leftRapidFireCount),
+                    modeForBehavior(
+                        leftBehavior,
+                        leftRapidFireCount
+                    ),
                     LEFT_KEY_CODE
                 )
-                if (leftRapidFireCount > 0) {
+                if (
+                    leftBehavior ==
+                    NativeTgkTriggerBehavior.RAPID_FIRE
+                ) {
                     backend.setRapidFireCount(
                         leftRapidFireCount,
                         LEFT_KEY_CODE
@@ -158,10 +166,16 @@ object NativeTgkBridge {
                     right
                 )
                 backend.setMode(
-                    modeForRapidFire(rightRapidFireCount),
+                    modeForBehavior(
+                        rightBehavior,
+                        rightRapidFireCount
+                    ),
                     RIGHT_KEY_CODE
                 )
-                if (rightRapidFireCount > 0) {
+                if (
+                    rightBehavior ==
+                    NativeTgkTriggerBehavior.RAPID_FIRE
+                ) {
                     backend.setRapidFireCount(
                         rightRapidFireCount,
                         RIGHT_KEY_CODE
@@ -330,18 +344,21 @@ object NativeTgkBridge {
         return "$source: $detail"
     }
 
-    private fun modeForRapidFire(count: Int): Int {
-        require(
-            count in NativeTgkStorage.supportedRapidFireCounts
-        ) {
-            "Unsupported TGK rapid-fire count: $count"
+    private fun modeForBehavior(
+        behavior: NativeTgkTriggerBehavior,
+        rapidFireCount: Int
+    ): Int {
+        if (behavior == NativeTgkTriggerBehavior.RAPID_FIRE) {
+            require(
+                rapidFireCount in
+                    NativeTgkStorage.supportedRapidFireCounts &&
+                    rapidFireCount > 0
+            ) {
+                "Rapid fire requires a supported non-zero count"
+            }
         }
 
-        return if (count == 0) {
-            MODE_SINGLE_TOUCH
-        } else {
-            MODE_MULTI_CLICKS
-        }
+        return behavior.vendorMode
     }
 
     private interface Backend {

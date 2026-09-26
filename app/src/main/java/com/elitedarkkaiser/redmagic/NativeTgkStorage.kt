@@ -10,6 +10,14 @@ enum class NativeTgkOrientation {
     LANDSCAPE
 }
 
+enum class NativeTgkTriggerBehavior(
+    val vendorMode: Int
+) {
+    SINGLE_TOUCH(0),
+    LONG_PRESS(5),
+    RAPID_FIRE(6)
+}
+
 data class NativeTgkRect(
     val left: Int,
     val top: Int,
@@ -97,6 +105,10 @@ data class NativeTgkOrientationMapping(
 data class NativeTgkLayout(
     val id: String,
     val name: String,
+    val leftBehavior: NativeTgkTriggerBehavior =
+        NativeTgkTriggerBehavior.SINGLE_TOUCH,
+    val rightBehavior: NativeTgkTriggerBehavior =
+        NativeTgkTriggerBehavior.SINGLE_TOUCH,
     val leftRapidFireCount: Int = 0,
     val rightRapidFireCount: Int = 0,
     val portrait: NativeTgkOrientationMapping? = null,
@@ -131,6 +143,10 @@ data class NativeTgkProfile(
     val hapticsEnabled: Boolean = true,
     val showSavedTargets: Boolean = true,
     val savedTargetOpacityPercent: Int = 12,
+    val leftBehavior: NativeTgkTriggerBehavior =
+        NativeTgkTriggerBehavior.SINGLE_TOUCH,
+    val rightBehavior: NativeTgkTriggerBehavior =
+        NativeTgkTriggerBehavior.SINGLE_TOUCH,
     val leftRapidFireCount: Int = 0,
     val rightRapidFireCount: Int = 0,
     val portrait: NativeTgkOrientationMapping? = null,
@@ -176,6 +192,16 @@ data class NativeTgkProfile(
             ?: leftRapidFireCount
     }
 
+    fun effectiveLeftBehavior(): NativeTgkTriggerBehavior {
+        return activeLayout()?.leftBehavior
+            ?: leftBehavior
+    }
+
+    fun effectiveRightBehavior(): NativeTgkTriggerBehavior {
+        return activeLayout()?.rightBehavior
+            ?: rightBehavior
+    }
+
     fun effectiveRightRapidFireCount(): Int {
         return activeLayout()?.rightRapidFireCount
             ?: rightRapidFireCount
@@ -206,16 +232,23 @@ data class NativeTgkProfile(
         )
     }
 
-    fun withRapidFireCount(
+    fun withTriggerBehavior(
         left: Boolean,
+        behavior: NativeTgkTriggerBehavior,
         count: Int
     ): NativeTgkProfile {
         val active = activeLayout()
         if (active == null) {
             return if (left) {
-                copy(leftRapidFireCount = count)
+                copy(
+                    leftBehavior = behavior,
+                    leftRapidFireCount = count
+                )
             } else {
-                copy(rightRapidFireCount = count)
+                copy(
+                    rightBehavior = behavior,
+                    rightRapidFireCount = count
+                )
             }
         }
 
@@ -224,9 +257,15 @@ data class NativeTgkProfile(
                 if (it.id != active.id) {
                     it
                 } else if (left) {
-                    it.copy(leftRapidFireCount = count)
+                    it.copy(
+                        leftBehavior = behavior,
+                        leftRapidFireCount = count
+                    )
                 } else {
-                    it.copy(rightRapidFireCount = count)
+                    it.copy(
+                        rightBehavior = behavior,
+                        rightRapidFireCount = count
+                    )
                 }
             }
         )
@@ -237,7 +276,7 @@ object NativeTgkStorage {
     private const val TAG = "RedmagicNativeTgk"
     private const val PREFS_NAME = "native_tgk_profiles"
     private const val PROFILES_KEY = "profiles_json"
-    private const val VERSION = 3
+    private const val VERSION = 4
     private const val EXPORT_FORMAT =
         "redmagic-native-tgk-profiles"
     private const val EXPORT_VERSION = 1
@@ -563,6 +602,8 @@ object NativeTgkStorage {
                 "savedTargetOpacityPercent",
                 savedTargetOpacityPercent
             )
+            .put("leftBehavior", leftBehavior.name)
+            .put("rightBehavior", rightBehavior.name)
             .put("leftRapidFireCount", leftRapidFireCount)
             .put("rightRapidFireCount", rightRapidFireCount)
             .put("activeLayoutId", activeLayoutId)
@@ -588,6 +629,8 @@ object NativeTgkStorage {
         return JSONObject()
             .put("id", id)
             .put("name", name)
+            .put("leftBehavior", leftBehavior.name)
+            .put("rightBehavior", rightBehavior.name)
             .put("leftRapidFireCount", leftRapidFireCount)
             .put("rightRapidFireCount", rightRapidFireCount)
             .apply {
@@ -676,6 +719,14 @@ object NativeTgkStorage {
                 "savedTargetOpacityPercent",
                 12
             ).coerceIn(5, 30),
+            leftBehavior = behaviorFromJson(
+                "leftBehavior",
+                legacyLeftRapid
+            ),
+            rightBehavior = behaviorFromJson(
+                "rightBehavior",
+                legacyRightRapid
+            ),
             leftRapidFireCount = legacyLeftRapid,
             rightRapidFireCount = legacyRightRapid,
             portrait = legacyPortrait,
@@ -695,21 +746,32 @@ object NativeTgkStorage {
             return null
         }
 
+        val leftRapid = optInt(
+            "leftRapidFireCount",
+            0
+        ).takeIf {
+            it in supportedRapidFireCounts
+        } ?: 0
+        val rightRapid = optInt(
+            "rightRapidFireCount",
+            0
+        ).takeIf {
+            it in supportedRapidFireCounts
+        } ?: 0
+
         return NativeTgkLayout(
             id = id,
             name = name.take(40),
-            leftRapidFireCount = optInt(
-                "leftRapidFireCount",
-                0
-            ).takeIf {
-                it in supportedRapidFireCounts
-            } ?: 0,
-            rightRapidFireCount = optInt(
-                "rightRapidFireCount",
-                0
-            ).takeIf {
-                it in supportedRapidFireCounts
-            } ?: 0,
+            leftBehavior = behaviorFromJson(
+                "leftBehavior",
+                leftRapid
+            ),
+            rightBehavior = behaviorFromJson(
+                "rightBehavior",
+                rightRapid
+            ),
+            leftRapidFireCount = leftRapid,
+            rightRapidFireCount = rightRapid,
             portrait = optJSONObject("portrait")
                 ?.toOrientationMapping(),
             landscape = optJSONObject("landscape")
@@ -721,12 +783,37 @@ object NativeTgkStorage {
         val validLayouts = layouts
             .distinctBy { it.id }
             .take(MAX_LAYOUTS_PER_PROFILE)
+            .map { it.normalizedBehavior() }
 
         val normalizedLayouts = if (validLayouts.isEmpty()) {
             listOf(
                 NativeTgkLayout(
                     id = "default",
                     name = "Default",
+                    leftBehavior = if (
+                        leftRapidFireCount > 0
+                    ) {
+                        NativeTgkTriggerBehavior.RAPID_FIRE
+                    } else if (
+                        leftBehavior ==
+                        NativeTgkTriggerBehavior.RAPID_FIRE
+                    ) {
+                        NativeTgkTriggerBehavior.SINGLE_TOUCH
+                    } else {
+                        leftBehavior
+                    },
+                    rightBehavior = if (
+                        rightRapidFireCount > 0
+                    ) {
+                        NativeTgkTriggerBehavior.RAPID_FIRE
+                    } else if (
+                        rightBehavior ==
+                        NativeTgkTriggerBehavior.RAPID_FIRE
+                    ) {
+                        NativeTgkTriggerBehavior.SINGLE_TOUCH
+                    } else {
+                        rightBehavior
+                    },
                     leftRapidFireCount =
                         leftRapidFireCount,
                     rightRapidFireCount =
@@ -748,6 +835,62 @@ object NativeTgkStorage {
             activeLayoutId = normalizedActiveId,
             layouts = normalizedLayouts
         )
+    }
+
+    private fun NativeTgkLayout.normalizedBehavior():
+        NativeTgkLayout {
+        val normalizedLeftBehavior = when {
+            leftBehavior == NativeTgkTriggerBehavior.RAPID_FIRE &&
+                leftRapidFireCount <= 0 ->
+                NativeTgkTriggerBehavior.SINGLE_TOUCH
+            else -> leftBehavior
+        }
+        val normalizedRightBehavior = when {
+            rightBehavior == NativeTgkTriggerBehavior.RAPID_FIRE &&
+                rightRapidFireCount <= 0 ->
+                NativeTgkTriggerBehavior.SINGLE_TOUCH
+            else -> rightBehavior
+        }
+
+        return copy(
+            leftBehavior = normalizedLeftBehavior,
+            rightBehavior = normalizedRightBehavior,
+            leftRapidFireCount = if (
+                normalizedLeftBehavior ==
+                NativeTgkTriggerBehavior.RAPID_FIRE
+            ) {
+                leftRapidFireCount
+            } else {
+                0
+            },
+            rightRapidFireCount = if (
+                normalizedRightBehavior ==
+                NativeTgkTriggerBehavior.RAPID_FIRE
+            ) {
+                rightRapidFireCount
+            } else {
+                0
+            }
+        )
+    }
+
+    private fun JSONObject.behaviorFromJson(
+        key: String,
+        rapidFireCount: Int
+    ): NativeTgkTriggerBehavior {
+        val stored = optString(key).takeIf {
+            it.isNotBlank()
+        }?.let {
+            runCatching {
+                NativeTgkTriggerBehavior.valueOf(it)
+            }.getOrNull()
+        }
+
+        return stored ?: if (rapidFireCount > 0) {
+            NativeTgkTriggerBehavior.RAPID_FIRE
+        } else {
+            NativeTgkTriggerBehavior.SINGLE_TOUCH
+        }
     }
 
     private fun JSONObject.toOrientationMapping():

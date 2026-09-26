@@ -148,6 +148,8 @@ object NativeTgkCoordinator {
             displayWidth = displaySize.width,
             displayHeight = displaySize.height,
             hapticsEnabled = profile.hapticsEnabled,
+            leftBehavior = profile.effectiveLeftBehavior(),
+            rightBehavior = profile.effectiveRightBehavior(),
             leftRapidFireCount =
                 profile.effectiveLeftRapidFireCount(),
             rightRapidFireCount =

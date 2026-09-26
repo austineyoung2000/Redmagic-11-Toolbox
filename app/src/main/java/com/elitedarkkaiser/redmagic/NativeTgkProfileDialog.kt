@@ -793,42 +793,59 @@ object NativeTgkProfileDialog {
                     }
                 }
 
-                fun rapidLabel(
+                fun behaviorLabel(
                     side: String,
+                    behavior: NativeTgkTriggerBehavior,
                     count: Int
                 ): String {
-                    return if (count == 0) {
-                        "$side SINGLE"
-                    } else {
-                        "$side RAPID ×$count"
+                    return when (behavior) {
+                        NativeTgkTriggerBehavior.SINGLE_TOUCH ->
+                            "$side SINGLE"
+                        NativeTgkTriggerBehavior.LONG_PRESS ->
+                            "$side LONG PRESS"
+                        NativeTgkTriggerBehavior.RAPID_FIRE ->
+                            "$side RAPID ×$count"
                     }
                 }
 
-                fun rapidButton(
+                fun behaviorButton(
                     side: String,
+                    behavior: NativeTgkTriggerBehavior,
                     count: Int,
                     left: Boolean
                 ): MaterialButton {
                     return actionButton(
                         activity,
-                        rapidLabel(side, count),
+                        behaviorLabel(side, behavior, count),
                         primary = false
                     ).apply {
                         setOnClickListener {
+                            val behaviors = arrayOf(
+                                NativeTgkTriggerBehavior.SINGLE_TOUCH,
+                                NativeTgkTriggerBehavior.LONG_PRESS,
+                                NativeTgkTriggerBehavior.RAPID_FIRE,
+                                NativeTgkTriggerBehavior.RAPID_FIRE,
+                                NativeTgkTriggerBehavior.RAPID_FIRE
+                            )
                             val counts = intArrayOf(
+                                0,
                                 0,
                                 2,
                                 5,
                                 10
                             )
                             val labels = arrayOf(
-                                "Single tap",
+                                "Single touch",
+                                "Long press",
                                 "Rapid fire ×2",
                                 "Rapid fire ×5",
                                 "Rapid fire ×10"
                             )
-                            var selected = counts.indexOf(count)
-                                .coerceAtLeast(0)
+                            var selected = behaviors.indices
+                                .firstOrNull {
+                                    behaviors[it] == behavior &&
+                                        counts[it] == count
+                                } ?: 0
 
                             MaterialAlertDialogBuilder(activity)
                                 .setTitle("$side trigger behavior")
@@ -848,8 +865,10 @@ object NativeTgkProfileDialog {
                                             ?: return@setPositiveButton
 
                                     val updated = current
-                                        .withRapidFireCount(
+                                        .withTriggerBehavior(
                                             left = left,
+                                            behavior =
+                                                behaviors[selected],
                                             count = counts[selected]
                                         )
 
@@ -864,13 +883,15 @@ object NativeTgkProfileDialog {
                     }
                 }
 
-                val leftRapidButton = rapidButton(
+                val leftRapidButton = behaviorButton(
                     "L",
+                    profile.effectiveLeftBehavior(),
                     profile.effectiveLeftRapidFireCount(),
                     true
                 )
-                val rightRapidButton = rapidButton(
+                val rightRapidButton = behaviorButton(
                     "R",
+                    profile.effectiveRightBehavior(),
                     profile.effectiveRightRapidFireCount(),
                     false
                 )
