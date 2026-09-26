@@ -4,6 +4,9 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -173,12 +176,53 @@ object RefreshRateProfileDialog {
                     setOnCheckedChangeListener { _, checked ->
                         RefreshRateStorage.saveProfile(
                             activity,
-                            profile.copy(enabled = checked)
+                            (
+                                RefreshRateStorage.getProfile(
+                                    activity,
+                                    profile.packageName
+                                ) ?: profile
+                                ).copy(enabled = checked)
                         )
                         RefreshRateCoordinator.clearRuntimeState()
                     }
                 }
                 card.addView(enabledSwitch)
+
+                val overlaySwitch = MaterialSwitch(activity).apply {
+                    text = "Show live refresh-rate overlay"
+                    textSize = 14f
+                    setTextColor(AppTheme.textPrimary)
+                    isChecked = profile.showOverlay
+                    setOnCheckedChangeListener { button, checked ->
+                        if (checked && !Settings.canDrawOverlays(activity)) {
+                            button.isChecked = false
+                            Toast.makeText(
+                                activity,
+                                "Allow display over other apps, then enable the overlay again",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            activity.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${activity.packageName}")
+                                )
+                            )
+                            return@setOnCheckedChangeListener
+                        }
+                        RefreshRateStorage.saveProfile(
+                            activity,
+                            (
+                                RefreshRateStorage.getProfile(
+                                    activity,
+                                    profile.packageName
+                                ) ?: profile
+                                ).copy(showOverlay = checked)
+                        )
+                        if (!checked) RefreshRateOverlay.hide()
+                        RefreshRateCoordinator.clearRuntimeState()
+                    }
+                }
+                card.addView(overlaySwitch)
 
                 val row = LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL

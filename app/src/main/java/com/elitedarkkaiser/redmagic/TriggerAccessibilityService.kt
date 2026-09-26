@@ -51,6 +51,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         ) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
                 deactivateNativeTgk("screen off")
+                RefreshRateOverlay.hide()
                 RefreshRateCoordinator.clearRuntimeState()
             }
         }
@@ -133,6 +134,7 @@ class TriggerAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
         deactivateNativeTgk(
             "accessibility service interrupted"
@@ -155,6 +157,7 @@ class TriggerAccessibilityService : AccessibilityService() {
          * application events.
          */
         NativeTgkRuntimeState.clear()
+        RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
         nativeTgkTask = nativeTgkExecutor.submit {
             NativeTgkCoordinator.disable(
@@ -172,6 +175,7 @@ class TriggerAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         lastForegroundPackage = null
         NativeTgkRuntimeState.clear()
+        RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
 
         nativeTgkTask?.cancel(true)

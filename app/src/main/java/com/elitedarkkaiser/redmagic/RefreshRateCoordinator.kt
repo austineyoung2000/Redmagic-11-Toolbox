@@ -19,6 +19,7 @@ object RefreshRateCoordinator {
             packageName
         )
         if (profile == null) {
+            RefreshRateOverlay.hide()
             clearRuntimeState()
             return null
         }
@@ -33,6 +34,11 @@ object RefreshRateCoordinator {
             activePackage == packageName &&
             activeRate == effectiveRate
         ) {
+            if (profile.enabled && profile.showOverlay) {
+                RefreshRateOverlay.show(context)
+            } else {
+                RefreshRateOverlay.hide()
+            }
             return null
         }
 
@@ -50,12 +56,18 @@ object RefreshRateCoordinator {
             }
             activePackage = packageName
             activeRate = effectiveRate
+            if (profile.enabled && profile.showOverlay) {
+                RefreshRateOverlay.show(context)
+            } else {
+                RefreshRateOverlay.hide()
+            }
             Log.i(
                 TAG,
                 "Applied $effectiveRate Hz to $packageName " +
                     "through ${result.backend}"
             )
         } else {
+            RefreshRateOverlay.hide()
             clearRuntimeState()
             Log.w(TAG, result.message)
         }

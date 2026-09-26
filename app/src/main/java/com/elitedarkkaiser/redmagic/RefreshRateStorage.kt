@@ -11,14 +11,15 @@ data class RefreshRateProfile(
     val appLabel: String,
     val refreshRateHz: Int,
     val enabled: Boolean = true,
-    val pendingReset: Boolean = false
+    val pendingReset: Boolean = false,
+    val showOverlay: Boolean = false
 )
 
 object RefreshRateStorage {
     private const val PREFS = "refresh_rate_profiles"
     private const val KEY = "profiles_json"
     private const val FORMAT = "redmagic-refresh-rate-profiles"
-    private const val VERSION = 1
+    private const val VERSION = 2
     private const val MAX_IMPORT_SIZE = 1_000_000
 
     private val packagePattern = Regex(
@@ -226,6 +227,7 @@ object RefreshRateStorage {
             .put("refreshRateHz", refreshRateHz)
             .put("enabled", enabled)
             .put("pendingReset", pendingReset)
+            .put("showOverlay", showOverlay)
     }
 
     private fun JSONObject.toProfile(): RefreshRateProfile? {
@@ -234,7 +236,8 @@ object RefreshRateStorage {
             appLabel = optString("appLabel"),
             refreshRateHz = optInt("refreshRateHz", -1),
             enabled = optBoolean("enabled", true),
-            pendingReset = optBoolean("pendingReset", false)
+            pendingReset = optBoolean("pendingReset", false),
+            showOverlay = optBoolean("showOverlay", false)
         )
         return profile.takeIf { it.isValid() }
     }
