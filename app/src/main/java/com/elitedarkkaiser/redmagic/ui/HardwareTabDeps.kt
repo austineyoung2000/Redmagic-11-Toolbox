@@ -32,6 +32,7 @@ data class HardwareTabDeps(
         ((ChargeSeparationResult) -> Unit) -> Unit,
     val setChargeSeparation:
         (Boolean, (ChargeSeparationResult) -> Unit) -> Unit,
+    val showRefreshRateProfiles: () -> Unit,
 
     val loadMasterProfiles: () -> List<MasterProfile>,
     val saveMasterProfile:

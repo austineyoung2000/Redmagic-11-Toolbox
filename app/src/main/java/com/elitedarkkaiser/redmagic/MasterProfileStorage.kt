@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object MasterProfileStorage {
-    const val CURRENT_SCHEMA_VERSION = 8
+    const val CURRENT_SCHEMA_VERSION = 9
     private const val PREFS = "master_profiles"
     private const val KEY = "profiles"
     private const val LAST_APPLIED_KEY = "last_applied_profile"
@@ -162,6 +162,9 @@ object MasterProfileStorage {
         chargeSeparationEnabled?.let {
             put("chargeSeparationEnabled", it)
         }
+        refreshRateProfilesJson?.let {
+            put("refreshRateProfiles", JSONObject(it))
+        }
     }
 
     private fun JSONObject.toMasterProfile(): MasterProfile {
@@ -245,6 +248,11 @@ object MasterProfileStorage {
                 has("chargeSeparationEnabled")
             ) {
                 optBoolean("chargeSeparationEnabled")
+            } else {
+                null
+            },
+            refreshRateProfilesJson = if (version >= 9) {
+                optJSONObject("refreshRateProfiles")?.toString()
             } else {
                 null
             }

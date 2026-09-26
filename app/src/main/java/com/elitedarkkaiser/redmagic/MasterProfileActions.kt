@@ -90,7 +90,12 @@ object MasterProfileActions {
                 ChargeSeparationController
                     .read(context)
                     .takeIf { it.success }
-                    ?.enabled
+                    ?.enabled,
+            refreshRateProfilesJson =
+                RefreshRateStorage.createExportJson(
+                    context = context,
+                    allowEmpty = true
+                )
         )
     }
 
@@ -162,6 +167,17 @@ object MasterProfileActions {
                 ChargeSeparationController.setEnabled(
                     context,
                     it
+                )
+            }
+        }
+
+        if (profile.schemaVersion >= 9) {
+            profile.refreshRateProfilesJson?.let {
+                RefreshRateCoordinator.clearRuntimeState()
+                RefreshRateStorage.importProfilesJson(
+                    context = context,
+                    raw = it,
+                    replaceAll = true
                 )
             }
         }

@@ -31,6 +31,13 @@ class TriggerAccessibilityService : AccessibilityService() {
             }
         }
 
+    private val refreshRateExecutor: ExecutorService =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "RedMagicRefreshRate").apply {
+                priority = Thread.NORM_PRIORITY - 1
+            }
+        }
+
     private var nativeTgkTask: Future<*>? = null
     private var screenReceiverRegistered = false
 
@@ -44,6 +51,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         ) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
                 deactivateNativeTgk("screen off")
+                RefreshRateCoordinator.clearRuntimeState()
             }
         }
     }
@@ -83,6 +91,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         lastForegroundPackage = pkg
         NativeTgkDiagnostics.recordForeground(this, pkg)
         dispatchNativeTgkForForeground(pkg)
+        dispatchRefreshRateForForeground(pkg)
 
         if (
             pkg == packageName ||
@@ -124,6 +133,7 @@ class TriggerAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        RefreshRateCoordinator.clearRuntimeState()
         deactivateNativeTgk(
             "accessibility service interrupted"
         )
@@ -145,6 +155,7 @@ class TriggerAccessibilityService : AccessibilityService() {
          * application events.
          */
         NativeTgkRuntimeState.clear()
+        RefreshRateCoordinator.clearRuntimeState()
         nativeTgkTask = nativeTgkExecutor.submit {
             NativeTgkCoordinator.disable(
                 applicationContext,
@@ -161,6 +172,7 @@ class TriggerAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         lastForegroundPackage = null
         NativeTgkRuntimeState.clear()
+        RefreshRateCoordinator.clearRuntimeState()
 
         nativeTgkTask?.cancel(true)
         nativeTgkTask = null
@@ -173,6 +185,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         }
 
         nativeTgkExecutor.shutdownNow()
+        refreshRateExecutor.shutdownNow()
 
         Thread(
             {
@@ -273,6 +286,19 @@ class TriggerAccessibilityService : AccessibilityService() {
                 )
             }
         }.getOrNull()
+    }
+
+    private fun dispatchRefreshRateForForeground(
+        packageName: String
+    ) {
+        runCatching {
+            refreshRateExecutor.execute {
+                RefreshRateCoordinator.onForegroundPackage(
+                    applicationContext,
+                    packageName
+                )
+            }
+        }
     }
 
     private fun latestResumedPackage(): String? {

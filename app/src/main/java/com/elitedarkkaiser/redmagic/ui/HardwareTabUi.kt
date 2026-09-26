@@ -313,6 +313,49 @@ object HardwareTabUi {
 
         container.addView(chargeSeparationCard)
 
+        val refreshRateButton = deps.actionButton(
+            "MANAGE APP REFRESH RATES",
+            false
+        ) {
+            deps.showRefreshRateProfiles()
+        }
+        val refreshRateCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("↻", "PER-APP REFRESH RATE"))
+            addView(
+                deps.bodyText(
+                    "Assign a supported display refresh rate to each " +
+                        "app. The stock REDMAGIC display service applies " +
+                        "the saved rate only while that app is foreground."
+                )
+            )
+            addView(deps.space(deps.dp(8)))
+            addView(deps.singleRow(refreshRateButton))
+            addView(deps.space(deps.dp(6)))
+            addView(
+                deps.bodyText(
+                    "Uses the ordinary vendor Binder API without root. " +
+                        "Choose Follow system to keep Android's current rate."
+                )
+            )
+        }
+        if (
+            !deps.capabilities.scanComplete ||
+            !deps.capabilities.refreshRateAvailable
+        ) {
+            refreshRateCard.addView(
+                deps.bodyText(
+                    if (deps.capabilities.scanComplete) {
+                        "Unavailable: stock REDMAGIC firmware and the " +
+                            "ZteScreenRefreshRate service are required."
+                    } else {
+                        "Unavailable until the compatibility scan completes."
+                    }
+                )
+            )
+            CapabilityUi.disableInteractions(refreshRateCard)
+        }
+        container.addView(refreshRateCard)
+
         val hapticSummary = deps.subtleLabel("")
         var selectedHapticStrength =
             HapticFeedback.Strength.fromKey(

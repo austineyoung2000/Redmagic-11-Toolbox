@@ -131,7 +131,8 @@ object DeviceCapabilityScanner {
             exists(DeviceCompatibility.Paths.GYRO_ENABLE) &&
                 exists(DeviceCompatibility.Paths.GYRO_X) &&
                 exists(DeviceCompatibility.Paths.GYRO_Y)
-        val refreshRateAvailable = stockGameSuiteAvailable
+        val refreshRateAvailable =
+            RefreshRateBridge.probe(context).compatible
         val touchTuningAvailable = stockGameSuiteAvailable
         val performanceModesAvailable = stockGameSuiteAvailable
         val superResolutionAvailable = stockGameSuiteAvailable

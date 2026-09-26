@@ -1192,6 +1192,9 @@ class MainActivity : Activity() {
                         )
                     }
                 },
+                showRefreshRateProfiles = {
+                    RefreshRateProfileDialog.show(this)
+                },
 
                 loadMasterProfiles = { MasterProfileStorage.loadProfiles(this) },
                 saveMasterProfile = { name, onComplete ->

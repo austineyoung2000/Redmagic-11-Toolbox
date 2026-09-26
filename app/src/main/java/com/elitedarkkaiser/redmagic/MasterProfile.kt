@@ -35,5 +35,6 @@ data class MasterProfile(
     val hapticFeedback: HapticFeedbackConfig =
         HapticFeedbackConfig(),
     val nativeTgkProfilesJson: String? = null,
-    val chargeSeparationEnabled: Boolean? = null
+    val chargeSeparationEnabled: Boolean? = null,
+    val refreshRateProfilesJson: String? = null
 )
