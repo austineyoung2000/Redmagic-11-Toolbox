@@ -21,7 +21,9 @@ object DeviceScanActions {
         }
 
         Thread {
-            val report = DeviceCapabilityScanner.scan()
+            val report = DeviceCapabilityScanner.scan(
+                context.applicationContext
+            )
             saveDeviceCapabilityReportStorage(context, report)
             onComplete?.invoke(
                 report.toDeviceCapabilities()

@@ -161,6 +161,20 @@ object HardwareTabUi {
             addView(deps.singleRow(nativeDiagnosticsButton))
         }
 
+        if (
+            deps.capabilities.scanComplete &&
+            !deps.capabilities.nativeTgkAvailable
+        ) {
+            nativeMappingCard.addView(
+                deps.bodyText(
+                    "Native TGK is unavailable on this firmware. " +
+                        "The REDMAGIC InputManager TGK interface " +
+                        "must be present and readable."
+                )
+            )
+            CapabilityUi.disableInteractions(nativeMappingCard)
+        }
+
         container.addView(nativeMappingCard)
 
         val triggerSafetySummary =

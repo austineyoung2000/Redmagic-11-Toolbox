@@ -1,5 +1,8 @@
 package com.elitedarkkaiser.redmagic
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 
 data class DeviceCapabilityReport(
@@ -13,6 +16,18 @@ data class DeviceCapabilityReport(
     val ledAvailable: Boolean,
     val triggersAvailable: Boolean,
     val sliderAvailable: Boolean,
+    val stockFirmware: Boolean,
+    val stockGameSuiteAvailable: Boolean,
+    val nativeTgkAvailable: Boolean,
+    val chargeSeparationAvailable: Boolean,
+    val refreshRateAvailable: Boolean,
+    val touchTuningAvailable: Boolean,
+    val performanceModesAvailable: Boolean,
+    val gyroSensitivityAvailable: Boolean,
+    val superResolutionAvailable: Boolean,
+    val dtsEqualizerAvailable: Boolean,
+    val stockScreenRecorderAvailable: Boolean,
+    val fpsMonitorAvailable: Boolean,
     val summary: String
 )
 
@@ -30,7 +45,47 @@ object DeviceCapabilityScanner {
         return output("getprop $name")
     }
 
-    fun scan(): DeviceCapabilityReport {
+    private fun packageInstalled(packageName: String): Boolean {
+        val safe = packageName.replace("'", "'\\''")
+        return output("pm path '$safe'").startsWith("package:")
+    }
+
+    private fun providerAvailable(
+        context: Context,
+        authority: String
+    ): Boolean {
+        return runCatching {
+            context.contentResolver
+                .acquireUnstableContentProviderClient(
+                    Uri.parse("content://$authority")
+                )
+                ?.use { true }
+                ?: false
+        }.getOrDefault(false)
+    }
+
+    private fun handlesIntent(
+        context: Context,
+        action: String
+    ): Boolean {
+        val intent = Intent(action)
+        val packageManager = context.packageManager
+
+        return packageManager.queryIntentActivities(
+            intent,
+            0
+        ).isNotEmpty() ||
+            packageManager.queryIntentServices(
+                intent,
+                0
+            ).isNotEmpty() ||
+            packageManager.queryBroadcastReceivers(
+                intent,
+                0
+            ).isNotEmpty()
+    }
+
+    fun scan(context: Context): DeviceCapabilityReport {
         val identity = DeviceCompatibility.identity()
         val model = identity.detectedModel
         val marketName = identity.marketName
@@ -68,6 +123,47 @@ object DeviceCapabilityScanner {
                 prop("persist.sys.nubia.slider")
                     .isNotBlank()
 
+        val stockFirmware =
+            DeviceCompatibility.isStockRedmagicFirmware()
+        val gameSpaceInstalled = packageInstalled(
+            "cn.nubia.gamelauncher"
+        )
+        val gameAssistInstalled = packageInstalled(
+            "cn.nubia.gameassist"
+        )
+        val stockGameSuiteAvailable =
+            stockFirmware &&
+                gameSpaceInstalled &&
+                gameAssistInstalled
+        val nativeTgkAvailable =
+            identity.supported &&
+                NativeTgkBridge.readState(context).success
+        val chargeSeparationAvailable =
+            stockFirmware && providerAvailable(
+                context,
+                "cn.zte.chargeseparation." +
+                    "chargeseparationcontentprovider"
+            )
+        val gyroSensitivityAvailable =
+            exists(DeviceCompatibility.Paths.GYRO_ENABLE) &&
+                exists(DeviceCompatibility.Paths.GYRO_X) &&
+                exists(DeviceCompatibility.Paths.GYRO_Y)
+        val refreshRateAvailable = stockGameSuiteAvailable
+        val touchTuningAvailable = stockGameSuiteAvailable
+        val performanceModesAvailable = stockGameSuiteAvailable
+        val superResolutionAvailable = stockGameSuiteAvailable
+        val fpsMonitorAvailable = stockGameSuiteAvailable
+        val dtsEqualizerAvailable =
+            stockFirmware && handlesIntent(
+                context,
+                "cn.zte.intent.action.EQUALIZERSERVICE"
+            )
+        val stockScreenRecorderAvailable =
+            stockFirmware && handlesIntent(
+                context,
+                "cn.nubia.action.supersnap.screenrecord"
+            )
+
         val summary = buildString {
             append("Model: ").append(model.ifBlank { "unknown" })
             if (marketName.isNotBlank()) append(" / ").append(marketName)
@@ -86,6 +182,39 @@ object DeviceCapabilityScanner {
             append("\nLED: ").append(if (ledAvailable) "available" else "missing")
             append("\nTriggers: ").append(if (triggersAvailable) "available" else "missing")
             append("\nSlider: ").append(if (sliderAvailable) "available" else "unknown/missing")
+            append("\nStock REDMAGIC firmware: ").append(
+                if (stockFirmware) "confirmed" else "not confirmed"
+            )
+            append("\nNative TGK: ").append(
+                if (nativeTgkAvailable) "available" else "unavailable"
+            )
+            append("\nCharge separation: ").append(
+                if (chargeSeparationAvailable) "available" else "unavailable"
+            )
+            append("\nRefresh rate: ").append(
+                if (refreshRateAvailable) "available" else "unavailable"
+            )
+            append("\nTouch tuning: ").append(
+                if (touchTuningAvailable) "available" else "unavailable"
+            )
+            append("\nPerformance modes: ").append(
+                if (performanceModesAvailable) "available" else "unavailable"
+            )
+            append("\nGyroscope sensitivity: ").append(
+                if (gyroSensitivityAvailable) "available" else "unavailable"
+            )
+            append("\nSuper resolution: ").append(
+                if (superResolutionAvailable) "available" else "unavailable"
+            )
+            append("\nDTS equalizer: ").append(
+                if (dtsEqualizerAvailable) "available" else "unavailable"
+            )
+            append("\nStock screen recorder: ").append(
+                if (stockScreenRecorderAvailable) "available" else "unavailable"
+            )
+            append("\nPerformance monitor: ").append(
+                if (fpsMonitorAvailable) "available" else "unavailable"
+            )
         }
 
         return DeviceCapabilityReport(
@@ -99,6 +228,24 @@ object DeviceCapabilityScanner {
             ledAvailable = ledAvailable,
             triggersAvailable = triggersAvailable,
             sliderAvailable = sliderAvailable,
+            stockFirmware = stockFirmware,
+            stockGameSuiteAvailable =
+                stockGameSuiteAvailable,
+            nativeTgkAvailable = nativeTgkAvailable,
+            chargeSeparationAvailable =
+                chargeSeparationAvailable,
+            refreshRateAvailable = refreshRateAvailable,
+            touchTuningAvailable = touchTuningAvailable,
+            performanceModesAvailable =
+                performanceModesAvailable,
+            gyroSensitivityAvailable =
+                gyroSensitivityAvailable,
+            superResolutionAvailable =
+                superResolutionAvailable,
+            dtsEqualizerAvailable = dtsEqualizerAvailable,
+            stockScreenRecorderAvailable =
+                stockScreenRecorderAvailable,
+            fpsMonitorAvailable = fpsMonitorAvailable,
             summary = summary
         )
     }

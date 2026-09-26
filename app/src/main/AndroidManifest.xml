@@ -5,9 +5,20 @@
     package="com.elitedarkkaiser.redmagic">
 
     <queries>
+        <package android:name="cn.nubia.gamelauncher" />
+        <package android:name="cn.nubia.gameassist" />
+        <package android:name="com.dts.dtsxultra" />
+        <provider
+            android:authorities="cn.zte.chargeseparation.chargeseparationcontentprovider" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="cn.nubia.action.supersnap.screenrecord" />
+        </intent>
+        <intent>
+            <action android:name="cn.zte.intent.action.EQUALIZERSERVICE" />
         </intent>
     </queries>
 

@@ -73,6 +73,35 @@ object DeviceCompatibility {
             "/sys/class/leds/sar0/mode_operation"
         const val SAR1_MODE =
             "/sys/class/leds/sar1/mode_operation"
+
+        const val GYRO_ENABLE =
+            "/sys/class/sensors_sensitivity/gyro/gyro_enable"
+        const val GYRO_X =
+            "/sys/class/sensors_sensitivity/gyro/gyro_x"
+        const val GYRO_Y =
+            "/sys/class/sensors_sensitivity/gyro/gyro_y"
+    }
+
+    fun isStockRedmagicFirmware(): Boolean {
+        val fingerprint = Build.FINGERPRINT.orEmpty()
+        val brand = Build.BRAND.orEmpty()
+        val manufacturer = Build.MANUFACTURER.orEmpty()
+
+        return isSupportedDevice() &&
+            Build.VERSION.SDK_INT >= 36 &&
+            fingerprint.startsWith(
+                "REDMAGIC/NX809J",
+                ignoreCase = true
+            ) &&
+            (
+                brand.equals("REDMAGIC", ignoreCase = true) ||
+                    manufacturer.equals(
+                        "REDMAGIC",
+                        ignoreCase = true
+                    ) ||
+                    manufacturer.equals("nubia", ignoreCase = true) ||
+                    manufacturer.equals("ZTE", ignoreCase = true)
+                )
     }
 
     @Volatile
