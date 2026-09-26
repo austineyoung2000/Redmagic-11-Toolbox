@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object MasterProfileStorage {
-    const val CURRENT_SCHEMA_VERSION = 7
+    const val CURRENT_SCHEMA_VERSION = 8
     private const val PREFS = "master_profiles"
     private const val KEY = "profiles"
     private const val LAST_APPLIED_KEY = "last_applied_profile"
@@ -159,6 +159,9 @@ object MasterProfileStorage {
         nativeTgkProfilesJson?.let {
             put("nativeTgkProfiles", JSONObject(it))
         }
+        chargeSeparationEnabled?.let {
+            put("chargeSeparationEnabled", it)
+        }
     }
 
     private fun JSONObject.toMasterProfile(): MasterProfile {
@@ -234,6 +237,14 @@ object MasterProfileStorage {
             },
             nativeTgkProfilesJson = if (version >= 7) {
                 optJSONObject("nativeTgkProfiles")?.toString()
+            } else {
+                null
+            },
+            chargeSeparationEnabled = if (
+                version >= 8 &&
+                has("chargeSeparationEnabled")
+            ) {
+                optBoolean("chargeSeparationEnabled")
             } else {
                 null
             }

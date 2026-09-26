@@ -85,7 +85,12 @@ object MasterProfileActions {
                 NativeTgkStorage.createExportJson(
                     context = context,
                     allowEmpty = true
-                )
+                ),
+            chargeSeparationEnabled =
+                ChargeSeparationController
+                    .read(context)
+                    .takeIf { it.success }
+                    ?.enabled
         )
     }
 
@@ -148,6 +153,15 @@ object MasterProfileActions {
                     raw = it,
                     replaceExisting = true,
                     replaceAll = true
+                )
+            }
+        }
+
+        if (profile.schemaVersion >= 8) {
+            profile.chargeSeparationEnabled?.let {
+                ChargeSeparationController.setEnabled(
+                    context,
+                    it
                 )
             }
         }

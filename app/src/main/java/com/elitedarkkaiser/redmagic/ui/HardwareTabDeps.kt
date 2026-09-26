@@ -5,6 +5,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.elitedarkkaiser.redmagic.MasterProfile
 import com.elitedarkkaiser.redmagic.DeviceCapabilities
+import com.elitedarkkaiser.redmagic.ChargeSeparationResult
 
 data class HardwareTabDeps(
     val scrollTabContainer: () -> LinearLayout,
@@ -26,6 +27,11 @@ data class HardwareTabDeps(
     val showTriggerSafetyDialog: ((() -> Unit) -> Unit),
     val enableTriggersAndService: ((Boolean) -> Unit) -> Unit,
     val disableTriggersAndService: ((Boolean) -> Unit) -> Unit,
+
+    val readChargeSeparation:
+        ((ChargeSeparationResult) -> Unit) -> Unit,
+    val setChargeSeparation:
+        (Boolean, (ChargeSeparationResult) -> Unit) -> Unit,
 
     val loadMasterProfiles: () -> List<MasterProfile>,
     val saveMasterProfile:

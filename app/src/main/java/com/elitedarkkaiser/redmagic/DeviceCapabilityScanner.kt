@@ -2,7 +2,6 @@ package com.elitedarkkaiser.redmagic
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 
 data class DeviceCapabilityReport(
@@ -48,20 +47,6 @@ object DeviceCapabilityScanner {
     private fun packageInstalled(packageName: String): Boolean {
         val safe = packageName.replace("'", "'\\''")
         return output("pm path '$safe'").startsWith("package:")
-    }
-
-    private fun providerAvailable(
-        context: Context,
-        authority: String
-    ): Boolean {
-        return runCatching {
-            context.contentResolver
-                .acquireUnstableContentProviderClient(
-                    Uri.parse("content://$authority")
-                )
-                ?.use { true }
-                ?: false
-        }.getOrDefault(false)
     }
 
     private fun handlesIntent(
@@ -139,11 +124,9 @@ object DeviceCapabilityScanner {
             identity.supported &&
                 NativeTgkBridge.readState(context).success
         val chargeSeparationAvailable =
-            stockFirmware && providerAvailable(
-                context,
-                "cn.zte.chargeseparation." +
-                    "chargeseparationcontentprovider"
-            )
+            ChargeSeparationController
+                .probe(context)
+                .compatible
         val gyroSensitivityAvailable =
             exists(DeviceCompatibility.Paths.GYRO_ENABLE) &&
                 exists(DeviceCompatibility.Paths.GYRO_X) &&

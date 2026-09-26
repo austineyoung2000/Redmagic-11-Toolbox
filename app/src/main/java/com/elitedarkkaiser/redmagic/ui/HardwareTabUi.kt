@@ -211,6 +211,108 @@ object HardwareTabUi {
 
         container.addView(triggerSafetyCard)
 
+        var updatingChargeSeparation = true
+        val chargeSeparationStatus = deps.subtleLabel(
+            "Reading stock charge-separation state…"
+        )
+        val chargeSeparationSwitch = MaterialSwitch(activity).apply {
+            text = "Power device directly while charging"
+            textSize = 14f
+            setTextColor(AppTheme.textPrimary)
+            isEnabled = false
+        }
+
+        fun renderChargeSeparation(
+            result: com.elitedarkkaiser.redmagic.ChargeSeparationResult
+        ) {
+            updatingChargeSeparation = true
+            result.enabled?.let {
+                chargeSeparationSwitch.isChecked = it
+            }
+            chargeSeparationStatus.text = buildString {
+                append(result.message)
+                result.backend?.let {
+                    append(" • Backend: ").append(it)
+                }
+            }
+            chargeSeparationSwitch.isEnabled =
+                deps.capabilities.scanComplete &&
+                    deps.capabilities.chargeSeparationAvailable
+            updatingChargeSeparation = false
+        }
+
+        chargeSeparationSwitch.setOnCheckedChangeListener {
+                _, checked ->
+            if (updatingChargeSeparation) {
+                return@setOnCheckedChangeListener
+            }
+
+            updatingChargeSeparation = true
+            chargeSeparationSwitch.isEnabled = false
+            chargeSeparationStatus.text =
+                if (checked) {
+                    "Enabling and verifying charge separation…"
+                } else {
+                    "Disabling and verifying charge separation…"
+                }
+
+            deps.setChargeSeparation(checked) { result ->
+                renderChargeSeparation(result)
+                Toast.makeText(
+                    activity,
+                    result.message,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        val chargeSeparationCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("⚡", "CHARGE SEPARATION"))
+            addView(
+                deps.bodyText(
+                    "Use the stock REDMAGIC charging controller to " +
+                        "power the phone directly from a connected " +
+                        "charger, reducing battery cycling and gaming heat."
+                )
+            )
+            addView(deps.space(deps.dp(8)))
+            addView(chargeSeparationSwitch)
+            addView(deps.space(deps.dp(6)))
+            addView(chargeSeparationStatus)
+            addView(deps.space(deps.dp(6)))
+            addView(
+                deps.bodyText(
+                    "Enabling requires a connected charger and at " +
+                        "least 20% battery. The system state is read " +
+                        "through Android first; root is used only if " +
+                        "the protected setting cannot be written directly."
+                )
+            )
+        }
+
+        if (
+            !deps.capabilities.scanComplete ||
+            !deps.capabilities.chargeSeparationAvailable
+        ) {
+            chargeSeparationStatus.text =
+                if (deps.capabilities.scanComplete) {
+                    "Unavailable: stock REDMAGIC firmware, its " +
+                        "charge-separation provider, and a readable " +
+                        "system interface are required."
+                } else {
+                    "Unavailable until the compatibility scan completes."
+                }
+            CapabilityUi.disableInteractions(
+                chargeSeparationCard
+            )
+        } else {
+            deps.readChargeSeparation {
+                renderChargeSeparation(it)
+            }
+        }
+
+        container.addView(chargeSeparationCard)
+
         val hapticSummary = deps.subtleLabel("")
         var selectedHapticStrength =
             HapticFeedback.Strength.fromKey(

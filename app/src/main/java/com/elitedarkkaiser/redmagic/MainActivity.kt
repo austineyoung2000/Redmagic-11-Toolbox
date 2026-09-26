@@ -1143,6 +1143,56 @@ class MainActivity : Activity() {
                     }
                 },
 
+                readChargeSeparation = { onComplete ->
+                    val submitted = submitBackgroundTask {
+                        val result =
+                            ChargeSeparationController.read(this)
+
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) {
+                                onComplete(result)
+                            }
+                        }
+                    }
+
+                    if (!submitted) {
+                        onComplete(
+                            ChargeSeparationResult(
+                                success = false,
+                                enabled = null,
+                                backend = null,
+                                message = "Unable to read charge separation"
+                            )
+                        )
+                    }
+                },
+                setChargeSeparation = { enabled, onComplete ->
+                    val submitted = submitBackgroundTask {
+                        val result =
+                            ChargeSeparationController.setEnabled(
+                                this,
+                                enabled
+                            )
+
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) {
+                                onComplete(result)
+                            }
+                        }
+                    }
+
+                    if (!submitted) {
+                        onComplete(
+                            ChargeSeparationResult(
+                                success = false,
+                                enabled = null,
+                                backend = null,
+                                message = "Unable to apply charge separation"
+                            )
+                        )
+                    }
+                },
+
                 loadMasterProfiles = { MasterProfileStorage.loadProfiles(this) },
                 saveMasterProfile = { name, onComplete ->
                     val submitted = submitBackgroundTask {

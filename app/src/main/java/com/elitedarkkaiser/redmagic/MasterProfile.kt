@@ -34,5 +34,6 @@ data class MasterProfile(
         SliderDualAppConfig(),
     val hapticFeedback: HapticFeedbackConfig =
         HapticFeedbackConfig(),
-    val nativeTgkProfilesJson: String? = null
+    val nativeTgkProfilesJson: String? = null,
+    val chargeSeparationEnabled: Boolean? = null
 )
