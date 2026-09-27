@@ -4,44 +4,31 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import com.google.android.material.slider.Slider
 import android.widget.TextView
-import android.view.animation.LinearInterpolator
-import android.animation.ValueAnimator
-import android.animation.ArgbEvaluator
 import android.widget.Toast
 import com.elitedarkkaiser.redmagic.storage.AppPrefs
 import com.elitedarkkaiser.redmagic.state.LedState
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.shape.MaterialShapeDrawable
-import com.google.android.material.shape.ShapeAppearanceModel
 import com.elitedarkkaiser.redmagic.ui.AppTheme
+import com.elitedarkkaiser.redmagic.ui.components.MainActivityUiKit
 
 class MainActivity : Activity() {
-    companion object {
-        private const val MASTER_BACKUP_EXPORT_REQUEST = 8201
-        private const val MASTER_BACKUP_IMPORT_REQUEST = 8202
-    }
-
     private var useFahrenheit = true
 
 
@@ -118,13 +105,13 @@ class MainActivity : Activity() {
     private val borderColor get() = AppTheme.borderColor
 
     private val accent get() = AppTheme.accentColor
-    private val chipOn get() = AppTheme.chipOnColor
-    private val chipActive get() = AppTheme.chipActiveColor
-    private val danger get() = AppTheme.dangerColor
     private val textPrimary get() = AppTheme.textPrimary
     private val textSecondary get() = AppTheme.textSecondary
     private val typeface: Typeface? = Typeface.SANS_SERIF
     private val highlightBorder get() = AppTheme.highlightBorder
+    private val mainUiKit by lazy(LazyThreadSafetyMode.NONE) {
+        MainActivityUiKit(this)
+    }
     private val statusRefreshHandler =
         Handler(Looper.getMainLooper())
 
@@ -214,68 +201,18 @@ class MainActivity : Activity() {
             return
         }
 
-        if (resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
-
-        when (requestCode) {
-            MASTER_BACKUP_EXPORT_REQUEST -> {
-                submitBackgroundTask {
-                    val error = runCatching {
-                        val json = MasterProfileStorage
-                            .createBackupJson(this)
-                        contentResolver.openOutputStream(
-                            uri,
-                            "wt"
-                        )?.bufferedWriter()?.use {
-                            it.write(json)
-                        } ?: error("Unable to open backup destination")
-                    }.exceptionOrNull()
-
-                    runOnUiThread {
-                        Toast.makeText(
-                            this,
-                            error?.message
-                                ?: "Master backup exported",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+        if (
+            MasterProfileDocumentTransfer.handleActivityResult(
+                activity = this,
+                requestCode = requestCode,
+                resultCode = resultCode,
+                data = data,
+                runBackground = { task ->
+                    submitBackgroundTask(task)
                 }
-            }
-
-            MASTER_BACKUP_IMPORT_REQUEST -> {
-                submitBackgroundTask {
-                    val result = runCatching {
-                        val raw = contentResolver
-                            .openInputStream(uri)
-                            ?.bufferedReader()
-                            ?.use { it.readText() }
-                            ?: error("Unable to read backup")
-                        MasterProfileStorage.importBackup(
-                            this,
-                            raw
-                        )
-                    }
-
-                    runOnUiThread {
-                        result.onSuccess { imported ->
-                            Toast.makeText(
-                                this,
-                                "Imported ${imported.savedProfileCount} " +
-                                    "saved profiles and restored settings",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            recreate()
-                        }.onFailure { error ->
-                            Toast.makeText(
-                                this,
-                                error.message
-                                    ?: "Backup import failed",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }
-                }
-            }
+            )
+        ) {
+            return
         }
     }
 
@@ -1289,26 +1226,12 @@ class MainActivity : Activity() {
                     Toast.makeText(this, "Deleted $name", Toast.LENGTH_SHORT).show()
                 },
                 exportMasterBackup = {
-                    startActivityForResult(
-                        Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "application/json"
-                            putExtra(
-                                Intent.EXTRA_TITLE,
-                                "redmagic-11-toolbox-backup.json"
-                            )
-                        },
-                        MASTER_BACKUP_EXPORT_REQUEST
-                    )
+                    MasterProfileDocumentTransfer
+                        .requestExport(this)
                 },
                 importMasterBackup = {
-                    startActivityForResult(
-                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "application/json"
-                        },
-                        MASTER_BACKUP_IMPORT_REQUEST
-                    )
+                    MasterProfileDocumentTransfer
+                        .requestImport(this)
                 },
                 automationRulesSummary = {
                     AutomationRulesStorage.summary(this)
@@ -2316,7 +2239,6 @@ class MainActivity : Activity() {
             hasCachedRootAccessStorage(this) || RootShell.hasRoot()
 
         val telemetry = HardwareTelemetry.read()
-        val fanEnabled = telemetry.fanEnabled == true
         val rpmRaw = telemetry.fanRpm
         val tempF = telemetry.temperatureF
 
@@ -2332,7 +2254,6 @@ class MainActivity : Activity() {
         val romText = deviceInfo.rom
         val cpuText = deviceInfo.cpu
         val ramText = deviceInfo.ram
-        val modelText = Build.MODEL ?: "Unknown"
 
         val dashboardSummary =
             DashboardSnapshot.buildSummary(
@@ -2416,194 +2337,36 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun scrollTabContainer(): LinearLayout {
-        val inner = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+    private fun scrollTabContainer(): LinearLayout =
+        mainUiKit.scrollTabContainer()
 
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
+    private fun subtitleText(text: String): TextView =
+        mainUiKit.subtitleText(text)
 
-            addView(ScrollView(this@MainActivity).apply {
-                setBackgroundColor(bgColor)
-                addView(inner)
-            })
+    private fun ledTitleText(text: String): TextView =
+        mainUiKit.ledTitleText(text)
 
-            tag = inner
-        }.also { outer ->
-            val scroll = outer.getChildAt(0) as ScrollView
-            val child = scroll.getChildAt(0) as LinearLayout
-            outer.removeAllViews()
-            outer.addView(scroll.apply { removeAllViews(); addView(child) })
-        }
-    }
+    private fun bodyText(text: String): TextView =
+        mainUiKit.bodyText(text)
 
-    private fun subtitleText(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 13f
-            setTextColor(textSecondary)
-            setPadding(0, dp(4), 0, 0)
-        }
-    }
+    private fun infoRow(
+        label: String,
+        valueView: TextView
+    ): LinearLayout = mainUiKit.infoRow(label, valueView)
 
-    private fun ledTitleText(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 20f
-            setTextColor(textPrimary)
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(dp(14), 0, 0, 0)
-            setShadowLayer(dp(6).toFloat(), 0f, 0f, accent)
+    private fun infoValue(): TextView =
+        mainUiKit.infoValue()
 
-            val animator = ValueAnimator.ofObject(
-                ArgbEvaluator(),
-                accent,
-                textPrimary,
-                accent
-            ).apply {
-                duration = 1800L
-                repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.RESTART
-                interpolator = LinearInterpolator()
-                addUpdateListener { anim ->
-                    val c = anim.animatedValue as Int
-                    setTextColor(c)
-                    setShadowLayer(dp(8).toFloat(), 0f, 0f, c)
-                }
-            }
+    private fun sectionHeader(
+        icon: String,
+        text: String
+    ): LinearLayout = mainUiKit.sectionHeader(icon, text)
 
-            post { animator.start() }
-        }
-    }
+    private fun sectionPanel(): LinearLayout =
+        mainUiKit.sectionPanel()
 
-    private fun bodyText(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 13f
-            setTextColor(textSecondary)
-            setPadding(0, dp(4), 0, 0)
-        }
-    }
-
-    private fun infoRow(label: String, valueView: TextView): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
-            setPadding(0, 0, 0, dp(6))
-
-            val labelView = TextView(this@MainActivity).apply {
-                text = label
-                textSize = 13f
-                setTextColor(textSecondary)
-                setTypeface(typeface, Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(dp(64), ViewGroup.LayoutParams.WRAP_CONTENT)
-            }
-
-            valueView.layoutParams = LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-            )
-
-            addView(labelView)
-            addView(valueView)
-        }
-    }
-
-    private fun infoValue(): TextView {
-        return TextView(this).apply {
-            text = "--"
-            textSize = 13f
-            setTextColor(textPrimary)
-            setLineSpacing(0f, 1.1f)
-            isSingleLine = false
-            maxLines = 4
-        }
-    }
-
-    private fun sectionHeader(icon: String, text: String): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(10))
-
-            val iconView = TextView(this@MainActivity).apply {
-                this.text = icon
-                textSize = 11f
-                setTextColor(textSecondary)
-                gravity = Gravity.CENTER
-                background = roundedFill(panelPressed, 10)
-                setPadding(dp(7), dp(5), dp(7), dp(5))
-            }
-
-            val labelView = TextView(this@MainActivity).apply {
-                this.text = text
-                textSize = 11f
-                setTextColor(accent)
-                setTypeface(typeface, Typeface.BOLD)
-                letterSpacing = 0.06f
-                setPadding(dp(8), 0, 0, 0)
-            }
-
-            addView(iconView)
-            addView(labelView)
-        }
-    }
-
-    private fun sectionPanel(): LinearLayout {
-        val shapeModel = ShapeAppearanceModel.builder()
-            .setAllCornerSizes(dp(22).toFloat())
-            .build()
-
-        val panelBackground = MaterialShapeDrawable(shapeModel).apply {
-            initializeElevationOverlay(this@MainActivity)
-            fillColor = ColorStateList.valueOf(panelColor)
-            strokeWidth = dp(1).toFloat()
-            strokeColor = ColorStateList.valueOf(borderColor)
-            elevation = dp(2).toFloat()
-        }
-
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = panelBackground
-            elevation = dp(2).toFloat()
-            clipToOutline = true
-
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = dp(14)
-            }
-        }
-    }
-
-    private fun statusChip(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            setTextColor(textPrimary)
-            textSize = 10f
-            setTypeface(typeface, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            isSingleLine = true
-            minHeight = dp(40)
-            minimumWidth = dp(80)
-            includeFontPadding = false
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            background = roundedFill(chipOn, 999)
-        }
-    }
-
-    private fun setChipState(view: TextView, active: Boolean) {
-        view.background = roundedFill(if (active) chipActive else chipOn, 14)
-        view.setTextColor(textPrimary)
-    }
+    private fun statusChip(text: String): TextView =
+        mainUiKit.statusChip(text)
 
     private fun setActiveMode(active: Button) {
         updateSelectableButton(
@@ -2624,214 +2387,82 @@ class MainActivity : Activity() {
         button: Button,
         selected: Boolean
     ) {
-        button.isSelected = selected
-
-        if (button is MaterialButton) {
-            button.backgroundTintList = ColorStateList.valueOf(
-                if (selected) panelPressed else Color.TRANSPARENT
-            )
-            button.strokeColor = ColorStateList.valueOf(
-                if (selected) highlightBorder else borderColor
-            )
-        }
+        mainUiKit.updateSelectableButton(button, selected)
     }
 
-    private fun subtleLabel(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 12f
-            setTextColor(textSecondary)
-            setPadding(0, dp(4), 0, 0)
-        }
-    }
+    private fun subtleLabel(text: String): TextView =
+        mainUiKit.subtleLabel(text)
 
     private fun segmentedChip(
         label: String,
         selected: Boolean,
         onClick: () -> Unit
-    ): Button {
-        return MaterialButton(
-            this,
-            null,
-            com.google.android.material.R.attr.materialButtonOutlinedStyle
-        ).apply {
-            text = label
-            textSize = 12f
-            isAllCaps = false
-            setTextColor(textPrimary)
-            strokeWidth = dp(1)
-            rippleColor = ColorStateList.valueOf(AppTheme.rippleColor)
-            cornerRadius = dp(20)
+    ): Button = mainUiKit.segmentedChip(
+        label,
+        selected,
+        onClick
+    )
 
-            insetTop = 0
-            insetBottom = 0
-            minHeight = dp(48)
-            setPadding(dp(16), dp(10), dp(16), dp(10))
-            updateSelectableButton(this, selected)
-            setOnClickListener { onClick() }
-        }
-    }
+    private fun actionButton(
+        text: String,
+        isDanger: Boolean = false,
+        onClick: () -> Unit
+    ): Button = mainUiKit.actionButton(
+        text,
+        isDanger,
+        onClick
+    )
 
-    private fun actionButton(text: String, isDanger: Boolean = false, onClick: () -> Unit): Button {
-        return MaterialButton(this).apply {
-            this.text = text
-            textSize = 13f
-            isAllCaps = false
-            setTextColor(textPrimary)
+    private fun row(
+        left: Button,
+        right: Button
+    ): LinearLayout = mainUiKit.row(left, right)
 
-            backgroundTintList = ColorStateList.valueOf(
-                if (isDanger) danger else panelPressed
-            )
-            rippleColor = ColorStateList.valueOf(
-                if (isDanger) highlightBorder else AppTheme.rippleColor
-            )
-            cornerRadius = dp(16)
+    private fun singleRow(button: Button): LinearLayout =
+        mainUiKit.singleRow(button)
 
-            insetTop = 0
-            insetBottom = 0
-            minHeight = dp(48)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            setOnClickListener { onClick() }
-        }
-    }
+    private fun roundedBg(
+        fill: Int,
+        stroke: Int,
+        radiusDp: Int
+    ): GradientDrawable = mainUiKit.roundedBg(
+        fill,
+        stroke,
+        radiusDp
+    )
 
-    private fun row(left: Button, right: Button): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(8) }
+    private fun roundedFill(
+        fill: Int,
+        radiusDp: Int
+    ): GradientDrawable = mainUiKit.roundedFill(
+        fill,
+        radiusDp
+    )
 
-            left.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(6)
-            }
-            right.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(6)
-            }
+    private fun space(width: Int): TextView =
+        mainUiKit.space(width)
 
-            addView(left)
-            addView(right)
-        }
-    }
+    private fun spacer(height: Int): TextView =
+        mainUiKit.spacer(height)
 
-    private fun singleRow(button: Button): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(8) }
+    private fun getStatusBarHeight(): Int =
+        mainUiKit.getStatusBarHeight()
 
-            button.layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            addView(button)
-        }
-    }
+    private fun dp(value: Int): Int =
+        mainUiKit.dp(value)
 
-    private fun applyPressEffect(view: View, pressedColor: Int = panelPressed) {
-        val normalBg = view.background
-        view.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    v.alpha = 0.96f
-                    v.animate().scaleX(0.985f).scaleY(0.985f).setDuration(80).start()
-                    v.background = when (v) {
-                        is Button -> roundedFill(pressedColor, 16)
-                        else -> roundedBg(pressedColor, highlightBorder, 18)
-                    }
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.alpha = 1f
-                    v.animate().scaleX(1f).scaleY(1f).setDuration(90).start()
-                    v.background = normalBg
-                }
-            }
-            false
-        }
-    }
+    private fun smallActionButton(
+        label: String,
+        isDanger: Boolean = false,
+        onClick: () -> Unit
+    ): Button = mainUiKit.smallActionButton(
+        label,
+        isDanger,
+        onClick
+    )
 
-    private fun roundedBg(fill: Int, stroke: Int, radiusDp: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(radiusDp).toFloat()
-            setColor(fill)
-            setStroke(dp(1), stroke)
-        }
-    }
-
-    private fun roundedFill(fill: Int, radiusDp: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(radiusDp).toFloat()
-            setColor(fill)
-        }
-    }
-
-    private fun space(width: Int): TextView {
-        return TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(width, 1)
-        }
-    }
-
-    private fun spacer(height: Int): TextView {
-        return TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                height
-            )
-        }
-    }
-
-    private fun getStatusBarHeight(): Int {
-        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
-        return if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else dp(24)
-    }
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
-
-    private fun smallActionButton(label: String, isDanger: Boolean = false, onClick: () -> Unit): Button {
-        return MaterialButton(this).apply {
-            text = label
-            textSize = 12f
-            isAllCaps = false
-            setTextColor(textPrimary)
-
-            backgroundTintList = ColorStateList.valueOf(
-                if (isDanger) danger else panelPressed
-            )
-            rippleColor = ColorStateList.valueOf(
-                if (isDanger) highlightBorder else AppTheme.rippleColor
-            )
-            cornerRadius = dp(14)
-
-            insetTop = 0
-            insetBottom = 0
-            minHeight = dp(44)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            setOnClickListener { onClick() }
-        }
-    }
-
-    private fun flowRow(vararg views: View): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, dp(6))
-            views.forEachIndexed { index, v ->
-                val params = LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-                if (index > 0) params.marginStart = dp(6)
-                addView(v, params)
-            }
-        }
-    }
+    private fun flowRow(vararg views: View): LinearLayout =
+        mainUiKit.flowRow(*views)
 
 
     private fun showGamePickerDialog() {
