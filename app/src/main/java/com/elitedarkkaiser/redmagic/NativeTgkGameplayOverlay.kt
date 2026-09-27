@@ -9,7 +9,9 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -217,15 +219,156 @@ object NativeTgkGameplayOverlay {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = dp(context, 12)
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
             y = dp(context, 12)
         }
+
+        placeEditControl(
+            context = context,
+            manager = manager,
+            edit = edit,
+            params = params,
+            packageName = profile.packageName,
+            orientation = orientation
+        )
 
         runCatching {
             manager.addView(edit, params)
         }.onSuccess {
             editRoot = edit
+        }
+    }
+
+    private fun placeEditControl(
+        context: Context,
+        manager: WindowManager,
+        edit: TextView,
+        params: WindowManager.LayoutParams,
+        packageName: String,
+        orientation: NativeTgkOrientation
+    ) {
+        edit.measure(
+            View.MeasureSpec.makeMeasureSpec(
+                0,
+                View.MeasureSpec.UNSPECIFIED
+            ),
+            View.MeasureSpec.makeMeasureSpec(
+                0,
+                View.MeasureSpec.UNSPECIFIED
+            )
+        )
+
+        val screen = overlayBounds(context, manager)
+        val maxX = (screen.first - edit.measuredWidth).coerceAtLeast(0)
+        val maxY = (screen.second - edit.measuredHeight).coerceAtLeast(0)
+        val saved = GameplayEditPositionStorage.read(
+            context,
+            packageName,
+            orientation
+        )
+
+        params.x = saved?.xFor(maxX)
+            ?: (maxX - dp(context, 12)).coerceAtLeast(0)
+        params.y = saved?.yFor(maxY)
+            ?: dp(context, 12).coerceAtMost(maxY)
+
+        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+
+        edit.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    startX = params.x
+                    startY = params.y
+                    dragging = false
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.rawX - downRawX
+                    val deltaY = event.rawY - downRawY
+                    if (
+                        !dragging &&
+                        (
+                            kotlin.math.abs(deltaX) >= touchSlop ||
+                                kotlin.math.abs(deltaY) >= touchSlop
+                            )
+                    ) {
+                        dragging = true
+                    }
+
+                    if (dragging) {
+                        params.x = (startX + deltaX.roundToInt())
+                            .coerceIn(0, maxX)
+                        params.y = (startY + deltaY.roundToInt())
+                            .coerceIn(0, maxY)
+                        runCatching {
+                            manager.updateViewLayout(view, params)
+                        }
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    if (dragging) {
+                        GameplayEditPositionStorage.save(
+                            context = context,
+                            packageName = packageName,
+                            orientation = orientation,
+                            x = params.x,
+                            y = params.y,
+                            maxX = maxX,
+                            maxY = maxY
+                        )
+                    } else {
+                        view.performClick()
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    if (dragging) {
+                        GameplayEditPositionStorage.save(
+                            context = context,
+                            packageName = packageName,
+                            orientation = orientation,
+                            x = params.x,
+                            y = params.y,
+                            maxX = maxX,
+                            maxY = maxY
+                        )
+                    }
+                    true
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    private fun overlayBounds(
+        context: Context,
+        manager: WindowManager
+    ): Pair<Int, Int> {
+        return if (
+            android.os.Build.VERSION.SDK_INT >=
+            android.os.Build.VERSION_CODES.R
+        ) {
+            manager.currentWindowMetrics.bounds.let {
+                it.width() to it.height()
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            context.resources.displayMetrics.let {
+                it.widthPixels to it.heightPixels
+            }
         }
     }
 
