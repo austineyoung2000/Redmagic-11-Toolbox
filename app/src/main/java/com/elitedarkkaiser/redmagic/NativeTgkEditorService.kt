@@ -1,8 +1,8 @@
 package com.elitedarkkaiser.redmagic
 
 import android.app.Service
-import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -16,11 +16,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.button.MaterialButton
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -287,7 +287,7 @@ class NativeTgkEditorService : Service() {
 
         val instruction = TextView(this).apply {
             text = buildString {
-                append("Place L and R for ")
+                append("L/R • ")
                 append(targetLabel)
                 append(" • ")
                 append(
@@ -299,28 +299,36 @@ class NativeTgkEditorService : Service() {
                     }
                 )
             }
-            textSize = 14f
-            setTextColor(Color.WHITE)
+            textSize = 12f
+            setTextColor(
+                getColor(R.color.redmagic_text_primary)
+            )
             gravity = Gravity.CENTER
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
             setPadding(
-                dp(14),
                 dp(10),
-                dp(14),
-                dp(10)
+                0,
+                dp(10),
+                0
             )
         }
 
-        val cancel = Button(this).apply {
-            text = "Cancel"
-            isAllCaps = false
+        val cancel = editorActionButton(
+            label = "✕",
+            emphasized = false
+        ).apply {
+            contentDescription = "Cancel target editing"
             setOnClickListener {
                 cancelEditing()
             }
         }
 
-        val save = Button(this).apply {
-            text = "Save targets"
-            isAllCaps = false
+        val save = editorActionButton(
+            label = "✓  SAVE",
+            emphasized = true
+        ).apply {
+            contentDescription = "Save trigger targets"
             setOnClickListener {
                 saveTargets()
             }
@@ -330,38 +338,40 @@ class NativeTgkEditorService : Service() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                dp(8),
-                dp(6),
-                dp(8),
-                dp(6)
+                dp(4),
+                dp(3),
+                dp(4),
+                dp(3)
             )
             background = roundedBackground(
-                Color.argb(230, 24, 24, 28),
-                dp(18).toFloat()
+                getColor(R.color.redmagic_panel),
+                dp(14).toFloat(),
+                getColor(R.color.redmagic_border)
             )
+            elevation = dp(8).toFloat()
 
             addView(
                 cancel,
                 LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    0.8f
+                    dp(40),
+                    dp(32)
                 )
             )
             addView(
                 instruction,
                 LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    2f
+                    if (
+                        requestedOrientation ==
+                        NativeTgkOrientation.LANDSCAPE
+                    ) dp(190) else dp(110),
+                    dp(32)
                 )
             )
             addView(
                 save,
                 LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
+                    dp(68),
+                    dp(32)
                 )
             )
         }
@@ -369,13 +379,11 @@ class NativeTgkEditorService : Service() {
         root.addView(
             controls,
             FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
-                leftMargin = dp(14)
-                rightMargin = dp(14)
-                topMargin = dp(18)
+                topMargin = dp(8)
             }
         )
 
@@ -798,9 +806,46 @@ class NativeTgkEditorService : Service() {
         rightTarget = null
     }
 
+    private fun editorActionButton(
+        label: String,
+        emphasized: Boolean
+    ): MaterialButton {
+        val fill = if (emphasized) {
+            getColor(R.color.redmagic_accent)
+        } else {
+            getColor(R.color.redmagic_panel_pressed)
+        }
+
+        return MaterialButton(this).apply {
+            text = label
+            textSize = 10f
+            isAllCaps = false
+            minWidth = 0
+            minHeight = 0
+            insetTop = 0
+            insetBottom = 0
+            cornerRadius = dp(10)
+            setPadding(dp(7), 0, dp(7), 0)
+            setTextColor(Color.WHITE)
+            backgroundTintList = ColorStateList.valueOf(fill)
+            strokeColor = ColorStateList.valueOf(
+                if (emphasized) {
+                    getColor(R.color.redmagic_accent)
+                } else {
+                    getColor(R.color.redmagic_border)
+                }
+            )
+            strokeWidth = dp(1)
+            rippleColor = ColorStateList.valueOf(
+                getColor(R.color.redmagic_ripple)
+            )
+        }
+    }
+
     private fun roundedBackground(
         color: Int,
-        radius: Float
+        radius: Float,
+        strokeColor: Int = Color.argb(180, 255, 255, 255)
     ): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
@@ -808,7 +853,7 @@ class NativeTgkEditorService : Service() {
             cornerRadius = radius
             setStroke(
                 dp(1),
-                Color.argb(180, 255, 255, 255)
+                strokeColor
             )
         }
     }

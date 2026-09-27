@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.roundToInt
@@ -156,18 +157,49 @@ object NativeTgkGameplayOverlay {
         profile: NativeTgkProfile,
         orientation: NativeTgkOrientation
     ) {
-        val edit = TextView(context).apply {
-            text = "EDIT L/R"
+        val dragHandle = TextView(context).apply {
+            text = "⠿"
+            contentDescription = "Drag to move the edit control"
             textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             setPadding(
-                dp(context, 11),
+                dp(context, 9),
                 dp(context, 7),
-                dp(context, 11),
+                dp(context, 7),
                 dp(context, 7)
             )
-            alpha = 0.38f
+            background = GradientDrawable().apply {
+                cornerRadius = dp(context, 13).toFloat()
+                setColor(Color.argb(150, 255, 65, 90))
+            }
+        }
+
+        val editAction = TextView(context).apply {
+            text = "EDIT L/R"
+            contentDescription = "Edit L and R trigger targets"
+            textSize = 10f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setPadding(
+                dp(context, 8),
+                dp(context, 7),
+                dp(context, 10),
+                dp(context, 7)
+            )
+            setOnClickListener {
+                openEditor(
+                    context = context,
+                    profile = profile,
+                    orientation = orientation
+                )
+            }
+        }
+
+        val edit = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            alpha = 0.48f
             background = GradientDrawable().apply {
                 cornerRadius = dp(context, 16).toFloat()
                 setColor(Color.argb(220, 20, 20, 24))
@@ -176,39 +208,8 @@ object NativeTgkGameplayOverlay {
                     Color.argb(210, 255, 255, 255)
                 )
             }
-            setOnClickListener {
-                val editorIntent = Intent(
-                    context,
-                    NativeTgkEditorService::class.java
-                ).apply {
-                    putExtra(
-                        NativeTgkEditorService.EXTRA_PACKAGE_NAME,
-                        profile.packageName
-                    )
-                    putExtra(
-                        NativeTgkEditorService.EXTRA_APP_LABEL,
-                        profile.appLabel
-                    )
-                    putExtra(
-                        NativeTgkEditorService.EXTRA_ORIENTATION,
-                        orientation.name
-                    )
-                    putExtra(
-                        NativeTgkEditorService.EXTRA_LAUNCH_TARGET,
-                        false
-                    )
-                }
-
-                runCatching {
-                    context.startService(editorIntent)
-                }.onFailure {
-                    Toast.makeText(
-                        context,
-                        "Could not reopen the trigger editor",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
+            addView(dragHandle)
+            addView(editAction)
         }
 
         val params = WindowManager.LayoutParams(
@@ -228,6 +229,7 @@ object NativeTgkGameplayOverlay {
             context = context,
             manager = manager,
             edit = edit,
+            dragHandle = dragHandle,
             params = params,
             packageName = profile.packageName,
             orientation = orientation
@@ -240,10 +242,49 @@ object NativeTgkGameplayOverlay {
         }
     }
 
+    private fun openEditor(
+        context: Context,
+        profile: NativeTgkProfile,
+        orientation: NativeTgkOrientation
+    ) {
+        val editorIntent = Intent(
+            context,
+            NativeTgkEditorService::class.java
+        ).apply {
+            putExtra(
+                NativeTgkEditorService.EXTRA_PACKAGE_NAME,
+                profile.packageName
+            )
+            putExtra(
+                NativeTgkEditorService.EXTRA_APP_LABEL,
+                profile.appLabel
+            )
+            putExtra(
+                NativeTgkEditorService.EXTRA_ORIENTATION,
+                orientation.name
+            )
+            putExtra(
+                NativeTgkEditorService.EXTRA_LAUNCH_TARGET,
+                false
+            )
+        }
+
+        runCatching {
+            context.startService(editorIntent)
+        }.onFailure {
+            Toast.makeText(
+                context,
+                "Could not reopen the trigger editor",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private fun placeEditControl(
         context: Context,
         manager: WindowManager,
-        edit: TextView,
+        edit: View,
+        dragHandle: View,
         params: WindowManager.LayoutParams,
         packageName: String,
         orientation: NativeTgkOrientation
@@ -271,7 +312,12 @@ object NativeTgkGameplayOverlay {
         params.x = saved?.xFor(maxX)
             ?: (maxX - dp(context, 12)).coerceAtLeast(0)
         params.y = saved?.yFor(maxY)
-            ?: dp(context, 12).coerceAtMost(maxY)
+            ?: dp(
+                context,
+                if (
+                    orientation == NativeTgkOrientation.LANDSCAPE
+                ) 52 else 12
+            ).coerceAtMost(maxY)
 
         val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         var downRawX = 0f
@@ -280,7 +326,7 @@ object NativeTgkGameplayOverlay {
         var startY = 0
         var dragging = false
 
-        edit.setOnTouchListener { view, event ->
+        dragHandle.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = event.rawX
@@ -310,7 +356,7 @@ object NativeTgkGameplayOverlay {
                         params.y = (startY + deltaY.roundToInt())
                             .coerceIn(0, maxY)
                         runCatching {
-                            manager.updateViewLayout(view, params)
+                            manager.updateViewLayout(edit, params)
                         }
                     }
                     true
