@@ -69,6 +69,9 @@ class TriggerAccessibilityService : AccessibilityService() {
     private var foregroundRootReader: Thread? = null
 
     @Volatile
+    private var foregroundRootPollSeconds: Int? = null
+
+    @Volatile
     private var forceForegroundReconcile = false
 
     @Volatile
@@ -231,8 +234,11 @@ class TriggerAccessibilityService : AccessibilityService() {
     }
 
     private fun handleForegroundPackage(pkg: String) {
+        val foregroundChanged = lastForegroundPackage != pkg
         lastForegroundPackage = pkg
-        NativeTgkDiagnostics.recordForeground(this, pkg)
+        if (foregroundChanged) {
+            NativeTgkDiagnostics.recordForeground(this, pkg)
+        }
         dispatchNativeTgkForForeground(pkg)
         dispatchRefreshRateForForeground(pkg)
 
@@ -729,20 +735,30 @@ class TriggerAccessibilityService : AccessibilityService() {
 
     @Synchronized
     private fun ensureForegroundRootMonitor() {
-        if (foregroundRootProcess?.isAlive == true) {
-            return
-        }
-
         if (!needsForegroundMonitoring()) {
             stopForegroundRootMonitor()
             return
+        }
+
+        val desiredPollSeconds = desiredForegroundPollSeconds()
+        if (
+            foregroundRootProcess?.isAlive == true &&
+            foregroundRootPollSeconds == desiredPollSeconds
+        ) {
+            return
+        }
+
+        if (foregroundRootProcess != null) {
+            stopForegroundRootMonitor()
         }
 
         val process = runCatching {
             ProcessBuilder(
                 "su",
                 "-c",
-                ROOT_FOREGROUND_MONITOR_COMMAND
+                rootForegroundMonitorCommand(
+                    desiredPollSeconds
+                )
             ).redirectErrorStream(true).start()
         }.getOrElse {
             android.util.Log.e(
@@ -754,6 +770,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         }
 
         foregroundRootProcess = process
+        foregroundRootPollSeconds = desiredPollSeconds
 
         val readerThread = Thread(
             {
@@ -787,6 +804,7 @@ class TriggerAccessibilityService : AccessibilityService() {
                     if (foregroundRootProcess === process) {
                         foregroundRootProcess = null
                         foregroundRootReader = null
+                        foregroundRootPollSeconds = null
                     }
                 }
             },
@@ -806,6 +824,7 @@ class TriggerAccessibilityService : AccessibilityService() {
 
         foregroundRootProcess = null
         foregroundRootReader = null
+        foregroundRootPollSeconds = null
 
         reader?.interrupt()
         if (process != null) {
@@ -825,6 +844,20 @@ class TriggerAccessibilityService : AccessibilityService() {
             PerformanceModeStorage.readProfiles(this).any {
                 it.enabled
             }
+    }
+
+    private fun desiredForegroundPollSeconds(): Int {
+        val activeProfile =
+            NativeTgkEditorRuntime.isEditing() ||
+                NativeTgkRuntimeState.activePackage() != null ||
+                RefreshRateCoordinator.isActive() ||
+                PerformanceModeCoordinator.isActive()
+
+        return if (activeProfile) {
+            ACTIVE_FOREGROUND_POLL_SECONDS
+        } else {
+            IDLE_FOREGROUND_POLL_SECONDS
+        }
     }
 
     private fun registerScreenReceiver() {
@@ -864,8 +897,12 @@ class TriggerAccessibilityService : AccessibilityService() {
             750L
         private const val NATIVE_HEALTH_CHECK_INTERVAL_MS =
             10_000L
+        private const val ACTIVE_FOREGROUND_POLL_SECONDS = 1
+        private const val IDLE_FOREGROUND_POLL_SECONDS = 3
 
-        private val ROOT_FOREGROUND_MONITOR_COMMAND = """
+        private fun rootForegroundMonitorCommand(
+            pollSeconds: Int
+        ) = """
             while true; do
                 line="${'$'}(
                     dumpsys activity activities 2>/dev/null |
@@ -878,7 +915,7 @@ class TriggerAccessibilityService : AccessibilityService() {
                 if [ -n "${'$'}detected" ]; then
                     printf '%s\n' "${'$'}detected"
                 fi
-                sleep 1
+                sleep $pollSeconds
             done
         """.trimIndent()
     }

@@ -75,6 +75,11 @@ object RefreshRateCoordinator {
     }
 
     @Synchronized
+    fun isActive(): Boolean {
+        return activePackage != null
+    }
+
+    @Synchronized
     fun clearRuntimeState() {
         activePackage = null
         activeRate = null

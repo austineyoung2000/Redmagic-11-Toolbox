@@ -13,6 +13,7 @@ import android.os.SystemClock
 class RgbCycleService : Service() {
     companion object {
         private const val OWNER_RECHECK_MS = 750L
+        private const val MIN_FRAME_INTERVAL_MS = 500L
     }
 
     private lateinit var workerThread: HandlerThread
@@ -26,6 +27,7 @@ class RgbCycleService : Service() {
     private var nextFanAt = 0L
     private var screenOffAt: Long? = null
     private var ledsOffForTimeout = false
+    private var lastFrameAt = 0L
 
     private val cycleRunnable = object : Runnable {
         override fun run() {
@@ -147,6 +149,14 @@ class RgbCycleService : Service() {
         }
 
         val now = SystemClock.elapsedRealtime()
+        val frameDelay =
+            MIN_FRAME_INTERVAL_MS - (now - lastFrameAt)
+        if (lastFrameAt != 0L && frameDelay > 0L) {
+            scheduleNext(frameDelay)
+            return
+        }
+
+        var frameApplied = false
         if (state.syncZones) {
             if (now >= nextLogoAt) {
                 val color = nextColor(colorIndexLogo)
@@ -156,6 +166,7 @@ class RgbCycleService : Service() {
                     shoulderColor = color,
                     fanColor = color,
                 )
+                frameApplied = true
                 colorIndexLogo = advanceIndex(colorIndexLogo)
                 colorIndexShoulder = colorIndexLogo
                 colorIndexFan = colorIndexLogo
@@ -195,7 +206,12 @@ class RgbCycleService : Service() {
                     shoulderColor = shoulderColor,
                     fanColor = fanColor,
                 )
+                frameApplied = true
             }
+        }
+
+        if (frameApplied) {
+            lastFrameAt = SystemClock.elapsedRealtime()
         }
 
         val nextAt = minOf(nextLogoAt, nextShoulderAt, nextFanAt)

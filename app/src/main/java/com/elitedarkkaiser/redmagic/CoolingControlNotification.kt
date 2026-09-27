@@ -20,6 +20,7 @@ object CoolingControlNotification {
     private var rgbMode: String? = null
     private var temperatureF: Float? = null
     private var lastRenderedText: String? = null
+    private var lastPublishedAtMs = 0L
 
     @Synchronized
     fun startFan(context: Context): Notification {
@@ -48,10 +49,11 @@ object CoolingControlNotification {
         tempF: Float?,
         level: Int?
     ) {
+        val controlChanged = fanLevel != level?.takeIf { it >= 0 }
         fanActive = true
         temperatureF = tempF ?: temperatureF
         fanLevel = level?.takeIf { it >= 0 }
-        publish(context)
+        publish(context, force = controlChanged)
     }
 
     @Synchronized
@@ -60,10 +62,11 @@ object CoolingControlNotification {
         tempF: Float?,
         profile: String?
     ) {
+        val controlChanged = pumpProfile != profile
         pumpActive = true
         temperatureF = tempF ?: temperatureF
         pumpProfile = profile
-        publish(context)
+        publish(context, force = controlChanged)
     }
 
     @Synchronized
@@ -71,9 +74,10 @@ object CoolingControlNotification {
         context: Context,
         mode: String
     ) {
+        val controlChanged = rgbMode != mode
         rgbActive = true
         rgbMode = mode
-        publish(context)
+        publish(context, force = controlChanged)
     }
 
     @Synchronized
@@ -103,7 +107,7 @@ object CoolingControlNotification {
     private fun finishStop(context: Context) {
         if (fanActive || pumpActive || rgbActive) {
             lastRenderedText = null
-            publish(context)
+            publish(context, force = true)
         } else {
             lastRenderedText = null
             temperatureF = null
@@ -111,13 +115,27 @@ object CoolingControlNotification {
         }
     }
 
-    private fun publish(context: Context) {
+    private fun publish(
+        context: Context,
+        force: Boolean = false
+    ) {
         createChannel(context)
 
         val text = buildStatusText(context)
         if (text == lastRenderedText) return
 
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (
+            !force &&
+            lastRenderedText != null &&
+            now - lastPublishedAtMs <
+                MIN_NOTIFICATION_UPDATE_MS
+        ) {
+            return
+        }
+
         lastRenderedText = text
+        lastPublishedAtMs = now
         manager(context).notify(
             NOTIFICATION_ID,
             buildNotification(context, text)
@@ -219,4 +237,6 @@ object CoolingControlNotification {
 
     private fun manager(context: Context): NotificationManager =
         context.getSystemService(NotificationManager::class.java)
+
+    private const val MIN_NOTIFICATION_UPDATE_MS = 15_000L
 }

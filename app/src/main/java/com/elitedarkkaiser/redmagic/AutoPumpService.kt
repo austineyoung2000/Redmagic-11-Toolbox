@@ -11,12 +11,18 @@ class AutoPumpService : Service() {
     private lateinit var workerThread: HandlerThread
     private lateinit var handler: Handler
     private var lastProfile: String? = null
+    @Volatile
+    private var latestTemperatureF: Float? = null
     private var temperatureSubscription:
         DeviceTemperatureMonitor.Subscription? = null
 
     private val pollRunnable = object : Runnable {
         override fun run() {
-            val tempF = applyPumpRule()
+            val tempF = applyPumpRule(
+                latestTemperatureF
+                    ?: DashboardSnapshot.readCpuTempF()
+                        .toFloatOrNull()
+            )
             CoolingControlNotification.updatePump(
                 this@AutoPumpService,
                 tempF,
@@ -44,7 +50,10 @@ class AutoPumpService : Service() {
             DeviceTemperatureMonitor.subscribe(
                 this,
                 DeviceTemperatureMonitor.SamplingMode.BACKGROUND_CONTROL
-            ) {
+            ) { temperatureC ->
+                latestTemperatureF = temperatureC?.let {
+                    (it * 9f / 5f) + 32f
+                }
                 if (::handler.isInitialized) {
                     handler.removeCallbacks(pollRunnable)
                     handler.post(pollRunnable)
@@ -74,8 +83,8 @@ class AutoPumpService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun applyPumpRule(): Float? {
-        val tempF = DashboardSnapshot.readCpuTempF().toFloatOrNull() ?: return null
+    private fun applyPumpRule(tempF: Float?): Float? {
+        tempF ?: return null
 
         if (!HardwareScreenPolicy.isScreenInteractive(this@AutoPumpService)) {
             if (HardwareScreenPolicy.coolingShouldStopWhileScreenOff(tempF)) {

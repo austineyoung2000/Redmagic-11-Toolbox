@@ -15,12 +15,15 @@ class AutoFanService : Service() {
     private lateinit var workerThread: HandlerThread
     private lateinit var handler: Handler
     private var lastAppliedLevel = -1
+    @Volatile
+    private var latestTemperatureF: Float? = null
     private var temperatureSubscription:
         DeviceTemperatureMonitor.Subscription? = null
 
     private val loop = object : Runnable {
         override fun run() {
-            val tempF = HardwareController.readTemperatureF()
+            val tempF = latestTemperatureF
+                ?: HardwareController.readTemperatureF()
             val nextLevel = chooseStableFanLevel(tempF, lastAppliedLevel)
 
             if (!HardwareScreenPolicy.isScreenInteractive(this@AutoFanService)) {
@@ -75,7 +78,10 @@ class AutoFanService : Service() {
             DeviceTemperatureMonitor.subscribe(
                 this,
                 DeviceTemperatureMonitor.SamplingMode.BACKGROUND_CONTROL
-            ) {
+            ) { temperatureC ->
+                latestTemperatureF = temperatureC?.let {
+                    (it * 9f / 5f) + 32f
+                }
                 if (::handler.isInitialized) {
                     handler.removeCallbacks(loop)
                     handler.post(loop)
