@@ -35,6 +35,8 @@ compatibility fallback when an interactive root shell is rejected.
 | Magic Key modes | User changes slider behavior | Writes are user-driven and grouped into one settings command where multiple keys must change together |
 | Legacy quick actions | A configured physical key action fires | One command is issued for the actual action; no polling writes occur |
 | Haptic fallback | A requested hardware feedback event cannot use the normal vibrator path | Root sysfs write is fallback-only |
+| RGB Studio animation | Only while RGB Studio owns the LEDs | One grouped LED command per due frame; saved speeds are clamped to 500–6000 ms, ownership is rechecked, and identical commands are suppressed |
+| First-install permission bootstrap | Once after the user presses the explicit setup button | One grouped command grants app-ops/runtime permissions and merges this app into the existing accessibility-service list; every result is read back before setup is accepted |
 
 Application preferences, profile JSON, editor coordinates, and backup data are
 normal app-private or user-selected document writes. They do not use root and
@@ -53,6 +55,14 @@ do not write vendor partitions.
 - Added desired-state comparisons before protected settings writes.
 - Added duplicate hardware-write suppression and profile-transition signature
   suppression.
+- Serialized profile and automation stores whose read/modify/write sequences can
+  be reached by UI, service, document-import, and boot callbacks concurrently.
+- Coalesced simultaneous capability scans so all callers share one result instead
+  of opening competing root probes.
+- Routed document transfer, installed-app discovery, and master-profile disk work
+  through the activity-owned background queue so it is cancelled with the host.
+- Kept the RGB cycle's intentionally repeating writes bounded to one grouped
+  command per due frame, with a 500 ms minimum interval and LED-owner checks.
 
 ## Review checklist for future features
 

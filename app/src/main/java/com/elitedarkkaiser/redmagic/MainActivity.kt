@@ -177,7 +177,8 @@ class MainActivity : Activity() {
                 activity = this,
                 requestCode = requestCode,
                 resultCode = resultCode,
-                data = data
+                data = data,
+                runBackground = ::submitBackgroundTask
             )
         ) {
             return

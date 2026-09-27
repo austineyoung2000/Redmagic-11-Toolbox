@@ -1,6 +1,5 @@
 package com.elitedarkkaiser.redmagic
 
-import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.ColorStateList
 import android.graphics.Color

@@ -85,15 +85,17 @@ internal class MainHardwareController(
                     HapticFeedback.testPulse(strength)
                 }
             },
-            loadMasterProfiles = { actions.loadMasterProfiles() },
+            loadMasterProfiles = { onComplete ->
+                actions.loadMasterProfiles(onComplete)
+            },
             saveMasterProfile = { name, onComplete ->
                 actions.saveMasterProfile(name, onComplete)
             },
             applyMasterProfile = { profile ->
                 actions.applyMasterProfile(profile)
             },
-            deleteMasterProfile = { name ->
-                actions.deleteMasterProfile(name)
+            deleteMasterProfile = { name, onComplete ->
+                actions.deleteMasterProfile(name, onComplete)
             },
             exportMasterBackup = {
                 actions.requestMasterBackupExport()

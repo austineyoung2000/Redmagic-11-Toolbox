@@ -17,6 +17,7 @@ object MasterProfileStorage {
         val appliedCurrentSettings: Boolean
     )
 
+    @Synchronized
     fun loadProfiles(context: Context): MutableList<MasterProfile> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY, "[]") ?: "[]"
@@ -30,6 +31,7 @@ object MasterProfileStorage {
         }.toMutableList()
     }
 
+    @Synchronized
     fun saveProfiles(context: Context, profiles: List<MasterProfile>) {
         val array = JSONArray()
         profiles.forEach { array.put(it.toJson()) }
@@ -39,6 +41,7 @@ object MasterProfileStorage {
         ) { "Unable to save master profiles" }
     }
 
+    @Synchronized
     fun upsertProfile(context: Context, profile: MasterProfile) {
         val profiles = loadProfiles(context)
         val index = profiles.indexOfFirst { it.name == profile.name }
@@ -46,6 +49,7 @@ object MasterProfileStorage {
         saveProfiles(context, profiles)
     }
 
+    @Synchronized
     fun deleteProfile(context: Context, name: String) {
         saveProfiles(context, loadProfiles(context).filterNot { it.name == name })
         AutomationRulesStorage.clearProfileReferences(
@@ -58,6 +62,7 @@ object MasterProfileStorage {
         }
     }
 
+    @Synchronized
     fun markProfileApplied(context: Context, name: String) {
         if (loadProfiles(context).none { it.name == name }) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -66,6 +71,7 @@ object MasterProfileStorage {
             .apply()
     }
 
+    @Synchronized
     fun lastAppliedProfile(context: Context): MasterProfile? {
         val name = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(LAST_APPLIED_KEY, null)
@@ -73,6 +79,7 @@ object MasterProfileStorage {
         return loadProfiles(context).firstOrNull { it.name == name }
     }
 
+    @Synchronized
     fun createBackupJson(context: Context): String {
         val saved = JSONArray()
         loadProfiles(context).forEach { saved.put(it.toJson()) }
@@ -92,6 +99,7 @@ object MasterProfileStorage {
         }.toString(2)
     }
 
+    @Synchronized
     fun importBackup(context: Context, raw: String): ImportResult {
         require(raw.length <= 5_000_000) { "Backup is larger than 5 MB" }
         val root = JSONObject(raw)

@@ -9,17 +9,24 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 object NativeTgkDocumentTransfer {
     const val EXPORT_REQUEST = 8211
     const val IMPORT_REQUEST = 8212
-
-    private var exportRequested = false
-    private var exportPackageName: String? = null
+    private const val PENDING_PREFS = "mapping_document_transfer"
+    private const val PENDING_EXPORT_PACKAGE = "pending_export_package"
+    private const val EXPORT_ALL = "__all_profiles__"
 
     fun requestExport(
         activity: Activity,
         packageName: String? = null,
         appLabel: String? = null
     ) {
-        exportRequested = true
-        exportPackageName = packageName
+        activity.getSharedPreferences(
+            PENDING_PREFS,
+            Activity.MODE_PRIVATE
+        ).edit()
+            .putString(
+                PENDING_EXPORT_PACKAGE,
+                packageName ?: EXPORT_ALL
+            )
+            .apply()
 
         val safeLabel = appLabel
             ?.lowercase()
@@ -56,7 +63,8 @@ object NativeTgkDocumentTransfer {
         activity: Activity,
         requestCode: Int,
         resultCode: Int,
-        data: Intent?
+        data: Intent?,
+        runBackground: (() -> Unit) -> Boolean
     ): Boolean {
         if (
             requestCode != EXPORT_REQUEST &&
@@ -67,22 +75,24 @@ object NativeTgkDocumentTransfer {
 
         if (resultCode != Activity.RESULT_OK) {
             if (requestCode == EXPORT_REQUEST) {
-                clearExportRequest()
+                clearExportRequest(activity)
             }
             return true
         }
 
         val uri = data?.data
         if (uri == null) {
-            clearExportRequest()
+            if (requestCode == EXPORT_REQUEST) {
+                clearExportRequest(activity)
+            }
             showToast(activity, "No document was selected")
             return true
         }
 
         if (requestCode == EXPORT_REQUEST) {
-            handleExport(activity, uri)
+            handleExport(activity, uri, runBackground)
         } else {
-            handleImport(activity, uri)
+            handleImport(activity, uri, runBackground)
         }
 
         return true
@@ -90,95 +100,107 @@ object NativeTgkDocumentTransfer {
 
     private fun handleExport(
         activity: Activity,
-        uri: Uri
+        uri: Uri,
+        runBackground: (() -> Unit) -> Boolean
     ) {
-        val packageName = exportPackageName
-        val requested = exportRequested
-        clearExportRequest()
+        val pending = consumeExportRequest(activity)
+        val packageName = pending?.takeUnless { it == EXPORT_ALL }
 
-        if (!requested) {
+        if (pending == null) {
             showToast(activity, "TGK export request expired")
             return
         }
 
-        Thread(
-            {
-                val error = runCatching {
-                    val json = NativeTgkStorage.createExportJson(
-                        activity,
-                        packageName
-                    )
-                    activity.contentResolver.openOutputStream(
-                        uri,
-                        "wt"
-                    )?.bufferedWriter()?.use {
-                        it.write(json)
-                    } ?: error("Unable to open export destination")
-                }.exceptionOrNull()
+        val submitted = runBackground {
+            val error = runCatching {
+                val json = NativeTgkStorage.createExportJson(
+                    activity.applicationContext,
+                    packageName
+                )
+                activity.contentResolver.openOutputStream(
+                    uri,
+                    "wt"
+                )?.bufferedWriter()?.use {
+                    it.write(json)
+                } ?: error("Unable to open export destination")
+            }.exceptionOrNull()
 
-                activity.runOnUiThread {
+            activity.runOnUiThread {
+                if (activityAlive(activity)) {
                     showToast(
                         activity,
                         error?.message ?: "TGK profiles exported"
                     )
                 }
-            },
-            "RedMagicTgkExport"
-        ).start()
+            }
+        }
+
+        if (!submitted) {
+            showToast(activity, "Unable to start profile export")
+        }
     }
 
     private fun handleImport(
         activity: Activity,
-        uri: Uri
+        uri: Uri,
+        runBackground: (() -> Unit) -> Boolean
     ) {
-        Thread(
-            {
-                val loaded = runCatching {
-                    val raw = activity.contentResolver
-                        .openInputStream(uri)
-                        ?.bufferedReader()
-                        ?.use { it.readText() }
-                        ?: error("Unable to read TGK profile file")
-                    val packages =
-                        NativeTgkStorage.importedPackageNames(raw)
-                    val existing = NativeTgkStorage
-                        .readProfiles(activity)
-                        .map { it.packageName }
-                        .toSet()
+        val submitted = runBackground {
+            val loaded = runCatching {
+                val raw = activity.contentResolver
+                    .openInputStream(uri)
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                    ?: error("Unable to read TGK profile file")
+                val packages =
+                    NativeTgkStorage.importedPackageNames(raw)
+                val existing = NativeTgkStorage
+                    .readProfiles(activity.applicationContext)
+                    .map { it.packageName }
+                    .toSet()
 
-                    ImportDocument(
-                        raw = raw,
-                        conflictCount =
-                            packages.intersect(existing).size
-                    )
-                }
+                ImportDocument(
+                    raw = raw,
+                    conflictCount = packages.intersect(existing).size
+                )
+            }
 
-                activity.runOnUiThread {
-                    loaded.onSuccess { document ->
-                        if (document.conflictCount == 0) {
-                            importDocument(
-                                activity,
-                                document.raw,
-                                replaceExisting = true
-                            )
-                        } else {
-                            showConflictDialog(activity, document)
-                        }
-                    }.onFailure {
-                        showToast(
+            activity.runOnUiThread {
+                if (!activityAlive(activity)) return@runOnUiThread
+
+                loaded.onSuccess { document ->
+                    if (document.conflictCount == 0) {
+                        importDocument(
                             activity,
-                            it.message ?: "TGK import failed"
+                            document.raw,
+                            replaceExisting = true,
+                            runBackground = runBackground
+                        )
+                    } else {
+                        showConflictDialog(
+                            activity,
+                            document,
+                            runBackground
                         )
                     }
+                }.onFailure {
+                    showToast(
+                        activity,
+                        it.message ?: "TGK import failed"
+                    )
                 }
-            },
-            "RedMagicTgkImportRead"
-        ).start()
+            }
+        }
+
+        if (!submitted) {
+            showToast(activity, "Unable to start profile import")
+        }
     }
 
     private fun showConflictDialog(
         activity: Activity,
-        document: ImportDocument
+        document: ImportDocument,
+        runBackground: (() -> Unit) -> Boolean
     ) {
         MaterialAlertDialogBuilder(activity)
             .setTitle("Existing TGK mappings found")
@@ -192,14 +214,16 @@ object NativeTgkDocumentTransfer {
                 importDocument(
                     activity,
                     document.raw,
-                    replaceExisting = false
+                    replaceExisting = false,
+                    runBackground = runBackground
                 )
             }
             .setPositiveButton("Replace") { _, _ ->
                 importDocument(
                     activity,
                     document.raw,
-                    replaceExisting = true
+                    replaceExisting = true,
+                    runBackground = runBackground
                 )
             }
             .show()
@@ -208,47 +232,71 @@ object NativeTgkDocumentTransfer {
     private fun importDocument(
         activity: Activity,
         raw: String,
-        replaceExisting: Boolean
+        replaceExisting: Boolean,
+        runBackground: (() -> Unit) -> Boolean
     ) {
-        Thread(
-            {
-                val result = runCatching {
-                    NativeTgkRuntimeState.clear()
-                    NativeTgkCoordinator.disable(
-                        activity.applicationContext,
-                        "TGK profiles imported"
-                    )
-                    NativeTgkStorage.importProfilesJson(
-                        context = activity,
-                        raw = raw,
-                        replaceExisting = replaceExisting
-                    )
-                }
+        val submitted = runBackground {
+            val result = runCatching {
+                NativeTgkRuntimeState.clear()
+                NativeTgkCoordinator.disable(
+                    activity.applicationContext,
+                    "TGK profiles imported"
+                )
+                NativeTgkStorage.importProfilesJson(
+                    context = activity.applicationContext,
+                    raw = raw,
+                    replaceExisting = replaceExisting
+                )
+            }
 
-                activity.runOnUiThread {
-                    result.onSuccess {
-                        showToast(
-                            activity,
-                            "Imported ${it.importedCount}, " +
-                                "replaced ${it.replacedCount}, " +
-                                "skipped ${it.skippedCount} TGK profile(s)"
-                        )
-                        NativeTgkProfileDialog.show(activity)
-                    }.onFailure {
-                        showToast(
-                            activity,
-                            it.message ?: "TGK import failed"
-                        )
-                    }
+            activity.runOnUiThread {
+                if (!activityAlive(activity)) return@runOnUiThread
+
+                result.onSuccess {
+                    showToast(
+                        activity,
+                        "Imported ${it.importedCount}, " +
+                            "replaced ${it.replacedCount}, " +
+                            "skipped ${it.skippedCount} TGK profile(s)"
+                    )
+                    NativeTgkProfileDialog.show(activity)
+                }.onFailure {
+                    showToast(
+                        activity,
+                        it.message ?: "TGK import failed"
+                    )
                 }
-            },
-            "RedMagicTgkImportApply"
-        ).start()
+            }
+        }
+
+        if (!submitted) {
+            showToast(activity, "Unable to apply imported profiles")
+        }
     }
 
-    private fun clearExportRequest() {
-        exportRequested = false
-        exportPackageName = null
+    @Synchronized
+    private fun consumeExportRequest(activity: Activity): String? {
+        val prefs = activity.getSharedPreferences(
+            PENDING_PREFS,
+            Activity.MODE_PRIVATE
+        )
+        val pending = prefs.getString(PENDING_EXPORT_PACKAGE, null)
+        prefs.edit().remove(PENDING_EXPORT_PACKAGE).apply()
+        return pending
+    }
+
+    @Synchronized
+    private fun clearExportRequest(activity: Activity) {
+        activity.getSharedPreferences(
+            PENDING_PREFS,
+            Activity.MODE_PRIVATE
+        ).edit()
+            .remove(PENDING_EXPORT_PACKAGE)
+            .apply()
+    }
+
+    private fun activityAlive(activity: Activity): Boolean {
+        return !activity.isFinishing && !activity.isDestroyed
     }
 
     private fun showToast(

@@ -21,6 +21,8 @@ private const val GAME_MODE_SHOULDER_LED_ENABLED_KEY = "game_mode_shoulder_led_e
 private const val GAME_MODE_SHOULDER_LED_EFFECT_KEY = "game_mode_shoulder_led_effect"
 private const val GAME_MODE_SHOULDER_LED_COLOR_KEY = "game_mode_shoulder_led_color"
 
+private val gameModeStorageLock = Any()
+
 fun getSavedGameModeProfileStorage(context: Context): GameModeProfile {
     val prefs = context.getSharedPreferences(GAME_PREFS_NAME, Context.MODE_PRIVATE)
     return GameModeProfile(
@@ -109,8 +111,15 @@ fun getSavedGamePackagesStorage(context: Context): MutableSet<String> {
 }
 
 fun setSavedGamePackagesStorage(context: Context, packages: Set<String>) {
-    val prefs = context.getSharedPreferences(GAME_PREFS_NAME, Context.MODE_PRIVATE)
-    prefs.edit().putStringSet(GAME_MODE_PACKAGES_KEY, packages).apply()
+    synchronized(gameModeStorageLock) {
+        val prefs = context.getSharedPreferences(
+            GAME_PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+        prefs.edit()
+            .putStringSet(GAME_MODE_PACKAGES_KEY, packages.toSet())
+            .apply()
+    }
 }
 
 fun getSavedPerGameProfilesStorage(
@@ -137,24 +146,26 @@ fun setSavedPerGameProfilesStorage(
     context: Context,
     profiles: Map<String, String>
 ) {
-    val prefs = context.getSharedPreferences(
-        GAME_PREFS_NAME,
-        Context.MODE_PRIVATE
-    )
-    val editor = prefs.edit()
-    prefs.all.keys
-        .filter { it.startsWith("game_profile_") }
-        .forEach(editor::remove)
+    synchronized(gameModeStorageLock) {
+        val prefs = context.getSharedPreferences(
+            GAME_PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+        val editor = prefs.edit()
+        prefs.all.keys
+            .filter { it.startsWith("game_profile_") }
+            .forEach(editor::remove)
 
-    profiles.forEach { (pkg, raw) ->
-        if (
-            pkg.isNotBlank() &&
-            runCatching { JSONObject(raw) }.isSuccess
-        ) {
-            editor.putString("game_profile_$pkg", raw)
+        profiles.forEach { (pkg, raw) ->
+            if (
+                pkg.isNotBlank() &&
+                runCatching { JSONObject(raw) }.isSuccess
+            ) {
+                editor.putString("game_profile_$pkg", raw)
+            }
         }
+        editor.commit()
     }
-    editor.commit()
 }
 
 fun getGameModeStatusTextStorage(context: Context): String {

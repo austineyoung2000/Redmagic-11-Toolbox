@@ -46,4 +46,19 @@ class BootEventPolicyTest {
         assertTrue(decision.resetManualTriggerPause)
         assertFalse(decision.needsAsyncWork)
     }
+
+    @Test
+    fun userUnlockedCanRecoverWhenBootBroadcastWasMissed() {
+        val decision = BootEventPolicy.decide(
+            event = BootEvent.USER_UNLOCKED,
+            coreServicesAlreadyStarted = false,
+            triggersAutoStart = true,
+            hasUnlockAutomation = true
+        )
+
+        assertTrue(decision.startCoreServices)
+        assertTrue(decision.resetManualTriggerPause)
+        assertTrue(decision.startTriggers)
+        assertTrue(decision.runUnlockAutomation)
+    }
 }

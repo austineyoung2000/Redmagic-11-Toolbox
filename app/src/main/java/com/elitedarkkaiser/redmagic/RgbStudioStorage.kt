@@ -23,6 +23,7 @@ object RgbStudioStorage {
     )
     private val allowedTimeouts = setOf(0, 1, 5, 15, 30)
 
+    @Synchronized
     fun read(context: Context): RgbStudioState {
         val prefs = context.getSharedPreferences(
             AppPrefs.PREFS_NAME,
@@ -66,6 +67,7 @@ object RgbStudioStorage {
         )
     }
 
+    @Synchronized
     fun save(context: Context, state: RgbStudioState) {
         val safe = sanitize(state)
         context.getSharedPreferences(
@@ -83,18 +85,21 @@ object RgbStudioStorage {
                 SCREEN_OFF_TIMEOUT_MINUTES,
                 safe.screenOffTimeoutMinutes
             )
-            .commit()
+            .apply()
     }
 
+    @Synchronized
     fun setEnabled(context: Context, enabled: Boolean) {
         val current = read(context)
         save(context, current.copy(enabled = enabled))
     }
 
+    @Synchronized
     fun isEnabled(context: Context): Boolean {
         return read(context).enabled
     }
 
+    @Synchronized
     fun summary(context: Context): String {
         val state = read(context)
         if (!state.enabled) return "Off"

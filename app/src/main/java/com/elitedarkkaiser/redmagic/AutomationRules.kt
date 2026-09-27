@@ -51,6 +51,7 @@ enum class AutomationRuleEvent(
 object AutomationRulesStorage {
     private const val PREFS = "automation_rules"
 
+    @Synchronized
     fun profileName(
         context: Context,
         event: AutomationRuleEvent
@@ -62,6 +63,7 @@ object AutomationRulesStorage {
             ?.takeIf { it.isNotBlank() }
     }
 
+    @Synchronized
     fun saveProfileName(
         context: Context,
         event: AutomationRuleEvent,
@@ -84,6 +86,7 @@ object AutomationRulesStorage {
         editor.apply()
     }
 
+    @Synchronized
     fun clearProfileReferences(
         context: Context,
         profileName: String
@@ -112,6 +115,7 @@ object AutomationRulesStorage {
         }
     }
 
+    @Synchronized
     fun summary(context: Context): String {
         val enabled = AutomationRuleEvent.entries
             .count { profileName(context, it) != null }
@@ -123,6 +127,7 @@ object AutomationRulesStorage {
         }
     }
 
+    @Synchronized
     fun toJson(context: Context): JSONObject {
         return JSONObject().apply {
             AutomationRuleEvent.entries.forEach { event ->
@@ -133,6 +138,7 @@ object AutomationRulesStorage {
         }
     }
 
+    @Synchronized
     fun restoreFromJson(
         context: Context,
         json: JSONObject

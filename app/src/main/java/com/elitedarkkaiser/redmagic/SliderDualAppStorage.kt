@@ -98,6 +98,7 @@ object SliderDualAppStorage {
     private const val PREVIOUS_VALID =
         "slider_dual_app_previous_valid"
 
+    @Synchronized
     fun read(context: Context): SliderDualAppConfig {
         val prefs = context.getSharedPreferences(
             AppPrefs.PREFS_NAME,
@@ -131,6 +132,7 @@ object SliderDualAppStorage {
         )
     }
 
+    @Synchronized
     fun save(context: Context, config: SliderDualAppConfig) {
         context.getSharedPreferences(
             AppPrefs.PREFS_NAME,
@@ -159,6 +161,7 @@ object SliderDualAppStorage {
             .apply()
     }
 
+    @Synchronized
     fun capturePreviousMode(context: Context): Boolean {
         val prefs = context.getSharedPreferences(
             AppPrefs.PREFS_NAME,
@@ -239,6 +242,7 @@ object SliderDualAppStorage {
         return editor.commit()
     }
 
+    @Synchronized
     fun disable(
         context: Context,
         restorePrevious: Boolean = false
@@ -257,6 +261,7 @@ object SliderDualAppStorage {
         }
     }
 
+    @Synchronized
     private fun restorePreviousMode(context: Context): Boolean {
         val prefs = context.getSharedPreferences(
             AppPrefs.PREFS_NAME,
@@ -325,6 +330,7 @@ object SliderDualAppStorage {
         return restored
     }
 
+    @Synchronized
     private fun clearPreviousMode(context: Context) {
         context.getSharedPreferences(
             AppPrefs.PREFS_NAME,
@@ -338,6 +344,7 @@ object SliderDualAppStorage {
             .apply()
     }
 
+    @Synchronized
     fun summary(context: Context): String {
         val config = read(context)
         return when {

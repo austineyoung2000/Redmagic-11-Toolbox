@@ -40,11 +40,11 @@ data class HardwareTabDeps(
     val showPerformanceModeProfiles: () -> Unit,
     val testHapticStrength: (HapticFeedback.Strength) -> Unit,
 
-    val loadMasterProfiles: () -> List<MasterProfile>,
+    val loadMasterProfiles: ((List<MasterProfile>) -> Unit) -> Unit,
     val saveMasterProfile:
         (String, (Boolean) -> Unit) -> Unit,
     val applyMasterProfile: (MasterProfile) -> Unit,
-    val deleteMasterProfile: (String) -> Unit,
+    val deleteMasterProfile: (String, () -> Unit) -> Unit,
     val exportMasterBackup: () -> Unit,
     val importMasterBackup: () -> Unit,
 

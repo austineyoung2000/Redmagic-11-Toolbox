@@ -177,7 +177,8 @@ internal class MainControlsController(
             roundedFill = { color, radius ->
                 uiKit.roundedFill(color, radius)
             },
-            space = { value -> uiKit.space(value) }
+            space = { value -> uiKit.space(value) },
+            runBackground = runBackground
         )
     }
 }

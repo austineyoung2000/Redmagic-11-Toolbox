@@ -62,8 +62,17 @@ class MainHardwareTabActions(
         }
     }
 
-    fun loadMasterProfiles(): List<MasterProfile> {
-        return MasterProfileStorage.loadProfiles(activity)
+    fun loadMasterProfiles(
+        onComplete: (List<MasterProfile>) -> Unit
+    ) {
+        val submitted = runBackground {
+            val profiles = MasterProfileStorage.loadProfiles(activity)
+            postIfAlive { onComplete(profiles) }
+        }
+
+        if (!submitted) {
+            onComplete(emptyList())
+        }
     }
 
     fun saveMasterProfile(
@@ -135,9 +144,28 @@ class MainHardwareTabActions(
         }
     }
 
-    fun deleteMasterProfile(name: String) {
-        MasterProfileStorage.deleteProfile(activity, name)
-        showShortToast("Deleted $name")
+    fun deleteMasterProfile(
+        name: String,
+        onComplete: () -> Unit
+    ) {
+        val submitted = runBackground {
+            val deleted = runCatching {
+                MasterProfileStorage.deleteProfile(activity, name)
+                true
+            }.getOrDefault(false)
+
+            postIfAlive {
+                showShortToast(
+                    if (deleted) "Deleted $name"
+                    else "Failed to delete $name"
+                )
+                if (deleted) onComplete()
+            }
+        }
+
+        if (!submitted) {
+            showShortToast("Unable to start profile deletion")
+        }
     }
 
     fun requestMasterBackupExport() {

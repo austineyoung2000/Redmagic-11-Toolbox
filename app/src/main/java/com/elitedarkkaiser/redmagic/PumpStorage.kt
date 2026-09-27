@@ -31,19 +31,19 @@ fun savePumpStateStorage(context: Context, enabled: Boolean, profile: String) {
         .edit()
         .putBoolean(AppPrefs.PUMP_ENABLED, enabled)
         .putString(AppPrefs.PUMP_PROFILE, profile)
-        .commit()
+        .apply()
 }
 
 fun setPumpExperimentalAcceptedStorage(context: Context, accepted: Boolean) {
     context.getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
         .edit()
         .putBoolean(AppPrefs.PUMP_EXPERIMENTAL_ACCEPTED, accepted)
-        .commit()
+        .apply()
 }
 
 fun saveAutoPumpStateStorage(context: Context, enabled: Boolean) {
     context.getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
         .edit()
         .putBoolean(AppPrefs.AUTO_PUMP_ENABLED, enabled)
-        .commit()
+        .apply()
 }

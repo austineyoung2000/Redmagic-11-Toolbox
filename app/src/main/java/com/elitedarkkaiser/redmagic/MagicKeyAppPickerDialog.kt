@@ -36,7 +36,8 @@ internal object MagicKeyAppPickerDialog {
         val dp: (Int) -> Int,
         val roundedBg: (Int, Int, Int) -> Drawable,
         val roundedFill: (Int, Int) -> Drawable,
-        val space: (Int) -> View
+        val space: (Int) -> View,
+        val runBackground: (() -> Unit) -> Boolean
     )
 
     data class MagicKeyAppItem(
@@ -66,7 +67,7 @@ internal object MagicKeyAppPickerDialog {
         targetButton.isEnabled = false
         targetButton.text = "MAGIC KEY APP: Loading…"
 
-        Thread({
+        val submitted = deps.runBackground {
             val result = runCatching {
                 loadLaunchableApps(activity)
             }
@@ -125,9 +126,15 @@ internal object MagicKeyAppPickerDialog {
                     ).show()
                 }
             }
-        }, "RedMagicMagicKeyApps").apply {
-            priority = Thread.NORM_PRIORITY - 1
-            start()
+        }
+
+        if (!submitted) {
+            restoreTargetButton(activity, targetButton)
+            Toast.makeText(
+                activity,
+                "Unable to start installed-app scan",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -139,7 +146,7 @@ internal object MagicKeyAppPickerDialog {
         deps: Deps,
         onSelected: (MagicKeyAppItem) -> Unit
     ) {
-        Thread({
+        val submitted = deps.runBackground {
             val result = runCatching {
                 loadLaunchableApps(activity)
             }
@@ -183,9 +190,14 @@ internal object MagicKeyAppPickerDialog {
                     ).show()
                 }
             }
-        }, "RedMagicSliderApps").apply {
-            priority = Thread.NORM_PRIORITY - 1
-            start()
+        }
+
+        if (!submitted) {
+            Toast.makeText(
+                activity,
+                "Unable to start installed-app scan",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 

@@ -1,6 +1,5 @@
 package com.elitedarkkaiser.redmagic
 
-import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -514,237 +513,33 @@ internal object GameModeUi {
         var gmShoulderLedEffect = current.shoulderLedEffect
         var gmShoulderLedColor = current.shoulderLedColor
 
-        val logoLabel = TextView(activity).apply {
-            text = "Logo LED"
-            textSize = 13f
-            setTextColor(deps.textSecondary)
-            setPadding(0, deps.dp(12), 0, deps.dp(6))
-        }
+        GameModeLedZoneUi.create(
+            activity = activity,
+            deps = deps,
+            title = "Logo LED",
+            enableLabel = "Enable logo LED",
+            initialEnabled = gmLogoLedEnabled,
+            initialEffect = gmLogoLedEffect,
+            initialColor = gmLogoLedColor,
+            shoulderZone = false,
+            onEnabledChanged = { gmLogoLedEnabled = it },
+            onEffectChanged = { gmLogoLedEffect = it },
+            onColorChanged = { gmLogoLedColor = it }
+        ).forEach(container::addView)
 
-        val logoEnable = MaterialCheckBox(activity).apply {
-            text = "Enable logo LED"
-            isChecked = gmLogoLedEnabled
-            setTextColor(deps.textPrimary)
-            buttonTintList = ColorStateList.valueOf(deps.accent)
-            setOnCheckedChangeListener { _, checked ->
-                gmLogoLedEnabled = checked
-            }
-        }
-
-        val logoEffectRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        lateinit var logoSteadyBtn: Button
-        lateinit var logoBreatheBtn: Button
-        lateinit var logoFlashingBtn: Button
-        lateinit var logoRapidBtn: Button
-
-        fun refreshLogoEffectButtons() {
-            GameModeActions.refreshLedEffectButtons(
-                selectedEffect = gmLogoLedEffect,
-                steadyBtn = logoSteadyBtn,
-                breatheBtn = logoBreatheBtn,
-                flashingBtn = logoFlashingBtn,
-                rapidBtn = logoRapidBtn,
-                roundedFill = deps.roundedFill,
-                selectedColor = deps.panelPressed,
-                unselectedColor = deps.panelColor
-            )
-        }
-
-        fun logoBtn(label: String, value: String): Button {
-            return deps.filterChip(label, gmLogoLedEffect == value) {
-                GameModeActions.updateLogoLedEffect(
-                    value = value,
-                    onEffectChanged = { newValue -> gmLogoLedEffect = newValue }
-                )
-                refreshLogoEffectButtons()
-            }
-        }
-
-        logoSteadyBtn = logoBtn("Steady", "steady")
-        logoBreatheBtn = logoBtn("Breathe", "breathe")
-        logoFlashingBtn = logoBtn("Flashing", "flashing")
-        logoRapidBtn = logoBtn("Rapid", "rapid")
-
-        logoEffectRow.addView(logoSteadyBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-        logoEffectRow.addView(deps.space(deps.dp(8)))
-        logoEffectRow.addView(logoBreatheBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-        logoEffectRow.addView(deps.space(deps.dp(8)))
-        logoEffectRow.addView(logoFlashingBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-        logoEffectRow.addView(deps.space(deps.dp(8)))
-        logoEffectRow.addView(logoRapidBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-
-        lateinit var logoColorRow: LinearLayout
-        lateinit var logoColorRow2: LinearLayout
-
-        fun refreshLogoColorDots() {
-            logoColorRow.getChildAt(0).background = deps.colorDotDrawable("#FF0000", gmLogoLedColor == 1)
-            logoColorRow.getChildAt(2).background = deps.colorDotDrawable("#FF8C00", gmLogoLedColor == 3)
-            logoColorRow.getChildAt(4).background = deps.colorDotDrawable("#FFD600", gmLogoLedColor == 4)
-            logoColorRow.getChildAt(6).background = deps.colorDotDrawable("#00E676", gmLogoLedColor == 5)
-            logoColorRow2.getChildAt(0).background = deps.colorDotDrawable("#00E5FF", gmLogoLedColor == 6)
-            logoColorRow2.getChildAt(2).background = deps.colorDotDrawable("#1565FF", gmLogoLedColor == 7)
-            logoColorRow2.getChildAt(4).background = deps.colorDotDrawable("#A020F0", gmLogoLedColor == 8)
-            logoColorRow2.getChildAt(6).background = deps.colorDotDrawable("#FF69B4", gmLogoLedColor == 9)
-        }
-
-        fun logoDot(id: Int, hex: String): View {
-            return deps.colorDotGeneric(hex, gmLogoLedColor == id) {
-                GameModeActions.updateLogoLedColor(
-                    id = id,
-                    onColorChanged = { newColor -> gmLogoLedColor = newColor },
-                    refreshColorDots = { refreshLogoColorDots() }
-                )
-            }
-        }
-
-        logoColorRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, deps.dp(10), 0, 0)
-            addView(logoDot(1, "#FF0000"))
-            addView(deps.space(deps.dp(10)))
-            addView(logoDot(3, "#FF8C00"))
-            addView(deps.space(deps.dp(10)))
-            addView(logoDot(4, "#FFD600"))
-            addView(deps.space(deps.dp(10)))
-            addView(logoDot(5, "#00E676"))
-        }
-
-        logoColorRow2 = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, deps.dp(10), 0, 0)
-            addView(logoDot(6, "#00E5FF"))
-            addView(deps.space(deps.dp(10)))
-            addView(logoDot(7, "#1565FF"))
-            addView(deps.space(deps.dp(10)))
-            addView(logoDot(8, "#A020F0"))
-            addView(deps.space(deps.dp(10)))
-            addView(logoDot(9, "#FF69B4"))
-        }
-
-        container.addView(logoLabel)
-        container.addView(logoEnable)
-        container.addView(logoEffectRow)
-        container.addView(logoColorRow)
-        container.addView(logoColorRow2)
-
-        val shoulderLabel = TextView(activity).apply {
-            text = "Shoulder LEDs"
-            textSize = 13f
-            setTextColor(deps.textSecondary)
-            setPadding(0, deps.dp(12), 0, deps.dp(6))
-        }
-
-        val shoulderEnable = MaterialCheckBox(activity).apply {
-            text = "Enable shoulder LEDs"
-            isChecked = gmShoulderLedEnabled
-            textSize = 14f
-            setTextColor(deps.textPrimary)
-            buttonTintList = ColorStateList.valueOf(deps.accent)
-            setOnCheckedChangeListener { _, checked ->
-                gmShoulderLedEnabled = checked
-            }
-        }
-
-        lateinit var shoulderSteadyBtn: Button
-        lateinit var shoulderBreatheBtn: Button
-        lateinit var shoulderFlashingBtn: Button
-        lateinit var shoulderRapidBtn: Button
-
-        fun refreshShoulderEffectButtons() {
-            GameModeActions.refreshShoulderEffectButtons(
-                selectedEffect = gmShoulderLedEffect,
-                steadyBtn = shoulderSteadyBtn,
-                breatheBtn = shoulderBreatheBtn,
-                flashingBtn = shoulderFlashingBtn,
-                rapidBtn = shoulderRapidBtn,
-                roundedFill = deps.roundedFill,
-                selectedColor = deps.panelPressed,
-                unselectedColor = deps.panelColor
-            )
-        }
-
-        fun gmShoulderEffectBtn(label: String, value: String): Button {
-            return deps.filterChip(label, gmShoulderLedEffect == value) {
-                GameModeActions.updateShoulderLedEffect(
-                    value = value,
-                    onEffectChanged = { newValue -> gmShoulderLedEffect = newValue },
-                    refreshButtons = { refreshShoulderEffectButtons() }
-                )
-            }
-        }
-
-        val shoulderEffectRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        shoulderSteadyBtn = gmShoulderEffectBtn("Steady", "steady")
-        shoulderBreatheBtn = gmShoulderEffectBtn("Breathe", "breathe")
-        shoulderFlashingBtn = gmShoulderEffectBtn("Flashing", "flashing")
-        shoulderRapidBtn = gmShoulderEffectBtn("Rapid", "rapid")
-        shoulderEffectRow.addView(shoulderSteadyBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-        shoulderEffectRow.addView(deps.space(deps.dp(8)))
-        shoulderEffectRow.addView(shoulderBreatheBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-        shoulderEffectRow.addView(deps.space(deps.dp(8)))
-        shoulderEffectRow.addView(shoulderFlashingBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-        shoulderEffectRow.addView(deps.space(deps.dp(8)))
-        shoulderEffectRow.addView(shoulderRapidBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
-
-        lateinit var shoulderColorRow: LinearLayout
-        lateinit var shoulderColorRow2: LinearLayout
-
-        fun refreshShoulderColorDots() {
-            shoulderColorRow.getChildAt(0).background = deps.colorDotDrawable("#FF0000", gmShoulderLedColor == 1)
-            shoulderColorRow.getChildAt(2).background = deps.colorDotDrawable("#FF8C00", gmShoulderLedColor == 3)
-            shoulderColorRow.getChildAt(4).background = deps.colorDotDrawable("#FFD600", gmShoulderLedColor == 4)
-            shoulderColorRow.getChildAt(6).background = deps.colorDotDrawable("#00E676", gmShoulderLedColor == 5)
-            shoulderColorRow2.getChildAt(0).background = deps.colorDotDrawable("#00E5FF", gmShoulderLedColor == 6)
-            shoulderColorRow2.getChildAt(2).background = deps.colorDotDrawable("#1565FF", gmShoulderLedColor == 7)
-            shoulderColorRow2.getChildAt(4).background = deps.colorDotDrawable("#A020F0", gmShoulderLedColor == 8)
-            shoulderColorRow2.getChildAt(6).background = deps.colorDotDrawable("#FF69B4", gmShoulderLedColor == 9)
-        }
-
-        fun gmShoulderColorDot(id: Int, hex: String): View {
-            return deps.colorDotGeneric(hex, gmShoulderLedColor == id) {
-                GameModeActions.updateShoulderLedColor(
-                    id = id,
-                    onColorChanged = { newColor -> gmShoulderLedColor = newColor },
-                    refreshColorDots = { refreshShoulderColorDots() }
-                )
-            }
-        }
-
-        shoulderColorRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, deps.dp(10), 0, 0)
-            addView(gmShoulderColorDot(1, "#FF0000"))
-            addView(deps.space(deps.dp(10)))
-            addView(gmShoulderColorDot(3, "#FF8C00"))
-            addView(deps.space(deps.dp(10)))
-            addView(gmShoulderColorDot(4, "#FFD600"))
-            addView(deps.space(deps.dp(10)))
-            addView(gmShoulderColorDot(5, "#00E676"))
-        }
-
-        shoulderColorRow2 = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, deps.dp(10), 0, 0)
-            addView(gmShoulderColorDot(6, "#00E5FF"))
-            addView(deps.space(deps.dp(10)))
-            addView(gmShoulderColorDot(7, "#1565FF"))
-            addView(deps.space(deps.dp(10)))
-            addView(gmShoulderColorDot(8, "#A020F0"))
-            addView(deps.space(deps.dp(10)))
-            addView(gmShoulderColorDot(9, "#FF69B4"))
-        }
-
-        container.addView(shoulderLabel)
-        container.addView(shoulderEnable)
-        container.addView(shoulderEffectRow)
-        container.addView(shoulderColorRow)
-        container.addView(shoulderColorRow2)
+        GameModeLedZoneUi.create(
+            activity = activity,
+            deps = deps,
+            title = "Shoulder LEDs",
+            enableLabel = "Enable shoulder LEDs",
+            initialEnabled = gmShoulderLedEnabled,
+            initialEffect = gmShoulderLedEffect,
+            initialColor = gmShoulderLedColor,
+            shoulderZone = true,
+            onEnabledChanged = { gmShoulderLedEnabled = it },
+            onEffectChanged = { gmShoulderLedEffect = it },
+            onColorChanged = { gmShoulderLedColor = it }
+        ).forEach(container::addView)
 
         container.addView(buttonRow)
 
@@ -752,10 +547,6 @@ internal object GameModeUi {
         refreshLedEffectButtons()
         refreshLedColorDots()
         refreshPresetBubbles()
-        refreshLogoEffectButtons()
-        refreshLogoColorDots()
-        refreshShoulderEffectButtons()
-        refreshShoulderColorDots()
 
         val dialog = MaterialAlertDialogBuilder(activity)
             .setView(scroll)

@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import java.util.concurrent.atomic.AtomicBoolean
 
 class GameModeService : Service() {
 
@@ -31,6 +32,7 @@ class GameModeService : Service() {
     private val foregroundDebounceMs = 1_500L
 
     private var pendingForegroundPackage: String? = null
+    private val stopping = AtomicBoolean(false)
 
     private val foregroundPackageRunnable = Runnable {
         val pkg = pendingForegroundPackage
@@ -46,6 +48,10 @@ class GameModeService : Service() {
             val action = intent.action
 
             handler.post {
+                if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
+                    return@post
+                }
+
                 when (action) {
                     Intent.ACTION_SCREEN_OFF -> {
                         pollingPausedForScreenOff = true
@@ -55,13 +61,15 @@ class GameModeService : Service() {
                         )
                         pendingForegroundPackage = null
 
-                        if (gameModeActiveFor != null) {
-                            restoreNormalProfile()
-                            setGameModeLedOverrideActiveStorage(
-                                this@GameModeService,
-                                false
+                        if (GameModeLifecyclePolicy.needsRestore(
+                                activePackage = gameModeActiveFor,
+                                ledOverrideActive =
+                                    isGameModeLedOverrideActiveStorage(
+                                        this@GameModeService
+                                    )
                             )
-                            gameModeActiveFor = null
+                        ) {
+                            restoreAndClear("screen off")
                         }
 
                         android.util.Log.i(
@@ -86,6 +94,8 @@ class GameModeService : Service() {
 
     private val pollRunnable = object : Runnable {
         override fun run() {
+            if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) return
+
             try {
                 val currentPkg = getForegroundPackageName()
                 val tracked = getSavedGamePackagesStorage(this@GameModeService)
@@ -103,8 +113,7 @@ class GameModeService : Service() {
                     }
                 } else if (!currentPkg.isNullOrBlank()) {
                     if (gameModeActiveFor != null) {
-                        restoreNormalProfile()
-                        gameModeActiveFor = null
+                        restoreAndClear("foreground app changed")
                     }
                     stopSelf()
                 } else if (gameModeActiveFor == null) {
@@ -112,7 +121,13 @@ class GameModeService : Service() {
                 }
             } catch (_: Throwable) {
             } finally {
-                if (!pollingPausedForScreenOff && gameModeActiveFor != null) {
+                if (
+                    GameModeLifecyclePolicy.acceptsWork(
+                        stopping = stopping.get(),
+                        pausedForScreenOff = pollingPausedForScreenOff
+                    ) &&
+                    gameModeActiveFor != null
+                ) {
                     handler.postDelayed(this, activeGamePollMs)
                 }
             }
@@ -131,6 +146,9 @@ class GameModeService : Service() {
         handler = Handler(workerThread.looper)
 
         handler.post {
+            if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
+                return@post
+            }
             ChargingLedRecovery.repairStaleChargingOwnership(
                 this@GameModeService
             )
@@ -166,6 +184,10 @@ class GameModeService : Service() {
             ) == true
 
         handler.post {
+            if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
+                return@post
+            }
+
             when {
                 applySavedProfile -> {
                     applySavedProfileNow()
@@ -221,6 +243,8 @@ class GameModeService : Service() {
     private fun scheduleForegroundPackage(
         currentPkg: String
     ) {
+        if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) return
+
         pendingForegroundPackage = currentPkg
 
         handler.removeCallbacks(
@@ -235,19 +259,24 @@ class GameModeService : Service() {
     private fun handleForegroundPackageNow(
         currentPkg: String
     ) {
-        if (pollingPausedForScreenOff) return
+        if (
+            !GameModeLifecyclePolicy.acceptsWork(
+                stopping = stopping.get(),
+                pausedForScreenOff = pollingPausedForScreenOff
+            )
+        ) return
 
         val tracked = getSavedGamePackagesStorage(this)
         handler.removeCallbacks(pollRunnable)
 
         if (!tracked.contains(currentPkg)) {
-            if (
-                gameModeActiveFor != null ||
-                isGameModeLedOverrideActiveStorage(this)
+            if (GameModeLifecyclePolicy.needsRestore(
+                    activePackage = gameModeActiveFor,
+                    ledOverrideActive =
+                        isGameModeLedOverrideActiveStorage(this)
+                )
             ) {
-                restoreNormalProfile()
-                setGameModeLedOverrideActiveStorage(this, false)
-                gameModeActiveFor = null
+                restoreAndClear("left tracked game")
 
                 android.util.Log.i(
                     "RedmagicGameMode",
@@ -274,6 +303,11 @@ class GameModeService : Service() {
     }
 
     override fun onDestroy() {
+        if (!stopping.compareAndSet(false, true)) {
+            super.onDestroy()
+            return
+        }
+
         handler.removeCallbacks(pollRunnable)
         handler.removeCallbacks(
             foregroundPackageRunnable
@@ -284,16 +318,19 @@ class GameModeService : Service() {
             unregisterReceiver(screenReceiver)
         }
 
-        val cleanupPosted = handler.post {
+        val cleanupPosted = handler.postAtFrontOfQueue {
             handler.removeCallbacks(pollRunnable)
+            handler.removeCallbacks(foregroundPackageRunnable)
 
-            if (gameModeActiveFor != null) {
-                restoreNormalProfile()
-                setGameModeLedOverrideActiveStorage(
-                    this@GameModeService,
-                    false
+            if (GameModeLifecyclePolicy.needsRestore(
+                    activePackage = gameModeActiveFor,
+                    ledOverrideActive =
+                        isGameModeLedOverrideActiveStorage(
+                            this@GameModeService
+                        )
                 )
-                gameModeActiveFor = null
+            ) {
+                restoreAndClear("service destroyed")
             }
 
             workerThread.quitSafely()
@@ -307,6 +344,33 @@ class GameModeService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun restoreAndClear(reason: String) {
+        val activePackage = gameModeActiveFor
+        val overrideActive = isGameModeLedOverrideActiveStorage(this)
+
+        if (!GameModeLifecyclePolicy.needsRestore(
+                activePackage = activePackage,
+                ledOverrideActive = overrideActive
+            )
+        ) return
+
+        /* Clear ownership before restoring so re-entrant cleanup cannot run
+         * the same hardware restoration twice. */
+        gameModeActiveFor = null
+        gameModeApplyPendingFor = null
+
+        runCatching {
+            restoreNormalProfile()
+        }.onFailure { error ->
+            android.util.Log.e(
+                "RedmagicGameMode",
+                "Failed to restore after $reason for " +
+                    (activePackage ?: "stale LED override"),
+                error
+            )
+        }
+    }
 
     private fun getForegroundPackageName(): String? {
         val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager

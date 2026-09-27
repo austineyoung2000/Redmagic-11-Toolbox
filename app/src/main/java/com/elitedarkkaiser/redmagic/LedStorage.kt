@@ -19,7 +19,7 @@ fun saveFanLedStateStorage(context: Context, state: LedState) {
         .putBoolean(AppPrefs.FAN_LED_ENABLED, state.enabled)
         .putString(AppPrefs.FAN_LED_EFFECT, state.effect)
         .putInt(AppPrefs.FAN_LED_COLOR, state.color)
-        .commit()
+        .apply()
 }
 
 fun savedLogoLedStateStorage(context: Context): LedState {
@@ -37,7 +37,7 @@ fun saveLogoLedStateStorage(context: Context, state: LedState) {
         .putBoolean(AppPrefs.LOGO_LED_ENABLED, state.enabled)
         .putString(AppPrefs.LOGO_LED_EFFECT, state.effect)
         .putInt(AppPrefs.LOGO_LED_COLOR, state.color)
-        .commit()
+        .apply()
 }
 
 fun savedShoulderLedStateStorage(context: Context): LedState {
@@ -55,5 +55,5 @@ fun saveShoulderLedStateStorage(context: Context, state: LedState) {
         .putBoolean(AppPrefs.SHOULDER_LED_ENABLED, state.enabled)
         .putString(AppPrefs.SHOULDER_LED_EFFECT, state.effect)
         .putInt(AppPrefs.SHOULDER_LED_COLOR, state.color)
-        .commit()
+        .apply()
 }

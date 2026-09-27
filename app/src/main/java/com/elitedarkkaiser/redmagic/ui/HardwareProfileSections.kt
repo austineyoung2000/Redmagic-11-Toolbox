@@ -34,60 +34,76 @@ internal object HardwareProfileSections {
                 orientation = LinearLayout.VERTICAL
                 setPadding(0, deps.dp(10), 0, 0)
             }
+            var renderGeneration = 0
 
             fun renderProfiles() {
+                renderGeneration += 1
+                val generation = renderGeneration
                 profileList.removeAllViews()
-                val profiles = deps.loadMasterProfiles()
+                profileList.addView(
+                    deps.subtleLabel("Loading master profiles…")
+                )
 
-                if (profiles.isEmpty()) {
-                    profileList.addView(
-                        deps.subtleLabel("No saved master profiles yet")
-                    )
-                    return
-                }
-
-                profiles.forEach { profile ->
-                    val row = LinearLayout(activity).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        gravity = Gravity.CENTER_VERTICAL
-                    }
-                    val applyButton = deps.actionButton(
-                        profile.name,
-                        false
-                    ) {
-                        deps.applyMasterProfile(profile)
-                    }.apply {
-                        setPadding(
-                            deps.dp(16),
-                            deps.dp(10),
-                            deps.dp(16),
-                            deps.dp(10)
-                        )
-                    }
-                    val deleteButton = deps.actionButton("DEL", true) {
-                        deps.deleteMasterProfile(profile.name)
-                        renderProfiles()
-                    }.apply {
-                        setPadding(
-                            deps.dp(14),
-                            deps.dp(10),
-                            deps.dp(14),
-                            deps.dp(10)
-                        )
+                deps.loadMasterProfiles profileLoad@ { profiles ->
+                    if (generation != renderGeneration) {
+                        return@profileLoad
                     }
 
-                    row.addView(
-                        applyButton,
-                        LinearLayout.LayoutParams(
-                            0,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            1f
+                    profileList.removeAllViews()
+
+                    if (profiles.isEmpty()) {
+                        profileList.addView(
+                            deps.subtleLabel(
+                                "No saved master profiles yet"
+                            )
                         )
-                    )
-                    row.addView(deps.space(deps.dp(8)))
-                    row.addView(deleteButton)
-                    profileList.addView(row)
-                    profileList.addView(deps.space(deps.dp(10)))
+                        return@profileLoad
+                    }
+
+                    profiles.forEach { profile ->
+                        val row = LinearLayout(activity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                        }
+                        val applyButton = deps.actionButton(
+                            profile.name,
+                            false
+                        ) {
+                            deps.applyMasterProfile(profile)
+                        }.apply {
+                            setPadding(
+                                deps.dp(16),
+                                deps.dp(10),
+                                deps.dp(16),
+                                deps.dp(10)
+                            )
+                        }
+                        val deleteButton = deps.actionButton("DEL", true) {
+                            deps.deleteMasterProfile(profile.name) {
+                                renderProfiles()
+                            }
+                        }.apply {
+                            setPadding(
+                                deps.dp(14),
+                                deps.dp(10),
+                                deps.dp(14),
+                                deps.dp(10)
+                            )
+                        }
+
+                        row.addView(
+                            applyButton,
+                            LinearLayout.LayoutParams(
+                                0,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                1f
+                            )
+                        )
+                        row.addView(deps.space(deps.dp(8)))
+                        row.addView(deleteButton)
+                        profileList.addView(row)
+                        profileList.addView(deps.space(deps.dp(10)))
+                    }
                 }
             }
 

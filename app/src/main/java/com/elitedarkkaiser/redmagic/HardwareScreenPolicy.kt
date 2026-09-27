@@ -43,7 +43,11 @@ object HardwareScreenPolicy {
         return true
     }
 
-    fun blockCoolingWhileScreenOffUnlessHot(context: Context, reason: String): Boolean {
+    @Synchronized
+    fun blockCoolingWhileScreenOffUnlessHot(
+        context: Context,
+        reason: String
+    ): Boolean {
         if (isScreenInteractive(context)) {
             screenOffShutdownApplied = false
             return false

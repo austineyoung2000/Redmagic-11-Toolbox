@@ -1,8 +1,16 @@
 package com.elitedarkkaiser.redmagic
 
 import android.content.Context
+import java.util.concurrent.Executors
 
 object DeviceScanActions {
+    private val requests = SingleFlightQueue<DeviceCapabilities>()
+    private val executor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "RedMagicCapabilityScan").apply {
+            priority = Thread.NORM_PRIORITY - 1
+        }
+    }
+
     fun runBackgroundScan(
         context: Context,
         force: Boolean = false,
@@ -20,18 +28,25 @@ object DeviceScanActions {
             return
         }
 
-        Thread {
-            val report = DeviceCapabilityScanner.scan(
-                context.applicationContext
-            )
-            saveDeviceCapabilityReportStorage(context, report)
-            onComplete?.invoke(
-                report.toDeviceCapabilities()
-            )
-        }.apply {
-            name = "RedMagicCapabilityScan"
-            priority = Thread.NORM_PRIORITY - 1
-            start()
+        if (!requests.joinOrStart(onComplete)) {
+            return
+        }
+
+        val appContext = context.applicationContext
+        executor.execute {
+            val capabilities = runCatching {
+                DeviceCapabilityScanner.scan(appContext).also { report ->
+                    saveDeviceCapabilityReportStorage(appContext, report)
+                }.toDeviceCapabilities()
+            }.getOrElse {
+                runCatching {
+                    deviceCapabilitiesStorage(appContext)
+                }.getOrDefault(DeviceCapabilities.unknown())
+            }
+
+            requests.complete(capabilities).forEach { callback ->
+                runCatching { callback(capabilities) }
+            }
         }
     }
 }
