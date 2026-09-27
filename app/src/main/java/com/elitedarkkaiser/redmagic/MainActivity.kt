@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -137,12 +136,12 @@ class MainActivity : Activity() {
             runBackground = { task ->
                 submitBackgroundTask(task)
             },
-            dp = { value -> dp(value) },
+            dp = { value -> mainUiKit.dp(value) },
             filterChip = { label, selected, onClick ->
-                filterChip(label, selected, onClick)
+                ledControlViews.filterChip(label, selected, onClick)
             },
             updateSelectableButton = { button, selected ->
-                updateSelectableButton(button, selected)
+                mainUiKit.updateSelectableButton(button, selected)
             },
             onAllLedStateApplied = { effect, color ->
                 fanLedEnabled = true
@@ -401,14 +400,14 @@ class MainActivity : Activity() {
             panelColor = panelColor,
             borderColor = borderColor,
             typeface = typeface,
-            dp = { value -> dp(value) },
+            dp = { value -> mainUiKit.dp(value) },
             roundedBg = { fill, stroke, radius ->
-                roundedBg(fill, stroke, radius)
+                mainUiKit.roundedBg(fill, stroke, radius)
             },
             roundedFill = { color, radius ->
-                roundedFill(color, radius)
+                mainUiKit.roundedFill(color, radius)
             },
-            space = { value -> space(value) }
+            space = { value -> mainUiKit.space(value) }
         )
 
     private fun showSliderDualAppDialog(targetButton: Button) {
@@ -580,10 +579,10 @@ class MainActivity : Activity() {
                 borderColor = borderColor,
                 panelPressed = panelPressed,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                space = { value -> space(value) }
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                space = { value -> mainUiKit.space(value) }
             )
         )
     }
@@ -600,9 +599,9 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) }
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) }
             )
         )
     }
@@ -622,12 +621,12 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
+                dp = { value -> mainUiKit.dp(value) },
                 roundedBg = { fill, stroke, radius ->
-                    roundedBg(fill, stroke, radius)
+                    mainUiKit.roundedBg(fill, stroke, radius)
                 },
                 roundedFill = { color, radius ->
-                    roundedFill(color, radius)
+                    mainUiKit.roundedFill(color, radius)
                 }
             )
         )
@@ -684,9 +683,9 @@ class MainActivity : Activity() {
 
         val result = MainUiLauncher.launch(
             activity = this,
-            topInset = getStatusBarHeight(),
+            topInset = mainUiKit.getStatusBarHeight(),
             bgColor = bgColor,
-            dp = { value -> dp(value) },
+            dp = { value -> mainUiKit.dp(value) },
             createHomeTab = { createHomeTab() },
             createCoolingTab = { createCoolingTab() },
             createControlsTab = { createControlsTab() },
@@ -794,20 +793,20 @@ class MainActivity : Activity() {
     private fun createHomeTab(): LinearLayout {
         val result = com.elitedarkkaiser.redmagic.ui.HomeTabUi.create(
             com.elitedarkkaiser.redmagic.ui.HomeTabDeps(
-                scrollTabContainer = { scrollTabContainer() },
-                sectionPanel = { sectionPanel() },
-                sectionHeader = { icon, text -> sectionHeader(icon, text) },
-                subtitleText = { text -> subtitleText(text) },
-                bodyText = { text -> bodyText(text) },
-                ledTitleText = { text -> ledTitleText(text) },
-                infoValue = { infoValue() },
-                infoRow = { label, valueView -> infoRow(label, valueView) },
-                statusChip = { text -> statusChip(text) },
-                actionButton = { text, isDanger, onClick -> actionButton(text, isDanger, onClick) },
-                singleRow = { button -> singleRow(button) },
-                segmentedChip = { label, selected, onClick -> segmentedChip(label, selected, onClick) },
-                space = { width -> space(width) },
-                dp = { value -> dp(value) },
+                scrollTabContainer = { mainUiKit.scrollTabContainer() },
+                sectionPanel = { mainUiKit.sectionPanel() },
+                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
+                subtitleText = { text -> mainUiKit.subtitleText(text) },
+                bodyText = { text -> mainUiKit.bodyText(text) },
+                ledTitleText = { text -> mainUiKit.ledTitleText(text) },
+                infoValue = { mainUiKit.infoValue() },
+                infoRow = { label, valueView -> mainUiKit.infoRow(label, valueView) },
+                statusChip = { text -> mainUiKit.statusChip(text) },
+                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
+                singleRow = { button -> mainUiKit.singleRow(button) },
+                segmentedChip = { label, selected, onClick -> mainUiKit.segmentedChip(label, selected, onClick) },
+                space = { width -> mainUiKit.space(width) },
+                dp = { value -> mainUiKit.dp(value) },
                 runBackground = { task ->
                     submitBackgroundTask(task)
                 },
@@ -851,22 +850,22 @@ class MainActivity : Activity() {
 
     private fun coolingTabDeps(): com.elitedarkkaiser.redmagic.ui.CoolingTabDeps {
         return com.elitedarkkaiser.redmagic.ui.CoolingTabDeps(
-                scrollTabContainer = { scrollTabContainer() },
-                sectionPanel = { sectionPanel() },
-                sectionHeader = { icon, text -> sectionHeader(icon, text) },
-                subtleLabel = { text -> subtleLabel(text) },
-                bodyText = { text -> bodyText(text) },
-                segmentedChip = { label, selected, onClick -> segmentedChip(label, selected, onClick) },
+                scrollTabContainer = { mainUiKit.scrollTabContainer() },
+                sectionPanel = { mainUiKit.sectionPanel() },
+                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
+                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
+                bodyText = { text -> mainUiKit.bodyText(text) },
+                segmentedChip = { label, selected, onClick -> mainUiKit.segmentedChip(label, selected, onClick) },
                 updateSelectableButton = { button, selected ->
-                    updateSelectableButton(button, selected)
+                    mainUiKit.updateSelectableButton(button, selected)
                 },
-                actionButton = { text, isDanger, onClick -> actionButton(text, isDanger, onClick) },
-                row = { left, right -> row(left, right) },
-                singleRow = { button -> singleRow(button) },
-                space = { width -> space(width) },
-                spacer = { height -> spacer(height) },
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radiusDp -> roundedBg(fill, stroke, radiusDp) },
+                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
+                row = { left, right -> mainUiKit.row(left, right) },
+                singleRow = { button -> mainUiKit.singleRow(button) },
+                space = { width -> mainUiKit.space(width) },
+                spacer = { height -> mainUiKit.spacer(height) },
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radiusDp -> mainUiKit.roundedBg(fill, stroke, radiusDp) },
                 runBackground = { task ->
                     submitBackgroundTask(task)
                 },
@@ -975,19 +974,19 @@ class MainActivity : Activity() {
         val result = com.elitedarkkaiser.redmagic.ui.ControlsTabUi.create(
             this,
             com.elitedarkkaiser.redmagic.ui.ControlsTabDeps(
-                scrollTabContainer = { scrollTabContainer() },
-                sectionPanel = { sectionPanel() },
-                sectionHeader = { icon, text -> sectionHeader(icon, text) },
-                bodyText = { text -> bodyText(text) },
-                subtleLabel = { text -> subtleLabel(text) },
-                actionButton = { text, isDanger, onClick -> actionButton(text, isDanger, onClick) },
-                smallActionButton = { text, isDanger, onClick -> smallActionButton(text, isDanger, onClick) },
-                singleRow = { button -> singleRow(button) },
-                row = { left, right -> row(left, right) },
-                flowRow = { views -> flowRow(*views) },
-                space = { width -> space(width) },
-                spacer = { height -> spacer(height) },
-                dp = { value -> dp(value) },
+                scrollTabContainer = { mainUiKit.scrollTabContainer() },
+                sectionPanel = { mainUiKit.sectionPanel() },
+                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
+                bodyText = { text -> mainUiKit.bodyText(text) },
+                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
+                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
+                smallActionButton = { text, isDanger, onClick -> mainUiKit.smallActionButton(text, isDanger, onClick) },
+                singleRow = { button -> mainUiKit.singleRow(button) },
+                row = { left, right -> mainUiKit.row(left, right) },
+                flowRow = { views -> mainUiKit.flowRow(*views) },
+                space = { width -> mainUiKit.space(width) },
+                spacer = { height -> mainUiKit.spacer(height) },
+                dp = { value -> mainUiKit.dp(value) },
                 runBackground = { task ->
                     submitBackgroundTask(task)
                 },
@@ -1055,16 +1054,16 @@ class MainActivity : Activity() {
         return com.elitedarkkaiser.redmagic.ui.HardwareTabUi.create(
             this,
             com.elitedarkkaiser.redmagic.ui.HardwareTabDeps(
-                scrollTabContainer = { scrollTabContainer() },
-                sectionPanel = { sectionPanel() },
-                sectionHeader = { icon, text -> sectionHeader(icon, text) },
-                bodyText = { text -> bodyText(text) },
-                subtleLabel = { text -> subtleLabel(text) },
-                actionButton = { text, isDanger, onClick -> actionButton(text, isDanger, onClick) },
-                singleRow = { button -> singleRow(button) },
-                row = { left, right -> row(left, right) },
-                space = { width -> space(width) },
-                dp = { value -> dp(value) },
+                scrollTabContainer = { mainUiKit.scrollTabContainer() },
+                sectionPanel = { mainUiKit.sectionPanel() },
+                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
+                bodyText = { text -> mainUiKit.bodyText(text) },
+                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
+                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
+                singleRow = { button -> mainUiKit.singleRow(button) },
+                row = { left, right -> mainUiKit.row(left, right) },
+                space = { width -> mainUiKit.space(width) },
+                dp = { value -> mainUiKit.dp(value) },
                 capabilities = deviceCapabilities,
 
                 showTriggerSetupDialog = { showTriggerSetupDialog() },
@@ -1188,22 +1187,22 @@ class MainActivity : Activity() {
         return com.elitedarkkaiser.redmagic.ui.LightingTabUi.create(
             this,
             com.elitedarkkaiser.redmagic.ui.LightingTabDeps(
-                scrollTabContainer = { scrollTabContainer() },
-                sectionPanel = { sectionPanel() },
-                sectionHeader = { icon, text -> sectionHeader(icon, text) },
-                bodyText = { text -> bodyText(text) },
-                subtleLabel = { text -> subtleLabel(text) },
-                infoRow = { label, valueView -> infoRow(label, valueView) },
-                actionButton = { text, isDanger, onClick -> actionButton(text, isDanger, onClick) },
+                scrollTabContainer = { mainUiKit.scrollTabContainer() },
+                sectionPanel = { mainUiKit.sectionPanel() },
+                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
+                bodyText = { text -> mainUiKit.bodyText(text) },
+                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
+                infoRow = { label, valueView -> mainUiKit.infoRow(label, valueView) },
+                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
                 filterChip = { label, selected, onClick ->
-                    filterChip(label, selected, onClick)
+                    ledControlViews.filterChip(label, selected, onClick)
                 },
                 updateSelectableButton = { button, selected ->
-                    updateSelectableButton(button, selected)
+                    mainUiKit.updateSelectableButton(button, selected)
                 },
-                singleRow = { button -> singleRow(button) },
-                row = { left, right -> row(left, right) },
-                dp = { value -> dp(value) },
+                singleRow = { button -> mainUiKit.singleRow(button) },
+                row = { left, right -> mainUiKit.row(left, right) },
+                dp = { value -> mainUiKit.dp(value) },
                 capabilities = deviceCapabilities,
 
                 getRealTimePreviewEnabled = { realTimePreviewEnabled },
@@ -1246,13 +1245,13 @@ class MainActivity : Activity() {
                         panelPressed = panelPressed,
                         accent = accent,
                         typeface = typeface,
-                        dp = { value -> dp(value) },
-                        roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                        roundedFill = { color, radius -> roundedFill(color, radius) },
-                        space = { value -> space(value) },
-                        filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
+                        dp = { value -> mainUiKit.dp(value) },
+                        roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                        roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                        space = { value -> mainUiKit.space(value) },
+                        filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
                         colorDot = { colorId, hex, onClick -> colorDot(colorId, hex, onClick) },
-                        colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) },
+                        colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
                         fanPresetBubble = { c1, c2, c3, c4, presetValue, selected, onClick ->
                             selectedFanPresetBubble(c1, c2, c3, c4, presetValue, selected, onClick)
                         }
@@ -1317,13 +1316,13 @@ class MainActivity : Activity() {
             panelPressed = panelPressed,
             accent = accent,
             typeface = typeface,
-            dp = { value -> dp(value) },
-            roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-            roundedFill = { color, radius -> roundedFill(color, radius) },
-            filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
-            space = { value -> space(value) },
-            colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) },
-            colorDotGeneric = { hex, selected, onClick -> colorDotGeneric(hex, selected, onClick) },
+            dp = { value -> mainUiKit.dp(value) },
+            roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+            roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+            filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
+            space = { value -> mainUiKit.space(value) },
+            colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
+            colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
             fanPresetBubble = { c1, c2, c3, c4, presetValue, selected, onClick ->
                 selectedFanPresetBubble(c1, c2, c3, c4, presetValue, selected, onClick)
             }
@@ -1339,12 +1338,12 @@ class MainActivity : Activity() {
             panelPressed = panelPressed,
             accent = accent,
             typeface = typeface,
-            dp = { value -> dp(value) },
-            roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-            roundedFill = { color, radius -> roundedFill(color, radius) },
-            space = { value -> space(value) },
-            colorDotGeneric = { hex, selected, onClick -> colorDotGeneric(hex, selected, onClick) },
-            colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) },
+            dp = { value -> mainUiKit.dp(value) },
+            roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+            roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+            space = { value -> mainUiKit.space(value) },
+            colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
+            colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
             fanPresetBubble = { h1, h2, h3, h4, value, selected, onClick ->
                 selectedFanPresetBubble(h1, h2, h3, h4, value, selected, onClick)
             }
@@ -1366,10 +1365,10 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                space = { value -> space(value) }
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                space = { value -> mainUiKit.space(value) }
             )
         )
     }
@@ -1387,11 +1386,11 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
+                dp = { value -> mainUiKit.dp(value) },
                 roundedBg = { fill, stroke, radius ->
-                    roundedBg(fill, stroke, radius)
+                    mainUiKit.roundedBg(fill, stroke, radius)
                 },
-                space = { value -> space(value) }
+                space = { value -> mainUiKit.space(value) }
             ),
             onSaved = onSaved
         )
@@ -1409,13 +1408,13 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
-                space = { value -> space(value) },
-                colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) },
-                colorDotGeneric = { hex, selected, onClick -> colorDotGeneric(hex, selected, onClick) },
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
+                space = { value -> mainUiKit.space(value) },
+                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
+                colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
             ),
             onSaveProfile = { profile ->
                 saveGameModeProfileStorage(this, profile)
@@ -1452,11 +1451,11 @@ class MainActivity : Activity() {
                 borderColor = borderColor,
                 panelPressed = panelPressed,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
-                space = { value -> space(value) }
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
+                space = { value -> mainUiKit.space(value) }
             )
         )
     }
@@ -1513,13 +1512,13 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                space = { value -> space(value) },
-                filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
-                colorDotGeneric = { hex, selected, onClick -> colorDotGeneric(hex, selected, onClick) },
-                colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) }
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                space = { value -> mainUiKit.space(value) },
+                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
+                colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
+                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) }
             )
         )
     }
@@ -1576,13 +1575,13 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                space = { value -> space(value) },
-                filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
-                colorDotGeneric = { hex, selected, onClick -> colorDotGeneric(hex, selected, onClick) },
-                colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) }
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                space = { value -> mainUiKit.space(value) },
+                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
+                colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
+                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) }
             )
         )
     }
@@ -1635,13 +1634,13 @@ class MainActivity : Activity() {
                 panelPressed = panelPressed,
                 accent = accent,
                 typeface = typeface,
-                dp = { value -> dp(value) },
-                roundedBg = { fill, stroke, radius -> roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> roundedFill(color, radius) },
-                space = { value -> space(value) },
-                filterChip = { label, selected, onClick -> filterChip(label, selected, onClick) },
+                dp = { value -> mainUiKit.dp(value) },
+                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
+                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
+                space = { value -> mainUiKit.space(value) },
+                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
                 colorDot = { colorId, hex, onClick -> colorDot(colorId, hex, onClick) },
-                colorDotDrawable = { hex, selected -> colorDotDrawable(hex, selected) },
+                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
                 fanPresetBubble = { c1, c2, c3, c4, presetValue, onClick ->
                     fanPresetBubble(c1, c2, c3, c4, presetValue = presetValue, onClick = onClick)
                 }
@@ -1658,16 +1657,6 @@ class MainActivity : Activity() {
             restoreNormalLeds = false
         )
     }
-
-    private fun filterChip(
-        label: String,
-        selected: Boolean,
-        onClick: () -> Unit
-    ): Button = ledControlViews.filterChip(
-        label,
-        selected,
-        onClick
-    )
 
     private fun applyFanPreset(effectValue: String) {
         fanLedEnabled = true
@@ -1727,29 +1716,6 @@ class MainActivity : Activity() {
             onClick = onClick
         )
     }
-
-    private fun colorDotDrawable(
-        hex: String,
-        selected: Boolean
-    ): GradientDrawable {
-        return ledControlViews.colorDotDrawable(
-            hex,
-            selected
-        )
-    }
-
-    private fun colorDotGeneric(
-        hex: String,
-        selected: Boolean,
-        onClick: () -> Unit
-    ): View {
-        return ledControlViews.colorDot(
-            hex,
-            selected,
-            onClick
-        )
-    }
-
 
     private fun refreshCapabilityAwareTabs() {
         if (
@@ -2032,133 +1998,20 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun scrollTabContainer(): LinearLayout =
-        mainUiKit.scrollTabContainer()
-
-    private fun subtitleText(text: String): TextView =
-        mainUiKit.subtitleText(text)
-
-    private fun ledTitleText(text: String): TextView =
-        mainUiKit.ledTitleText(text)
-
-    private fun bodyText(text: String): TextView =
-        mainUiKit.bodyText(text)
-
-    private fun infoRow(
-        label: String,
-        valueView: TextView
-    ): LinearLayout = mainUiKit.infoRow(label, valueView)
-
-    private fun infoValue(): TextView =
-        mainUiKit.infoValue()
-
-    private fun sectionHeader(
-        icon: String,
-        text: String
-    ): LinearLayout = mainUiKit.sectionHeader(icon, text)
-
-    private fun sectionPanel(): LinearLayout =
-        mainUiKit.sectionPanel()
-
-    private fun statusChip(text: String): TextView =
-        mainUiKit.statusChip(text)
-
     private fun setActiveMode(active: Button) {
-        updateSelectableButton(
+        mainUiKit.updateSelectableButton(
             quietCurveButton,
             active === quietCurveButton
         )
-        updateSelectableButton(
+        mainUiKit.updateSelectableButton(
             balancedCurveButton,
             active === balancedCurveButton
         )
-        updateSelectableButton(
+        mainUiKit.updateSelectableButton(
             turboCurveButton,
             active === turboCurveButton
         )
     }
-
-    private fun updateSelectableButton(
-        button: Button,
-        selected: Boolean
-    ) {
-        mainUiKit.updateSelectableButton(button, selected)
-    }
-
-    private fun subtleLabel(text: String): TextView =
-        mainUiKit.subtleLabel(text)
-
-    private fun segmentedChip(
-        label: String,
-        selected: Boolean,
-        onClick: () -> Unit
-    ): Button = mainUiKit.segmentedChip(
-        label,
-        selected,
-        onClick
-    )
-
-    private fun actionButton(
-        text: String,
-        isDanger: Boolean = false,
-        onClick: () -> Unit
-    ): Button = mainUiKit.actionButton(
-        text,
-        isDanger,
-        onClick
-    )
-
-    private fun row(
-        left: Button,
-        right: Button
-    ): LinearLayout = mainUiKit.row(left, right)
-
-    private fun singleRow(button: Button): LinearLayout =
-        mainUiKit.singleRow(button)
-
-    private fun roundedBg(
-        fill: Int,
-        stroke: Int,
-        radiusDp: Int
-    ): GradientDrawable = mainUiKit.roundedBg(
-        fill,
-        stroke,
-        radiusDp
-    )
-
-    private fun roundedFill(
-        fill: Int,
-        radiusDp: Int
-    ): GradientDrawable = mainUiKit.roundedFill(
-        fill,
-        radiusDp
-    )
-
-    private fun space(width: Int): TextView =
-        mainUiKit.space(width)
-
-    private fun spacer(height: Int): TextView =
-        mainUiKit.spacer(height)
-
-    private fun getStatusBarHeight(): Int =
-        mainUiKit.getStatusBarHeight()
-
-    private fun dp(value: Int): Int =
-        mainUiKit.dp(value)
-
-    private fun smallActionButton(
-        label: String,
-        isDanger: Boolean = false,
-        onClick: () -> Unit
-    ): Button = mainUiKit.smallActionButton(
-        label,
-        isDanger,
-        onClick
-    )
-
-    private fun flowRow(vararg views: View): LinearLayout =
-        mainUiKit.flowRow(*views)
-
 
     private fun showGamePickerDialog() {
         showGamePickerDialogUI(this) {
