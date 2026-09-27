@@ -36,6 +36,10 @@ The investigation used locally extracted or device-produced material supplied by
 - `redmagic_tgk_binder_states.txt`
 - Runtime Binder monitoring and direct `service call input` experiments
 - Root-only inspection of the stock Game Space and TGK content providers
+- A device-side native-library capture containing `libandroid_servers.so`,
+  `libinputflinger.so`, `libinputflinger_base.so`, and `libinputreader.so`
+- ELF dependency, dynamic-symbol, and embedded-string inspection of those
+  four libraries
 
 The proprietary firmware archives and APKs are not redistributed in this repository. This document records the interoperability findings and the behavior independently confirmed on owned hardware.
 
@@ -71,6 +75,112 @@ flowchart TD
 ```
 
 The application configures state on foreground entry. It does **not** inject one command for every physical trigger press.
+
+## What the native libraries revealed
+
+The native-library capture located the TGK implementation below the Java
+framework and confirmed that it is integrated into Android's core input
+pipeline. REDMAGIC did not isolate the feature in a small, independently
+loadable library such as `libtgk.so`. Instead, related code and ABI additions
+span four platform libraries:
+
+| Native library | Confirmed TGK responsibility |
+|---|---|
+| `libandroid_servers.so` | Registers the system-server JNI methods for TGK configuration and carries the native callback into Java policy code. |
+| `libinputreader.so` | Contains the large `android::NubiaGamepad` implementation and the `InputReader` entry points that configure and generate virtual touch behavior. |
+| `libinputflinger_base.so` | Adds `NotifyGameKeyActionChangedArgs` and `NotifyMotionCollectionArgs` to the native input-listener event variant. |
+| `libinputflinger.so` | Propagates the added game-key event through the input filter, processor, pointer choreographer, interaction blocker, dispatcher, metrics, and latency layers. |
+
+`libandroid_servers.so` exposes or embeds the JNI registration names used by
+`NativeInputManagerService.NativeImpl`, including:
+
+```text
+releaseTgk
+setConsumeTgkKey
+setLTgkEnabled
+setMTgkEnabled
+setRTgkEnabled
+setTgkMode
+setTgkPoint
+setTgkRapidFireCount
+setTgkVersion
+virtualTouchEvent
+```
+
+It also exports
+`android::NativeInputManager::notifyGameKeyActionChanged(...)`, connecting the
+native trigger state back to the system-server visual-feedback path.
+
+The decisive implementation evidence is in `libinputreader.so`. Its dynamic
+symbols identify `android::NubiaGamepad` and expose substantial routines for:
+
+- Recognizing TGK keys and consuming their physical key events
+- Enabling the left, right, and middle triggers
+- Setting TGK version, point rectangles, behavior mode, and rapid-fire count
+- Generating, clearing, resetting, and repeating virtual-touch events
+- Processing continuous clicks or movement
+- Handling joystick, sensor, camera-key, and casting-related virtual-touch modes
+- Reporting trigger down/up state through `notifyGameKeyActionChanged(...)`
+
+Representative exported functions include
+`NubiaGamepad::virtualTouchEvent(...)`,
+`NubiaGamepad::resetVirtualTouchEvent()`,
+`NubiaGamepad::continuousClicksOrMoveVirtualTouchEvent()`,
+`NubiaGamepad::setTgkPoint(...)`, and `NubiaGamepad::setTgkMode(...)`.
+`InputReader` itself exposes corresponding TGK entry points, demonstrating that
+the controller is integrated with the reader rather than implemented by Game
+Space or by a separate application-facing daemon.
+
+The event ABI is also vendor-modified. `libinputflinger_base.so` adds
+`NotifyGameKeyActionChangedArgs` to the `std::variant` carried by
+`InputListenerInterface`, `QueuedInputListener`, and `TracedInputListener`.
+`libinputflinger.so` then implements matching handlers in `InputFilter`,
+`InputProcessor`, `PointerChoreographer`, `UnwantedInteractionBlocker`, and
+`InputDispatcher`. This native event is the bridge between physical trigger
+state and the framework-owned pressed-target and edge effects.
+
+No captured library declared a dependency on a separate TGK-specific shared
+object. The evidence therefore supports this native path:
+
+```mermaid
+flowchart TD
+    A["Physical L/R key event"] --> B["InputReader"]
+    B --> C["NubiaGamepad controller"]
+    C --> D["Virtual touch in input pipeline"]
+    C --> E["Game-key action event"]
+    E --> F["InputDispatcher and system-server visuals"]
+```
+
+This independently explains both important runtime observations: TGK contacts
+do not appear as new Linux touchscreen slots, and trigger down/up can still
+drive stock visual feedback in system_server.
+
+### Why the stock binaries are not a portable TGK package
+
+Copying these `.so` files into an AOSP or LineageOS build is not a safe shortcut.
+The vendor changed private C++ interfaces and the input-listener event variant,
+so the libraries form a tightly coupled set whose ABI must match the exact
+framework build. Replacing only `libinputreader.so` would leave its required
+listener types and callbacks missing. Replacing the inputflinger libraries as
+a group would still require matching JNI, Java APIs, policy code, resources,
+and device policy. Replacing the much broader `libandroid_servers.so` risks
+breaking unrelated system-server JNI services and can prevent Android from
+booting.
+
+A custom-ROM port should consequently be a source-level, clean-room
+reimplementation of the required subset, not a transplant of proprietary
+stock binaries. The minimum port spans `frameworks/base` and
+`frameworks/native`: the public/system Binder surface, InputManagerService JNI,
+an InputReader-side TGK controller, native event propagation for pressed-state
+feedback, and the relevant device SELinux and product configuration. Preserving
+the confirmed transaction ABI would allow the Toolbox's existing native TGK
+client to operate unchanged.
+
+The symbol coverage makes such a port technically feasible, but it is not a
+short framework patch. A minimal L/R implementation would still be a
+multi-week native-input project, followed by on-device validation of
+multitouch, rotation, simultaneous triggers, rapid fire, lifecycle cleanup,
+visual callbacks, and SELinux policy.
 
 ## Confirmed Binder transaction map
 
@@ -283,6 +393,10 @@ Native TGK depends on more than Java method declarations. A compatible ROM needs
 - Native input implementation and vendor driver behavior
 - REDMAGIC resources used by system visual effects
 - Device nodes, vendor libraries, feature flags, and SELinux policy
+
+Native ELF analysis confirms that these requirements are concrete rather than
+architectural speculation: TGK changes the InputReader implementation, the
+input-listener event ABI, InputDispatcher propagation, and system-server JNI.
 
 An app can detect and call these APIs when they exist, but it cannot recreate the downstream native contact injection on a ROM that removed the firmware implementation. A LineageOS port would need to forward-port or independently reimplement the complete framework/native/vendor path with appropriate legal permission and device-specific validation.
 
