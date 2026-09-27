@@ -1195,6 +1195,9 @@ class MainActivity : Activity() {
                 showRefreshRateProfiles = {
                     RefreshRateProfileDialog.show(this)
                 },
+                showTouchTuningProfiles = {
+                    TouchTuningProfileDialog.show(this)
+                },
 
                 loadMasterProfiles = { MasterProfileStorage.loadProfiles(this) },
                 saveMasterProfile = { name, onComplete ->

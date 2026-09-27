@@ -356,6 +356,49 @@ object HardwareTabUi {
         }
         container.addView(refreshRateCard)
 
+        val touchTuningButton = deps.actionButton(
+            "MANAGE APP TOUCH RESPONSE",
+            false
+        ) {
+            deps.showTouchTuningProfiles()
+        }
+        val touchTuningCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("☝", "GAME TOUCH RESPONSE"))
+            addView(
+                deps.bodyText(
+                    "Configure stock per-app touch sampling, sensitivity, " +
+                        "follow response, stability, and edge mistouch protection."
+                )
+            )
+            addView(deps.space(deps.dp(8)))
+            addView(deps.singleRow(touchTuningButton))
+            addView(deps.space(deps.dp(6)))
+            addView(
+                deps.bodyText(
+                    "The firmware applies saved values as the selected app " +
+                        "enters or leaves the foreground. Direct Android " +
+                        "settings access is tried before the batched root fallback."
+                )
+            )
+        }
+        if (
+            !deps.capabilities.scanComplete ||
+            !deps.capabilities.touchTuningAvailable
+        ) {
+            touchTuningCard.addView(
+                deps.bodyText(
+                    if (deps.capabilities.scanComplete) {
+                        "Unavailable: the stock REDMAGIC per-app touch " +
+                            "controller was not detected."
+                    } else {
+                        "Unavailable until the compatibility scan completes."
+                    }
+                )
+            )
+            CapabilityUi.disableInteractions(touchTuningCard)
+        }
+        container.addView(touchTuningCard)
+
         val hapticSummary = deps.subtleLabel("")
         var selectedHapticStrength =
             HapticFeedback.Strength.fromKey(

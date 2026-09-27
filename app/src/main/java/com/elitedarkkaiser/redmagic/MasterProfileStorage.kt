@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object MasterProfileStorage {
-    const val CURRENT_SCHEMA_VERSION = 9
+    const val CURRENT_SCHEMA_VERSION = 10
     private const val PREFS = "master_profiles"
     private const val KEY = "profiles"
     private const val LAST_APPLIED_KEY = "last_applied_profile"
@@ -165,6 +165,9 @@ object MasterProfileStorage {
         refreshRateProfilesJson?.let {
             put("refreshRateProfiles", JSONObject(it))
         }
+        touchTuningProfilesJson?.let {
+            put("touchTuningProfiles", JSONObject(it))
+        }
     }
 
     private fun JSONObject.toMasterProfile(): MasterProfile {
@@ -253,6 +256,11 @@ object MasterProfileStorage {
             },
             refreshRateProfilesJson = if (version >= 9) {
                 optJSONObject("refreshRateProfiles")?.toString()
+            } else {
+                null
+            },
+            touchTuningProfilesJson = if (version >= 10) {
+                optJSONObject("touchTuningProfiles")?.toString()
             } else {
                 null
             }

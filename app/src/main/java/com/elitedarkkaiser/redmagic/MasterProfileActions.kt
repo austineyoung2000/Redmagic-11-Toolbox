@@ -95,6 +95,11 @@ object MasterProfileActions {
                 RefreshRateStorage.createExportJson(
                     context = context,
                     allowEmpty = true
+                ),
+            touchTuningProfilesJson =
+                TouchTuningStorage.createExportJson(
+                    context = context,
+                    allowEmpty = true
                 )
         )
     }
@@ -178,6 +183,24 @@ object MasterProfileActions {
                     context = context,
                     raw = it,
                     replaceAll = true
+                )
+            }
+        }
+
+        if (profile.schemaVersion >= 10) {
+            profile.touchTuningProfilesJson?.let {
+                val previousPackages =
+                    TouchTuningStorage.readProfiles(context)
+                        .map { existing -> existing.packageName }
+                        .toSet()
+                TouchTuningStorage.importProfilesJson(
+                    context = context,
+                    raw = it,
+                    replaceAll = true
+                )
+                TouchTuningController.reconcileStored(
+                    context,
+                    previousPackages
                 )
             }
         }
