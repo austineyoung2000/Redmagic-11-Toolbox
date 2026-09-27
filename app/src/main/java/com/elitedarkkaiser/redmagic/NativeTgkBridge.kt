@@ -192,6 +192,25 @@ object NativeTgkBridge {
                  */
                 Thread.sleep(CONFIG_SETTLE_MS)
 
+                /*
+                 * Match the stock REDMAGIC TGK presentation. The
+                 * framework owns this top-edge press highlight and
+                 * automatically adds/removes it with native trigger
+                 * down/up events. Keep this optional so an older or
+                 * custom framework can reject the visual API without
+                 * preventing the proven touch-mapping path from
+                 * enabling.
+                 */
+                runCatching {
+                    backend.setTopEffectEnabled(true)
+                }.onFailure { error ->
+                    Log.w(
+                        TAG,
+                        "${backend.name} stock TGK top effect unavailable",
+                        error
+                    )
+                }
+
                 backend.setConsumeKeys(true)
                 backend.setHaptics(hapticsEnabled)
                 backend.setLeftEnabled(true)
@@ -384,6 +403,7 @@ object NativeTgkBridge {
 
         fun setDriveEnabled(enabled: Boolean)
         fun setVersion(version: Int)
+        fun setTopEffectEnabled(enabled: Boolean)
         fun setConsumeKeys(enabled: Boolean)
         fun setHaptics(enabled: Boolean)
         fun setLeftEnabled(enabled: Boolean)
@@ -470,6 +490,13 @@ object NativeTgkBridge {
                 "setTgkVersion",
                 arrayOf(Integer.TYPE),
                 version
+            )
+        }
+
+        override fun setTopEffectEnabled(enabled: Boolean) {
+            callBooleanSetter(
+                "setTgkTopEffectEnable",
+                enabled
             )
         }
 
@@ -625,6 +652,19 @@ object NativeTgkBridge {
             )
         }
 
+        override fun setTopEffectEnabled(enabled: Boolean) {
+            val output = callBooleanSetter(
+                151,
+                enabled
+            )
+            if (
+                output.contains("Exception", ignoreCase = true) ||
+                output.contains("Permission Denial", ignoreCase = true)
+            ) {
+                throw IllegalStateException(output)
+            }
+        }
+
         override fun setConsumeKeys(enabled: Boolean) {
             callBooleanSetter(101, enabled)
         }
@@ -657,8 +697,8 @@ object NativeTgkBridge {
         private fun callBooleanSetter(
             transaction: Int,
             enabled: Boolean
-        ) {
-            call(
+        ): String {
+            return call(
                 transaction,
                 "i32",
                 if (enabled) "1" else "0"
