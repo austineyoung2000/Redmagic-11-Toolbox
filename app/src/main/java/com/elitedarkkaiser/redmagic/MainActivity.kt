@@ -5,15 +5,12 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import android.app.Activity
 import android.content.Intent
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -24,9 +21,10 @@ import android.widget.TextView
 import android.widget.Toast
 import com.elitedarkkaiser.redmagic.storage.AppPrefs
 import com.elitedarkkaiser.redmagic.state.LedState
-import com.google.android.material.button.MaterialButton
 import com.elitedarkkaiser.redmagic.ui.AppTheme
+import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import com.elitedarkkaiser.redmagic.ui.components.MainActivityUiKit
+import com.elitedarkkaiser.redmagic.ui.components.MainBottomNavigation
 
 class MainActivity : Activity() {
     private var useFahrenheit = true
@@ -71,11 +69,6 @@ class MainActivity : Activity() {
     private var smartPumpStatusView: TextView? = null
     private var smartPumpSpeedView: TextView? = null
 
-    private lateinit var homeNav: LinearLayout
-    private lateinit var coolingNav: LinearLayout
-    private lateinit var controlsNav: LinearLayout
-    private lateinit var lightingNav: LinearLayout
-
     private var selectedCurve = "balanced"
     private var autoFanCurveEnabled = false
     private var realTimePreviewEnabled = true
@@ -111,6 +104,18 @@ class MainActivity : Activity() {
     private val highlightBorder get() = AppTheme.highlightBorder
     private val mainUiKit by lazy(LazyThreadSafetyMode.NONE) {
         MainActivityUiKit(this)
+    }
+    private val ledControlViews by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        LedControlViewFactory(this)
+    }
+    private val bottomNavigation by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainBottomNavigation(this) { tab ->
+            switchTab(tab)
+        }
     }
     private val statusRefreshHandler =
         Handler(Looper.getMainLooper())
@@ -647,7 +652,9 @@ class MainActivity : Activity() {
             createControlsTab = { createControlsTab() },
             createHardwareTab = { createHardwareTab() },
             createLightingTab = { createLightingTab() },
-            bottomNavBar = { bottomNavBar() }
+            bottomNavBar = {
+                bottomNavigation.createView()
+            }
         )
 
         homeTab = result.homeTab
@@ -1842,40 +1849,11 @@ class MainActivity : Activity() {
         label: String,
         selected: Boolean,
         onClick: () -> Unit
-    ): Button {
-        return MaterialButton(
-            this,
-            null,
-            com.google.android.material.R.attr.materialButtonOutlinedStyle
-        ).apply {
-            text = label
-            textSize = 11f
-            isAllCaps = false
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            isSingleLine = true
-            minWidth = 0
-            minimumWidth = 0
-            setTextColor(textPrimary)
-
-            backgroundTintList = ColorStateList.valueOf(
-                if (selected) panelPressed else Color.TRANSPARENT
-            )
-            strokeWidth = dp(1)
-            strokeColor = ColorStateList.valueOf(
-                if (selected) highlightBorder else borderColor
-            )
-            rippleColor =
-                ColorStateList.valueOf(AppTheme.rippleColor)
-            cornerRadius = dp(16)
-
-            insetTop = 0
-            insetBottom = 0
-            minHeight = dp(40)
-            setPadding(dp(10), dp(6), dp(10), dp(6))
-            setOnClickListener { onClick() }
-        }
-    }
+    ): Button = ledControlViews.filterChip(
+        label,
+        selected,
+        onClick
+    )
 
     private fun applyFanPreset(effectValue: String) {
         fanLedEnabled = true
@@ -1915,92 +1893,47 @@ class MainActivity : Activity() {
         selectedOverride: (() -> Boolean)? = null,
         onClick: () -> Unit
     ): View {
-        require(hexes.size == 4) { "fanPresetBubble requires exactly 4 colors" }
-
-        return object : View(this) {
-            private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-            private val ringPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                style = android.graphics.Paint.Style.STROKE
-                strokeWidth = dp(3).toFloat()
-            }
-
-            init {
-                val size = dp(42)
-                layoutParams = LinearLayout.LayoutParams(size, size)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener { onClick() }
-            }
-
-            override fun onDraw(canvas: android.graphics.Canvas) {
-                super.onDraw(canvas)
-
-                val pad = dp(3).toFloat()
-                val rect = android.graphics.RectF(
-                    pad,
-                    pad,
-                    width.toFloat() - pad,
-                    height.toFloat() - pad
-                )
-
-                val saveCount = canvas.save()
-                val clipPath = android.graphics.Path().apply {
-                    addOval(rect, android.graphics.Path.Direction.CW)
-                }
-                canvas.clipPath(clipPath)
-
-                val midX = rect.centerX()
-                val midY = rect.centerY()
-
-                fillPaint.color = Color.parseColor(hexes[0])
-                canvas.drawRect(rect.left, rect.top, midX, midY, fillPaint)
-
-                fillPaint.color = Color.parseColor(hexes[1])
-                canvas.drawRect(midX, rect.top, rect.right, midY, fillPaint)
-
-                fillPaint.color = Color.parseColor(hexes[2])
-                canvas.drawRect(rect.left, midY, midX, rect.bottom, fillPaint)
-
-                fillPaint.color = Color.parseColor(hexes[3])
-                canvas.drawRect(midX, midY, rect.right, rect.bottom, fillPaint)
-
-                canvas.restoreToCount(saveCount)
-
-                val selected = selectedOverride?.invoke() ?: (fanLedEffect == "preset:$presetValue")
-                ringPaint.color = if (selected) {
-                    Color.WHITE
-                } else {
-                    Color.TRANSPARENT
-                }
-                canvas.drawOval(rect, ringPaint)
-            }
-        }
+        return ledControlViews.fanPresetBubble(
+            colors = hexes.toList(),
+            selected = selectedOverride ?: {
+                fanLedEffect == "preset:$presetValue"
+            },
+            onClick = onClick
+        )
     }
 
-    private fun colorDot(colorId: Int, hex: String, onClick: () -> Unit): View {
-        return View(this).apply {
-            val size = dp(42)
-            layoutParams = LinearLayout.LayoutParams(size, size)
-            background = colorDotDrawable(hex, fanLedColor == colorId)
-            setOnClickListener { onClick() }
-        }
+    private fun colorDot(
+        colorId: Int,
+        hex: String,
+        onClick: () -> Unit
+    ): View {
+        return ledControlViews.colorDot(
+            hex = hex,
+            selected = fanLedColor == colorId,
+            onClick = onClick
+        )
     }
 
-    private fun colorDotDrawable(hex: String, selected: Boolean): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.parseColor(hex))
-            setStroke(dp(3), if (selected) Color.WHITE else Color.TRANSPARENT)
-        }
+    private fun colorDotDrawable(
+        hex: String,
+        selected: Boolean
+    ): GradientDrawable {
+        return ledControlViews.colorDotDrawable(
+            hex,
+            selected
+        )
     }
 
-    private fun colorDotGeneric(hex: String, selected: Boolean, onClick: () -> Unit): View {
-        return View(this).apply {
-            val size = dp(42)
-            layoutParams = LinearLayout.LayoutParams(size, size)
-            background = colorDotDrawable(hex, selected)
-            setOnClickListener { onClick() }
-        }
+    private fun colorDotGeneric(
+        hex: String,
+        selected: Boolean,
+        onClick: () -> Unit
+    ): View {
+        return ledControlViews.colorDot(
+            hex,
+            selected,
+            onClick
+        )
     }
 
 
@@ -2064,7 +1997,16 @@ class MainActivity : Activity() {
     private fun switchTab(tab: String) {
         val parent = homeTab.parent as ViewGroup
 
-        fun replaceTab(index: Int, newTab: LinearLayout): LinearLayout {
+        fun replaceTab(
+            oldTab: LinearLayout,
+            newTab: LinearLayout
+        ): LinearLayout {
+            val index = parent.indexOfChild(oldTab)
+            if (index < 0) {
+                parent.addView(newTab)
+                return newTab
+            }
+
             parent.removeViewAt(index)
             parent.addView(newTab, index)
             return newTab
@@ -2073,7 +2015,10 @@ class MainActivity : Activity() {
         when (tab) {
             "cooling" -> {
                 if (!coolingTabBuilt) {
-                    coolingTab = replaceTab(1, createCoolingTab())
+                    coolingTab = replaceTab(
+                        coolingTab,
+                        createCoolingTab()
+                    )
                     coolingTabBuilt = true
                     restoreFanCurveUiState()
                 }
@@ -2081,21 +2026,30 @@ class MainActivity : Activity() {
 
             "controls" -> {
                 if (!controlsTabBuilt) {
-                    controlsTab = replaceTab(2, createControlsTab())
+                    controlsTab = replaceTab(
+                        controlsTab,
+                        createControlsTab()
+                    )
                     controlsTabBuilt = true
                 }
             }
 
             "hardware" -> {
                 if (!hardwareTabBuilt) {
-                    hardwareTab = replaceTab(3, createHardwareTab())
+                    hardwareTab = replaceTab(
+                        hardwareTab,
+                        createHardwareTab()
+                    )
                     hardwareTabBuilt = true
                 }
             }
 
             "lighting" -> {
                 if (!lightingTabBuilt) {
-                    lightingTab = replaceTab(4, createLightingTab())
+                    lightingTab = replaceTab(
+                        lightingTab,
+                        createLightingTab()
+                    )
                     lightingTabBuilt = true
                 }
             }
@@ -2107,80 +2061,7 @@ class MainActivity : Activity() {
         hardwareTab.visibility = if (tab == "hardware") View.VISIBLE else View.GONE
         lightingTab.visibility = if (tab == "lighting") View.VISIBLE else View.GONE
 
-        setNavSelected(homeNav, tab == "home")
-        setNavSelected(coolingNav, tab == "cooling")
-        setNavSelected(controlsNav, tab == "controls")
-        val hardwareNav = (controlsNav.parent as LinearLayout).getChildAt(3) as LinearLayout
-        setNavSelected(hardwareNav, tab == "hardware")
-        setNavSelected(lightingNav, tab == "lighting")
-    }
-
-    private fun setNavSelected(nav: LinearLayout, selected: Boolean) {
-        nav.background = roundedFill(
-            if (selected) panelPressed else Color.TRANSPARENT,
-            18
-        )
-        nav.alpha = if (selected) 1f else 0.72f
-    }
-
-    private fun bottomNavBar(): LinearLayout {
-        homeNav = navItem("⌂", "Home") { switchTab("home") }
-        coolingNav = navItem("❄", "Cooling") { switchTab("cooling") }
-        controlsNav = navItem("⌘", "Controls") { switchTab("controls") }
-        val hardwareNav = navItem("⌥", "Hardware") { switchTab("hardware") }
-        lightingNav = navItem("✦", "Lighting") { switchTab("lighting") }
-
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = roundedTopBar()
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-
-            addView(homeNav, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(coolingNav, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(controlsNav, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(hardwareNav, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(lightingNav, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        }
-    }
-
-    private fun navItem(icon: String, label: String, onClick: () -> Unit): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { onClick() }
-
-            addView(TextView(this@MainActivity).apply {
-                text = icon
-                textSize = 20f
-                setTextColor(textPrimary)
-                gravity = Gravity.CENTER
-            })
-
-            addView(TextView(this@MainActivity).apply {
-                text = label
-                textSize = 12f
-                setTextColor(textPrimary)
-                gravity = Gravity.CENTER
-                setPadding(0, dp(4), 0, 0)
-            })
-        }
-    }
-
-    private fun roundedTopBar(): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(panelColor)
-            cornerRadius = dp(24).toFloat()
-            setStroke(dp(1), borderColor)
-        }
+        bottomNavigation.select(tab)
     }
 
     private fun updateManualCurveUiState() {
