@@ -129,6 +129,34 @@ class MainActivity : Activity() {
             }
         )
     }
+    private val lightingTabActions by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainLightingTabActions(
+            activity = this,
+            runBackground = { task ->
+                submitBackgroundTask(task)
+            },
+            dp = { value -> dp(value) },
+            filterChip = { label, selected, onClick ->
+                filterChip(label, selected, onClick)
+            },
+            updateSelectableButton = { button, selected ->
+                updateSelectableButton(button, selected)
+            },
+            onAllLedStateApplied = { effect, color ->
+                fanLedEnabled = true
+                fanLedEffect = effect
+                fanLedColor = color
+                logoLedEnabled = true
+                logoLedEffect = effect
+                logoLedColor = color
+                shoulderLedEnabled = true
+                shoulderLedEffect = effect
+                shoulderLedColor = color
+            }
+        )
+    }
     private val statusRefreshHandler =
         Handler(Looper.getMainLooper())
 
@@ -1186,91 +1214,24 @@ class MainActivity : Activity() {
                 showLogoLedDialog = { showLogoLedDialog() },
                 showShoulderLedDialog = { showShoulderLedDialog() },
                 rgbStudioSummary = {
-                    RgbStudioStorage.summary(this)
+                    lightingTabActions.rgbStudioSummary()
                 },
                 showRgbStudioDialog = { onUpdated ->
-                    RgbStudioDialog.show(
-                        activity = this,
-                        initial = RgbStudioStorage.read(this),
-                        deps = RgbStudioDialog.Deps(
-                            dp = { value -> dp(value) },
-                            filterChip = { label, selected, onClick ->
-                                filterChip(label, selected, onClick)
-                            },
-                            updateSelectableButton = { button, selected ->
-                                updateSelectableButton(button, selected)
-                            },
-                            onSaveAndApply = { state ->
-                                RgbStudioStorage.save(this, state)
-                                if (state.enabled) {
-                                    HardwareServiceActions.startRgbCycle(this)
-                                } else {
-                                    HardwareServiceActions.stopRgbCycle(this)
-                                }
-                                onUpdated()
-                            },
-                            onApplyToAll = { effect, color ->
-                                RgbStudioStorage.setEnabled(this, false)
-                                HardwareServiceActions.stopRgbCycle(
-                                    this,
-                                    restoreNormalLeds = false
-                                )
-
-                                fanLedEnabled = true
-                                fanLedEffect = effect
-                                fanLedColor = color
-                                logoLedEnabled = true
-                                logoLedEffect = effect
-                                logoLedColor = color
-                                shoulderLedEnabled = true
-                                shoulderLedEffect = effect
-                                shoulderLedColor = color
-
-                                saveFanLedStateStorage(
-                                    this,
-                                    LedState(true, effect, color)
-                                )
-                                saveLogoLedStateStorage(
-                                    this,
-                                    LedState(true, effect, color)
-                                )
-                                saveShoulderLedStateStorage(
-                                    this,
-                                    LedState(true, effect, color)
-                                )
-
-                                submitBackgroundTask {
-                                    HardwareController.setRgbCycleFrame(
-                                        effectName = effect,
-                                        logoColor = color,
-                                        shoulderColor = color,
-                                        fanColor = color
-                                    )
-                                    HardwareServiceActions.startFanLed(this)
-                                }
-                                onUpdated()
-                            },
-                            onStopService = {
-                                RgbStudioStorage.setEnabled(
-                                    this,
-                                    false
-                                )
-                                HardwareServiceActions.stopRgbCycle(
-                                    this
-                                )
-                                onUpdated()
-                            }
-                        )
+                    lightingTabActions.showRgbStudioDialog(
+                        onUpdated
                     )
                 },
                 showGameModeAppPicker = { showGamePickerDialog() },
                 showGameModeProfileDialog = { showGameModeProfileDialog() },
                 gameModeAppsSummary = { gameModeAppsSummaryStorage(this) },
 
-                getChargingLedEnabled = { ChargingLedState.isEnabled(this) },
+                getChargingLedEnabled = {
+                    lightingTabActions.isChargingLedEnabled()
+                },
                 setChargingLedEnabled = { enabled ->
-                    ChargingLedState.setEnabled(this, enabled)
-                    HardwareServiceActions.startChargingMode(this)
+                    lightingTabActions.setChargingLedEnabled(
+                        enabled
+                    )
                 },
                 showChargingFanLedDialog = {
                     ChargingLedActions.showFanDialog(
@@ -1315,83 +1276,33 @@ class MainActivity : Activity() {
                         deps = chargingLedDialogDeps()
                     )
                 },
-                getCallLightingEnabled = { CallLightingState.isEnabled(this) },
-                setCallLightingEnabled = { enabled ->
-                    CallLightingState.setEnabled(this, enabled)
-                    if (enabled) {
-                        HardwareServiceActions.startCallLighting(this)
-                    } else {
-                        CallLightingState.setActive(this, false)
-                        HardwareServiceActions.stopCallLighting(this)
-                    }
+                getCallLightingEnabled = {
+                    lightingTabActions.isCallLightingEnabled()
                 },
-                getPauseFanDuringCalls = { CallLightingState.shouldPauseFanDuringCalls(this) },
+                setCallLightingEnabled = { enabled ->
+                    lightingTabActions.setCallLightingEnabled(
+                        enabled
+                    )
+                },
+                getPauseFanDuringCalls = {
+                    lightingTabActions.shouldPauseFanDuringCalls()
+                },
                 setPauseFanDuringCalls = { enabled ->
-                    CallLightingState.setPauseFanDuringCalls(this, enabled)
+                    lightingTabActions.setPauseFanDuringCalls(
+                        enabled
+                    )
                 },
                 showIncomingCallProfileDialog = {
-                    CallLightingProfileUi.show(
-                        activity = this,
-                        title = "Incoming Call Lighting",
-                        subtitle = "These LED settings apply automatically while an incoming call is ringing.",
-                        fanKeys = CallLightingProfileUi.ZoneKeys(
-                            CallLightingState.INCOMING_FAN_ENABLED_KEY,
-                            CallLightingState.INCOMING_FAN_EFFECT_KEY,
-                            CallLightingState.INCOMING_FAN_COLOR_KEY,
-                            "Fan LED",
-                            "flashing",
-                            5
-                        ),
-                        logoKeys = CallLightingProfileUi.ZoneKeys(
-                            CallLightingState.INCOMING_LOGO_ENABLED_KEY,
-                            CallLightingState.INCOMING_LOGO_EFFECT_KEY,
-                            CallLightingState.INCOMING_LOGO_COLOR_KEY,
-                            "Logo LED",
-                            "flashing",
-                            1
-                        ),
-                        shoulderKeys = CallLightingProfileUi.ZoneKeys(
-                            CallLightingState.INCOMING_SHOULDER_ENABLED_KEY,
-                            CallLightingState.INCOMING_SHOULDER_EFFECT_KEY,
-                            CallLightingState.INCOMING_SHOULDER_COLOR_KEY,
-                            "Shoulder LEDs",
-                            "flashing",
-                            8
-                        ),
-                        deps = callLightingProfileDeps()
-                    )
+                    lightingTabActions
+                        .showIncomingCallProfileDialog(
+                            callLightingProfileDeps()
+                        )
                 },
                 showConnectedCallProfileDialog = {
-                    CallLightingProfileUi.show(
-                        activity = this,
-                        title = "Connected Call Lighting",
-                        subtitle = "These LED settings apply automatically while a call is connected.",
-                        fanKeys = CallLightingProfileUi.ZoneKeys(
-                            CallLightingState.CONNECTED_FAN_ENABLED_KEY,
-                            CallLightingState.CONNECTED_FAN_EFFECT_KEY,
-                            CallLightingState.CONNECTED_FAN_COLOR_KEY,
-                            "Fan LED",
-                            "steady",
-                            5
-                        ),
-                        logoKeys = CallLightingProfileUi.ZoneKeys(
-                            CallLightingState.CONNECTED_LOGO_ENABLED_KEY,
-                            CallLightingState.CONNECTED_LOGO_EFFECT_KEY,
-                            CallLightingState.CONNECTED_LOGO_COLOR_KEY,
-                            "Logo LED",
-                            "steady",
-                            1
-                        ),
-                        shoulderKeys = CallLightingProfileUi.ZoneKeys(
-                            CallLightingState.CONNECTED_SHOULDER_ENABLED_KEY,
-                            CallLightingState.CONNECTED_SHOULDER_EFFECT_KEY,
-                            CallLightingState.CONNECTED_SHOULDER_COLOR_KEY,
-                            "Shoulder LEDs",
-                            "steady",
-                            8
-                        ),
-                        deps = callLightingProfileDeps()
-                    )
+                    lightingTabActions
+                        .showConnectedCallProfileDialog(
+                            callLightingProfileDeps()
+                        )
                 }
             )
         )
