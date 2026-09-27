@@ -56,13 +56,13 @@ jobs:
         run: |
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/red-release.jks"
 
-      - name: Build signed release APK
+      - name: Test and build signed release APK
         env:
           SIGNING_STORE_FILE: ${{ runner.temp }}/red-release.jks
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew testDebugUnitTest assembleRelease
 
       - name: Upload signed release APK artifact
         uses: actions/upload-artifact@v4

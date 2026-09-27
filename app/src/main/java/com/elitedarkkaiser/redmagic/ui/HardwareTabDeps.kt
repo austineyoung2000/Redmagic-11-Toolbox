@@ -6,6 +6,7 @@ import android.widget.TextView
 import com.elitedarkkaiser.redmagic.MasterProfile
 import com.elitedarkkaiser.redmagic.DeviceCapabilities
 import com.elitedarkkaiser.redmagic.ChargeSeparationResult
+import com.elitedarkkaiser.redmagic.HapticFeedback
 
 data class HardwareTabDeps(
     val scrollTabContainer: () -> LinearLayout,
@@ -27,6 +28,8 @@ data class HardwareTabDeps(
     val showTriggerSafetyDialog: ((() -> Unit) -> Unit),
     val enableTriggersAndService: ((Boolean) -> Unit) -> Unit,
     val disableTriggersAndService: ((Boolean) -> Unit) -> Unit,
+    val triggersAutoStartEnabled: () -> Boolean,
+    val setTriggersAutoStartEnabled: (Boolean) -> Unit,
 
     val readChargeSeparation:
         ((ChargeSeparationResult) -> Unit) -> Unit,
@@ -35,6 +38,7 @@ data class HardwareTabDeps(
     val showRefreshRateProfiles: () -> Unit,
     val showTouchTuningProfiles: () -> Unit,
     val showPerformanceModeProfiles: () -> Unit,
+    val testHapticStrength: (HapticFeedback.Strength) -> Unit,
 
     val loadMasterProfiles: () -> List<MasterProfile>,
     val saveMasterProfile:

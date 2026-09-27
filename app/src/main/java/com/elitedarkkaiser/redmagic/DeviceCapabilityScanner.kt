@@ -163,11 +163,18 @@ object DeviceCapabilityScanner {
          * The physical slider is guaranteed by the model gate;
          * optional vendor signals only strengthen that result.
          */
-        val sliderAvailable =
-            identity.supported ||
-                exists("/proc/driver/slider") ||
-                prop("persist.sys.nubia.slider")
-                    .isNotBlank()
+        val sliderNodeAvailable = exists("/proc/driver/slider")
+        val sliderPropertyPresent =
+            if (identity.supported || sliderNodeAvailable) {
+                false
+            } else {
+                prop("persist.sys.nubia.slider").isNotBlank()
+            }
+        val sliderAvailable = DeviceCapabilityPolicy.sliderAvailable(
+            supportedModel = identity.supported,
+            sliderNodeAvailable = sliderNodeAvailable,
+            sliderPropertyPresent = sliderPropertyPresent
+        )
 
         val stockFirmware =
             DeviceCompatibility.isStockRedmagicFirmware()
@@ -180,9 +187,11 @@ object DeviceCapabilityScanner {
             "cn.nubia.gameassist"
         )
         val stockGameSuiteAvailable =
-            stockFirmware &&
-                gameSpaceInstalled &&
-                gameAssistInstalled
+            DeviceCapabilityPolicy.stockGameSuiteAvailable(
+                stockFirmware = stockFirmware,
+                gameSpaceInstalled = gameSpaceInstalled,
+                gameAssistInstalled = gameAssistInstalled
+            )
         val nativeTgkAvailable =
             identity.supported &&
                 NativeTgkBridge.readState(context).success

@@ -689,76 +689,19 @@ class TriggerAccessibilityService : AccessibilityService() {
         """.trimIndent()
     }
 
-    private fun prefs() = getSharedPreferences(
-        "triggers",
-        Context.MODE_PRIVATE
-    )
-
-    private fun getAction(key: String): String {
-        return prefs().getString(
-            key,
-            "NONE"
-        ) ?: "NONE"
-    }
-
     private fun submitRootAction(action: () -> Unit) {
         runCatching {
             rootExecutor.execute(action)
         }
     }
 
-    private fun performAction(action: String) {
-        val command = when (action) {
-            "VOL_UP" -> "input keyevent 24"
-            "VOL_DOWN" -> "input keyevent 25"
-            "MEDIA_PLAY_PAUSE" -> "input keyevent 85"
-            "MEDIA_NEXT" -> "input keyevent 87"
-            "MEDIA_PREVIOUS" -> "input keyevent 88"
-            else -> return
-        }
-
-        submitRootAction {
-            HapticFeedback.pulse(
-                this,
-                HapticFeedback.Event.TRIGGER
-            )
-            RootShell.exec(command)
-        }
-    }
-
     override fun onKeyEvent(event: KeyEvent): Boolean {
         /*
-         * Native TGK consumes F7/F8 inside InputManager and creates
-         * the mapped touch contacts. Never perform or consume the
-         * legacy quick action while that native path is active.
+         * TriggerRootService owns physical-trigger actions and applies the
+         * complete saved safety policy. Handling F7/F8 here created a second,
+         * unconditional action path that bypassed intent and hold settings.
+         * Leave all keys unconsumed so only the authoritative runtime acts.
          */
-        if (
-            NativeTgkRuntimeState.isActive() ||
-            NativeTgkEditorRuntime.isEditing()
-        ) {
-            return false
-        }
-
-        if (event.action != KeyEvent.ACTION_DOWN) {
-            return false
-        }
-
-        return when (event.keyCode) {
-            KeyEvent.KEYCODE_F7 -> {
-                performAction(
-                    getAction("left_trigger")
-                )
-                true
-            }
-
-            KeyEvent.KEYCODE_F8 -> {
-                performAction(
-                    getAction("right_trigger")
-                )
-                true
-            }
-
-            else -> false
-        }
+        return false
     }
 }

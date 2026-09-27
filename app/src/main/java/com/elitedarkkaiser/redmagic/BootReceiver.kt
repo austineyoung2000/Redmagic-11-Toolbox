@@ -5,24 +5,76 @@ import android.content.Context
 import android.content.Intent
 
 class BootReceiver : BroadcastReceiver() {
-
     override fun onReceive(context: Context, intent: Intent?) {
-        val action = intent?.action ?: return
-
-        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_USER_UNLOCKED) return
-
-        if (!DeviceCompatibility.isSupportedDevice()) {
-            return
+        val event = when (intent?.action) {
+            Intent.ACTION_BOOT_COMPLETED ->
+                BootEvent.BOOT_COMPLETED
+            Intent.ACTION_USER_UNLOCKED ->
+                BootEvent.USER_UNLOCKED
+            else -> return
         }
 
-        if (action == Intent.ACTION_BOOT_COMPLETED) {
+        if (!DeviceCompatibility.isSupportedDevice()) return
+
+        val appContext = context.applicationContext
+        val triggersAutoStart =
+            readTriggerPrefsSnapshot(appContext).triggersAutoStart
+        val hasUnlockAutomation =
+            AutomationRulesStorage.profileName(
+                appContext,
+                AutomationRuleEvent.DEVICE_UNLOCKED
+            ) != null
+        val decision = BootEventPolicy.decide(
+            event = event,
+            coreServicesAlreadyStarted =
+                !BootSessionStorage.claimCoreServiceStartup(appContext),
+            triggersAutoStart = triggersAutoStart,
+            hasUnlockAutomation = hasUnlockAutomation
+        )
+
+        if (decision.resetManualTriggerPause) {
             setTriggersDisabledUntilRestartStorage(
-                context,
+                appContext,
                 false
             )
         }
 
+        if (decision.startCoreServices) {
+            startCoreServices(appContext)
+        }
+
+        if (!decision.needsAsyncWork) return
+
+        val pendingResult = goAsync()
+        Thread(
+            {
+                android.os.Process.setThreadPriority(
+                    android.os.Process.THREAD_PRIORITY_BACKGROUND
+                )
+
+                try {
+                    if (decision.runUnlockAutomation) {
+                        AutomationRuleExecutor.applyNow(
+                            appContext,
+                            AutomationRuleEvent.DEVICE_UNLOCKED
+                        )
+                    }
+
+                    if (decision.startTriggers) {
+                        HardwareServiceActions
+                            .startTriggersIfAutoStartEnabled(appContext)
+                    }
+                } finally {
+                    pendingResult.finish()
+                }
+            },
+            "RedMagicBootStartup"
+        ).start()
+    }
+
+    private fun startCoreServices(context: Context) {
         HardwareServiceActions.startChargingMode(context)
+
         if (CallLightingState.isEnabled(context)) {
             HardwareServiceActions.startCallLighting(context)
         }
@@ -32,46 +84,5 @@ class BootReceiver : BroadcastReceiver() {
         if (SliderDualAppStorage.read(context).enabled) {
             HardwareServiceActions.startSliderDualApp(context)
         }
-
-        val shouldStartTriggers =
-            readTriggerPrefsSnapshot(context)
-                .triggersAutoStart
-        val shouldRunUnlockRule =
-            action == Intent.ACTION_USER_UNLOCKED &&
-                AutomationRulesStorage.profileName(
-                    context,
-                    AutomationRuleEvent.DEVICE_UNLOCKED
-                ) != null
-
-        if (shouldStartTriggers || shouldRunUnlockRule) {
-            val pendingResult = goAsync()
-
-            Thread({
-                android.os.Process.setThreadPriority(
-                    android.os.Process.THREAD_PRIORITY_BACKGROUND
-                )
-
-                try {
-                    if (shouldRunUnlockRule) {
-                        AutomationRuleExecutor.applyNow(
-                            context.applicationContext,
-                            AutomationRuleEvent
-                                .DEVICE_UNLOCKED
-                        )
-                    }
-
-                    if (shouldStartTriggers) {
-                        HardwareServiceActions
-                            .startTriggersIfAutoStartEnabled(
-                                context.applicationContext
-                            )
-                    }
-                } finally {
-                    pendingResult.finish()
-                }
-            }, "RedMagicTriggerAutoStart").start()
-        }
-
     }
-
 }

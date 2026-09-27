@@ -11,6 +11,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 import com.google.android.material.button.MaterialButton
+import java.util.concurrent.atomic.AtomicBoolean
 
 object FirstInstallPermissionsDialog {
     fun show(
@@ -72,8 +73,13 @@ object FirstInstallPermissionsDialog {
             .setView(container)
             .setCancelable(false)
             .create()
+        val setupRunning = AtomicBoolean(false)
 
         grantButton.setOnClickListener {
+            if (!setupRunning.compareAndSet(false, true)) {
+                return@setOnClickListener
+            }
+
             grantButton.isEnabled = false
             grantButton.text = "Applying…"
 
@@ -82,25 +88,16 @@ object FirstInstallPermissionsDialog {
                     android.os.Process.THREAD_PRIORITY_BACKGROUND
                 )
 
-                val rootApplied = RootShell.exec(
-                    "appops set ${activity.packageName} GET_USAGE_STATS allow; " +
-                        "appops set ${activity.packageName} SYSTEM_ALERT_WINDOW allow; " +
-                        "pm grant ${activity.packageName} android.permission.POST_NOTIFICATIONS || true; " +
-                        "pm grant ${activity.packageName} android.permission.READ_PHONE_STATE || true; " +
-                        "settings put secure accessibility_enabled 1; " +
-                        "settings put secure enabled_accessibility_services ${activity.packageName}/com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
-                )
-
-                val usageAccessGranted =
-                    rootApplied &&
-                        PermissionActions.hasUsageStatsPermission(activity)
+                val result = PermissionBootstrap.apply(activity)
 
                 activity.runOnUiThread {
                     if (activity.isFinishing || activity.isDestroyed) {
                         return@runOnUiThread
                     }
 
-                    if (usageAccessGranted) {
+                    setupRunning.set(false)
+
+                    if (result.success) {
                         setFirstInstallPermissionsPromptedStorage(
                             activity,
                             true
@@ -118,7 +115,19 @@ object FirstInstallPermissionsDialog {
 
                         Toast.makeText(
                             activity,
-                            "Root permission setup failed. Check your root manager and try again.",
+                            buildString {
+                                append("Permission setup incomplete")
+                                if (!result.rootCommandSucceeded) {
+                                    append(": root command failed")
+                                }
+                                if (result.missingPermissions.isNotEmpty()) {
+                                    append(". Missing: ")
+                                    append(
+                                        result.missingPermissions
+                                            .joinToString(", ")
+                                    )
+                                }
+                            },
                             Toast.LENGTH_LONG
                         ).show()
                     }

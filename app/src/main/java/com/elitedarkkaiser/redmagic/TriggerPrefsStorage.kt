@@ -238,6 +238,18 @@ fun readTriggerPrefsSnapshot(context: Context): TriggerPrefsSnapshot {
     )
 }
 
+fun setTriggersAutoStartStorage(
+    context: Context,
+    enabled: Boolean
+) {
+    context.getSharedPreferences(
+        TRIGGER_PREFS_NAME,
+        Context.MODE_PRIVATE
+    ).edit()
+        .putBoolean(TRIGGERS_AUTO_START_KEY, enabled)
+        .apply()
+}
+
 fun saveTriggerPrefsStorage(
     context: Context,
     profile: TriggerPrefsSnapshot

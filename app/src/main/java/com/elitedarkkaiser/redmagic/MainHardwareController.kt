@@ -59,6 +59,12 @@ internal class MainHardwareController(
             disableTriggersAndService = { onComplete ->
                 disableTriggers(onComplete)
             },
+            triggersAutoStartEnabled = {
+                readTriggerPrefsSnapshot(activity).triggersAutoStart
+            },
+            setTriggersAutoStartEnabled = { enabled ->
+                setTriggersAutoStartStorage(activity, enabled)
+            },
             readChargeSeparation = { onComplete ->
                 actions.readChargeSeparation(onComplete)
             },
@@ -73,6 +79,11 @@ internal class MainHardwareController(
             },
             showPerformanceModeProfiles = {
                 PerformanceModeProfileDialog.show(activity)
+            },
+            testHapticStrength = { strength ->
+                runBackground {
+                    HapticFeedback.testPulse(strength)
+                }
             },
             loadMasterProfiles = { actions.loadMasterProfiles() },
             saveMasterProfile = { name, onComplete ->
