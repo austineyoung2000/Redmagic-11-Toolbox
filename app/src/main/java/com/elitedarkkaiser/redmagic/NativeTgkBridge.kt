@@ -138,14 +138,6 @@ object NativeTgkBridge {
             }
 
             try {
-                /*
-                 * Clear any TGK ownership/session retained by the
-                 * stock gaming components before loading our points.
-                 * This is the non-root vendor release transaction and
-                 * is the Binder equivalent of starting from the clean
-                 * state used by the confirmed standalone Termux test.
-                 */
-                backend.release()
                 backend.disable()
 
                 backend.setPoint(
@@ -387,7 +379,6 @@ object NativeTgkBridge {
             keyCode: Int
         )
 
-        fun release()
         fun setConsumeKeys(enabled: Boolean)
         fun setHaptics(enabled: Boolean)
         fun setLeftEnabled(enabled: Boolean)
@@ -457,13 +448,6 @@ object NativeTgkBridge {
                 ),
                 count,
                 keyCode
-            )
-        }
-
-        override fun release() {
-            call(
-                "releaseTgk",
-                emptyArray()
             )
         }
 
@@ -605,10 +589,6 @@ object NativeTgkBridge {
                 "i32", count.toString(),
                 "i32", keyCode.toString()
             )
-        }
-
-        override fun release() {
-            call(149)
         }
 
         override fun setConsumeKeys(enabled: Boolean) {
