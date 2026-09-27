@@ -37,6 +37,7 @@ object NativeTgkBridge {
     const val RIGHT_KEY_CODE = 138
 
     private const val STOCK_TGK_VERSION = 40
+    private const val STOCK_PRESS_EFFECT_OPACITY = 100
     private const val CONFIG_SETTLE_MS = 2_000L
     private const val ENABLE_SETTLE_MS = 1_000L
 
@@ -207,6 +208,27 @@ object NativeTgkBridge {
                     Log.w(
                         TAG,
                         "${backend.name} stock TGK top effect unavailable",
+                        error
+                    )
+                }
+
+                /*
+                 * Stock Game Space uses the framework's center
+                 * effect as the pressed state for its saved L/R
+                 * targets. System_server adds it on native trigger
+                 * down and removes it on trigger up at the point
+                 * already supplied by setTgkPoint. Keep this visual
+                 * optional so it cannot block touch mapping.
+                 */
+                runCatching {
+                    backend.setCenterEffectEnabled(true)
+                    backend.setEffectTransparency(
+                        STOCK_PRESS_EFFECT_OPACITY
+                    )
+                }.onFailure { error ->
+                    Log.w(
+                        TAG,
+                        "${backend.name} stock TGK press effect unavailable",
                         error
                     )
                 }
@@ -404,6 +426,8 @@ object NativeTgkBridge {
         fun setDriveEnabled(enabled: Boolean)
         fun setVersion(version: Int)
         fun setTopEffectEnabled(enabled: Boolean)
+        fun setCenterEffectEnabled(enabled: Boolean)
+        fun setEffectTransparency(percent: Int)
         fun setConsumeKeys(enabled: Boolean)
         fun setHaptics(enabled: Boolean)
         fun setLeftEnabled(enabled: Boolean)
@@ -497,6 +521,21 @@ object NativeTgkBridge {
             callBooleanSetter(
                 "setTgkTopEffectEnable",
                 enabled
+            )
+        }
+
+        override fun setCenterEffectEnabled(enabled: Boolean) {
+            callBooleanSetter(
+                "setTgkCenterEffectEnable",
+                enabled
+            )
+        }
+
+        override fun setEffectTransparency(percent: Int) {
+            call(
+                "setTgkTransparency",
+                arrayOf(Integer.TYPE),
+                percent.coerceIn(0, 100)
             )
         }
 
@@ -657,12 +696,24 @@ object NativeTgkBridge {
                 151,
                 enabled
             )
-            if (
-                output.contains("Exception", ignoreCase = true) ||
-                output.contains("Permission Denial", ignoreCase = true)
-            ) {
-                throw IllegalStateException(output)
-            }
+            requireSuccessfulVisualCall(output)
+        }
+
+        override fun setCenterEffectEnabled(enabled: Boolean) {
+            val output = callBooleanSetter(
+                152,
+                enabled
+            )
+            requireSuccessfulVisualCall(output)
+        }
+
+        override fun setEffectTransparency(percent: Int) {
+            val output = call(
+                153,
+                "i32",
+                percent.coerceIn(0, 100).toString()
+            )
+            requireSuccessfulVisualCall(output)
         }
 
         override fun setConsumeKeys(enabled: Boolean) {
@@ -703,6 +754,15 @@ object NativeTgkBridge {
                 "i32",
                 if (enabled) "1" else "0"
             )
+        }
+
+        private fun requireSuccessfulVisualCall(output: String) {
+            if (
+                output.contains("Exception", ignoreCase = true) ||
+                output.contains("Permission Denial", ignoreCase = true)
+            ) {
+                throw IllegalStateException(output)
+            }
         }
 
         private fun readBoolean(
