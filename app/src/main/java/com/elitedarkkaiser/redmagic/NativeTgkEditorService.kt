@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -27,17 +28,39 @@ import kotlin.math.roundToInt
 object NativeTgkEditorRuntime {
     private val editing = AtomicBoolean(false)
 
+    @Volatile
+    private var targetPackageName: String? = null
+
+    @Volatile
+    private var startedAtElapsed = 0L
+
     fun isEditing(): Boolean {
         return editing.get()
     }
 
-    internal fun begin() {
+    fun shouldStopForForeground(
+        packageName: String
+    ): Boolean {
+        val target = targetPackageName ?: return false
+        return editing.get() &&
+            packageName != target &&
+            SystemClock.elapsedRealtime() - startedAtElapsed >=
+            FOREGROUND_LAUNCH_GRACE_MS
+    }
+
+    internal fun begin(packageName: String) {
+        targetPackageName = packageName
+        startedAtElapsed = SystemClock.elapsedRealtime()
         editing.set(true)
     }
 
     internal fun end() {
         editing.set(false)
+        targetPackageName = null
+        startedAtElapsed = 0L
     }
+
+    private const val FOREGROUND_LAUNCH_GRACE_MS = 3_000L
 }
 
 class NativeTgkEditorService : Service() {
@@ -133,7 +156,7 @@ class NativeTgkEditorService : Service() {
         requestedOrientation = orientation
         finishing = false
 
-        NativeTgkEditorRuntime.begin()
+        NativeTgkEditorRuntime.begin(targetPackage)
         NativeTgkRuntimeState.clear()
 
         Thread(
@@ -715,31 +738,13 @@ class NativeTgkEditorService : Service() {
             return
         }
 
-        NativeTgkRuntimeState.markActive(
-            targetPackage,
-            requestedOrientation
-        )
-
-        Thread(
-            {
-                val result =
-                    NativeTgkCoordinator.applyForegroundMapping(
-                        context = applicationContext,
-                        packageName = targetPackage,
-                        orientation = requestedOrientation
-                    )
-
-                if (!result.success) {
-                    NativeTgkRuntimeState.clearIfMatches(
-                        targetPackage,
-                        requestedOrientation
-                    )
-                }
-
-                stopSelf()
-            },
-            "RedMagicTgkEditorApply"
-        ).start()
+        /*
+         * Do not apply directly from the overlay service. The
+         * accessibility foreground reconciler will apply this saved
+         * mapping only if the target application is still resumed.
+         */
+        NativeTgkRuntimeState.clear()
+        stopSelf()
     }
 
     private fun finishWithoutMapping() {

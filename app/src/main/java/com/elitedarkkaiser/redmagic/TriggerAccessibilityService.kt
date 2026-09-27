@@ -9,6 +9,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import java.util.concurrent.ExecutorService
@@ -16,6 +19,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 class TriggerAccessibilityService : AccessibilityService() {
+
+    private val foregroundHandler = Handler(Looper.getMainLooper())
 
     private val rootExecutor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
@@ -41,6 +46,47 @@ class TriggerAccessibilityService : AccessibilityService() {
     private var nativeTgkTask: Future<*>? = null
     private var screenReceiverRegistered = false
 
+    private val foregroundMonitor = object : Runnable {
+        override fun run() {
+            if (isScreenInteractive()) {
+                latestResumedPackage()?.let { packageName ->
+                    val orientation =
+                        NativeTgkCoordinator.currentOrientation(
+                            this@TriggerAccessibilityService
+                        )
+                    val mappingNeedsApply =
+                        !NativeTgkEditorRuntime.isEditing() &&
+                            NativeTgkCoordinator.hasReadyMapping(
+                                context =
+                                    this@TriggerAccessibilityService,
+                                packageName = packageName,
+                                orientation = orientation
+                            ) &&
+                            !NativeTgkRuntimeState.matches(
+                                packageName,
+                                orientation
+                            )
+                    val editorNeedsStop =
+                        NativeTgkEditorRuntime
+                            .shouldStopForForeground(packageName)
+
+                    if (
+                        packageName != lastForegroundPackage ||
+                        mappingNeedsApply ||
+                        editorNeedsStop
+                    ) {
+                        handleForegroundPackage(packageName)
+                    }
+                }
+            }
+
+            foregroundHandler.postDelayed(
+                this,
+                FOREGROUND_MONITOR_INTERVAL_MS
+            )
+        }
+    }
+
     @Volatile
     private var lastForegroundPackage: String? = null
 
@@ -50,9 +96,12 @@ class TriggerAccessibilityService : AccessibilityService() {
             intent: Intent
         ) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                lastForegroundPackage = null
                 deactivateNativeTgk("screen off")
                 RefreshRateOverlay.hide()
                 RefreshRateCoordinator.clearRuntimeState()
+            } else if (intent.action == Intent.ACTION_SCREEN_ON) {
+                reconcileForeground(force = true)
             }
         }
     }
@@ -80,15 +129,20 @@ class TriggerAccessibilityService : AccessibilityService() {
          * another app is genuinely resumed, the resolved package
          * immediately drives TGK cleanup.
          */
-        val pkg = if (
-            reportedPackage == packageName ||
-            reportedPackage == SYSTEM_UI_PACKAGE
-        ) {
-            latestResumedPackage() ?: reportedPackage
-        } else {
-            reportedPackage
-        }
+        val pkg = latestResumedPackage()
+            ?: if (
+                reportedPackage == packageName ||
+                reportedPackage == SYSTEM_UI_PACKAGE
+            ) {
+                return
+            } else {
+                reportedPackage
+            }
 
+        handleForegroundPackage(pkg)
+    }
+
+    private fun handleForegroundPackage(pkg: String) {
         lastForegroundPackage = pkg
         NativeTgkDiagnostics.recordForeground(this, pkg)
         dispatchNativeTgkForForeground(pkg)
@@ -128,9 +182,8 @@ class TriggerAccessibilityService : AccessibilityService() {
     ) {
         super.onConfigurationChanged(newConfig)
 
-        lastForegroundPackage?.let {
-            dispatchNativeTgkForForeground(it)
-        }
+        /* Never reuse a cached package after rotation. */
+        reconcileForeground(force = true)
     }
 
     override fun onInterrupt() {
@@ -150,6 +203,8 @@ class TriggerAccessibilityService : AccessibilityService() {
         }
 
         registerScreenReceiver()
+        foregroundHandler.removeCallbacks(foregroundMonitor)
+        foregroundHandler.post(foregroundMonitor)
 
         /*
          * Repair any native TGK state left behind by an earlier
@@ -174,6 +229,7 @@ class TriggerAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         lastForegroundPackage = null
+        foregroundHandler.removeCallbacksAndMessages(null)
         NativeTgkRuntimeState.clear()
         RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
@@ -209,6 +265,17 @@ class TriggerAccessibilityService : AccessibilityService() {
         packageName: String
     ) {
         if (NativeTgkEditorRuntime.isEditing()) {
+            if (
+                NativeTgkEditorRuntime
+                    .shouldStopForForeground(packageName)
+            ) {
+                stopService(
+                    Intent(
+                        this,
+                        NativeTgkEditorService::class.java
+                    )
+                )
+            }
             if (NativeTgkRuntimeState.isActive()) {
                 deactivateNativeTgk(
                     "target editor active"
@@ -228,11 +295,11 @@ class TriggerAccessibilityService : AccessibilityService() {
             )
 
         if (!mappingReady) {
-            if (NativeTgkRuntimeState.isActive()) {
-                deactivateNativeTgk(
-                    "left mapped app or orientation"
-                )
-            }
+            /* Always remove any stale target window, even if the
+             * in-memory TGK state was already cleared. */
+            deactivateNativeTgk(
+                "left mapped app or orientation"
+            )
             return
         }
 
@@ -345,6 +412,24 @@ class TriggerAccessibilityService : AccessibilityService() {
         }.getOrNull()
     }
 
+    private fun reconcileForeground(force: Boolean) {
+        foregroundHandler.postDelayed(
+            {
+                val packageName = latestResumedPackage()
+                    ?: return@postDelayed
+                if (force || packageName != lastForegroundPackage) {
+                    handleForegroundPackage(packageName)
+                }
+            },
+            FOREGROUND_RECONCILE_DELAY_MS
+        )
+    }
+
+    private fun isScreenInteractive(): Boolean {
+        return getSystemService(PowerManager::class.java)
+            ?.isInteractive == true
+    }
+
     private fun registerScreenReceiver() {
         if (screenReceiverRegistered) {
             return
@@ -352,7 +437,9 @@ class TriggerAccessibilityService : AccessibilityService() {
 
         val filter = IntentFilter(
             Intent.ACTION_SCREEN_OFF
-        )
+        ).apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(
@@ -376,6 +463,10 @@ class TriggerAccessibilityService : AccessibilityService() {
             "com.android.systemui"
         private const val FOREGROUND_EVENT_LOOKBACK_MS =
             15_000L
+        private const val FOREGROUND_MONITOR_INTERVAL_MS =
+            750L
+        private const val FOREGROUND_RECONCILE_DELAY_MS =
+            200L
     }
 
     private fun prefs() = getSharedPreferences(
