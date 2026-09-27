@@ -18,7 +18,6 @@ import android.widget.CheckBox
 import android.widget.LinearLayout
 import com.google.android.material.slider.Slider
 import android.widget.TextView
-import android.widget.Toast
 import com.elitedarkkaiser.redmagic.storage.AppPrefs
 import com.elitedarkkaiser.redmagic.state.LedState
 import com.elitedarkkaiser.redmagic.ui.AppTheme
@@ -116,6 +115,19 @@ class MainActivity : Activity() {
         MainBottomNavigation(this) { tab ->
             switchTab(tab)
         }
+    }
+    private val hardwareTabActions by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainHardwareTabActions(
+            activity = this,
+            runBackground = { task ->
+                submitBackgroundTask(task)
+            },
+            onMasterProfileApplied = { profile ->
+                applyMasterProfileToUiState(profile)
+            }
+        )
     }
     private val statusRefreshHandler =
         Handler(Looper.getMainLooper())
@@ -1088,53 +1100,15 @@ class MainActivity : Activity() {
                 },
 
                 readChargeSeparation = { onComplete ->
-                    val submitted = submitBackgroundTask {
-                        val result =
-                            ChargeSeparationController.read(this)
-
-                        runOnUiThread {
-                            if (!isFinishing && !isDestroyed) {
-                                onComplete(result)
-                            }
-                        }
-                    }
-
-                    if (!submitted) {
-                        onComplete(
-                            ChargeSeparationResult(
-                                success = false,
-                                enabled = null,
-                                backend = null,
-                                message = "Unable to read charge separation"
-                            )
-                        )
-                    }
+                    hardwareTabActions.readChargeSeparation(
+                        onComplete
+                    )
                 },
                 setChargeSeparation = { enabled, onComplete ->
-                    val submitted = submitBackgroundTask {
-                        val result =
-                            ChargeSeparationController.setEnabled(
-                                this,
-                                enabled
-                            )
-
-                        runOnUiThread {
-                            if (!isFinishing && !isDestroyed) {
-                                onComplete(result)
-                            }
-                        }
-                    }
-
-                    if (!submitted) {
-                        onComplete(
-                            ChargeSeparationResult(
-                                success = false,
-                                enabled = null,
-                                backend = null,
-                                message = "Unable to apply charge separation"
-                            )
-                        )
-                    }
+                    hardwareTabActions.setChargeSeparation(
+                        enabled,
+                        onComplete
+                    )
                 },
                 showRefreshRateProfiles = {
                     RefreshRateProfileDialog.show(this)
@@ -1146,99 +1120,28 @@ class MainActivity : Activity() {
                     PerformanceModeProfileDialog.show(this)
                 },
 
-                loadMasterProfiles = { MasterProfileStorage.loadProfiles(this) },
+                loadMasterProfiles = {
+                    hardwareTabActions.loadMasterProfiles()
+                },
                 saveMasterProfile = { name, onComplete ->
-                    val submitted = submitBackgroundTask {
-                        val saved = runCatching {
-                            MasterProfileActions.captureAndSave(
-                                this,
-                                name
-                            )
-                            true
-                        }.getOrDefault(false)
-
-                        runOnUiThread {
-                            if (isFinishing || isDestroyed) {
-                                return@runOnUiThread
-                            }
-
-                            Toast.makeText(
-                                this,
-                                if (saved) {
-                                    "Saved $name"
-                                } else {
-                                    "Failed to save $name"
-                                },
-                                Toast.LENGTH_SHORT
-                            ).show()
-
-                            onComplete(saved)
-                        }
-                    }
-
-                    if (!submitted) {
-                        Toast.makeText(
-                            this,
-                            "Unable to start master-profile capture",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        onComplete(false)
-                    }
+                    hardwareTabActions.saveMasterProfile(
+                        name,
+                        onComplete
+                    )
                 },
                 applyMasterProfile = { profile ->
-                    val submitted = submitBackgroundTask {
-                        val applied = runCatching {
-                            MasterProfileActions.applyProfile(
-                                this,
-                                profile
-                            )
-                            MasterProfileStorage.markProfileApplied(
-                                this,
-                                profile.name
-                            )
-                            true
-                        }.getOrDefault(false)
-
-                        runOnUiThread {
-                            if (isFinishing || isDestroyed) {
-                                return@runOnUiThread
-                            }
-
-                            if (applied) {
-                                applyMasterProfileToUiState(profile)
-                            }
-
-                            Toast.makeText(
-                                this,
-                                if (applied) {
-                                    "Applied ${profile.name}"
-                                } else {
-                                    "Failed to apply ${profile.name}"
-                                },
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-
-                    if (!submitted) {
-                        Toast.makeText(
-                            this,
-                            "Unable to start master-profile application",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                    hardwareTabActions.applyMasterProfile(
+                        profile
+                    )
                 },
                 deleteMasterProfile = { name ->
-                    MasterProfileStorage.deleteProfile(this, name)
-                    Toast.makeText(this, "Deleted $name", Toast.LENGTH_SHORT).show()
+                    hardwareTabActions.deleteMasterProfile(name)
                 },
                 exportMasterBackup = {
-                    MasterProfileDocumentTransfer
-                        .requestExport(this)
+                    hardwareTabActions.requestMasterBackupExport()
                 },
                 importMasterBackup = {
-                    MasterProfileDocumentTransfer
-                        .requestImport(this)
+                    hardwareTabActions.requestMasterBackupImport()
                 },
                 automationRulesSummary = {
                     AutomationRulesStorage.summary(this)
