@@ -22,6 +22,7 @@ object RefreshRateOverlay {
     private var windowManager: WindowManager? = null
     private var overlayView: TextView? = null
     private var appContext: Context? = null
+    private var foregroundPackage: String? = null
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -32,7 +33,10 @@ object RefreshRateOverlay {
         }
     }
 
-    fun show(context: Context) {
+    fun show(
+        context: Context,
+        packageName: String
+    ) {
         val contextForApp = context.applicationContext
         mainHandler.post {
             if (!Settings.canDrawOverlays(contextForApp)) {
@@ -41,6 +45,7 @@ object RefreshRateOverlay {
             }
 
             appContext = contextForApp
+            foregroundPackage = packageName
             if (overlayView == null) {
                 val manager = contextForApp.getSystemService(
                     Context.WINDOW_SERVICE
@@ -72,6 +77,7 @@ object RefreshRateOverlay {
         overlayView = null
         windowManager = null
         appContext = null
+        foregroundPackage = null
         if (view != null && manager != null) {
             runCatching { manager.removeViewImmediate(view) }
         }
@@ -83,7 +89,17 @@ object RefreshRateOverlay {
             Context.DISPLAY_SERVICE
         ) as? DisplayManager ?: return
         val display = manager.getDisplay(Display.DEFAULT_DISPLAY) ?: return
-        overlayView?.text = "${display.refreshRate.roundToInt()} Hz"
+        val displayLine =
+            "Display: ${display.refreshRate.roundToInt()} Hz"
+        val touchLine = foregroundPackage
+            ?.let { TouchTuningStorage.getProfile(context, it) }
+            ?.takeIf { it.enabled }
+            ?.let { "Touch: ${it.sampleRateHz} Hz" }
+
+        overlayView?.text = listOfNotNull(
+            displayLine,
+            touchLine
+        ).joinToString("\n")
     }
 
     private fun buildView(context: Context): TextView {

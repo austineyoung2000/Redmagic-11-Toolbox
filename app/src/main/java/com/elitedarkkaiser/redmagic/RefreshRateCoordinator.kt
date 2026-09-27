@@ -35,7 +35,7 @@ object RefreshRateCoordinator {
             activeRate == effectiveRate
         ) {
             if (profile.enabled && profile.showOverlay) {
-                RefreshRateOverlay.show(context)
+                RefreshRateOverlay.show(context, packageName)
             } else {
                 RefreshRateOverlay.hide()
             }
@@ -57,7 +57,7 @@ object RefreshRateCoordinator {
             activePackage = packageName
             activeRate = effectiveRate
             if (profile.enabled && profile.showOverlay) {
-                RefreshRateOverlay.show(context)
+                RefreshRateOverlay.show(context, packageName)
             } else {
                 RefreshRateOverlay.hide()
             }
