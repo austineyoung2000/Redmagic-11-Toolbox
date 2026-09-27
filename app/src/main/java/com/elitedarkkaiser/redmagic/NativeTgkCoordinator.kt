@@ -142,6 +142,24 @@ object NativeTgkCoordinator {
 
         val displaySize = currentDisplaySize(context)
 
+        /*
+         * The saved targets and native TGK configuration are one
+         * foreground lifecycle. Display the non-interactive targets
+         * as soon as the mapped application is accepted instead of
+         * waiting through the vendor configuration and verification
+         * delay. A failed apply removes them below, and every
+         * foreground exit goes through disable(), which removes the
+         * same overlay before disabling TGK.
+         */
+        NativeTgkGameplayOverlay.show(
+            context = context,
+            profile = profile,
+            mapping = mapping,
+            orientation = orientation,
+            displayWidth = displaySize.width,
+            displayHeight = displaySize.height
+        )
+
         val result = NativeTgkBridge.applyMapping(
             context = context,
             mapping = mapping,
@@ -164,15 +182,6 @@ object NativeTgkCoordinator {
         )
 
         if (result.success) {
-            NativeTgkGameplayOverlay.show(
-                context = context,
-                profile = profile,
-                mapping = mapping,
-                orientation = orientation,
-                displayWidth = displaySize.width,
-                displayHeight = displaySize.height
-            )
-
             android.util.Log.i(
                 TAG,
                 "Applied $orientation TGK mapping " +

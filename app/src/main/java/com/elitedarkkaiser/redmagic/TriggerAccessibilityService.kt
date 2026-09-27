@@ -55,13 +55,19 @@ class TriggerAccessibilityService : AccessibilityService() {
     @Volatile
     private var forceForegroundReconcile = false
 
+    @Volatile
+    private var nativeTgkStartupCleanupComplete = false
+
     private val foregroundPackagePattern = Regex(
         """[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+"""
     )
 
     private val foregroundMonitor = object : Runnable {
         override fun run() {
-            if (isScreenInteractive()) {
+            if (
+                nativeTgkStartupCleanupComplete &&
+                isScreenInteractive()
+            ) {
                 ensureForegroundRootMonitor()
 
                 if (foregroundRootProcess?.isAlive != true) {
@@ -97,7 +103,9 @@ class TriggerAccessibilityService : AccessibilityService() {
                 RefreshRateCoordinator.clearRuntimeState()
             } else if (intent.action == Intent.ACTION_SCREEN_ON) {
                 forceForegroundReconcile = true
-                ensureForegroundRootMonitor()
+                if (nativeTgkStartupCleanupComplete) {
+                    ensureForegroundRootMonitor()
+                }
             }
         }
     }
@@ -114,6 +122,10 @@ class TriggerAccessibilityService : AccessibilityService() {
             ?: return
 
         if (reportedPackage.isBlank()) {
+            return
+        }
+
+        if (!nativeTgkStartupCleanupComplete) {
             return
         }
 
@@ -243,9 +255,8 @@ class TriggerAccessibilityService : AccessibilityService() {
         }
 
         registerScreenReceiver()
-        ensureForegroundRootMonitor()
         foregroundHandler.removeCallbacks(foregroundMonitor)
-        foregroundHandler.post(foregroundMonitor)
+        nativeTgkStartupCleanupComplete = false
 
         /*
          * Repair any native TGK state left behind by an earlier
@@ -260,6 +271,20 @@ class TriggerAccessibilityService : AccessibilityService() {
                 applicationContext,
                 "accessibility service connected"
             )
+
+            foregroundHandler.post {
+                if (nativeTgkExecutor.isShutdown) {
+                    return@post
+                }
+
+                nativeTgkStartupCleanupComplete = true
+                forceForegroundReconcile = true
+                ensureForegroundRootMonitor()
+                foregroundHandler.removeCallbacks(
+                    foregroundMonitor
+                )
+                foregroundHandler.post(foregroundMonitor)
+            }
         }
 
         submitRootAction {
@@ -271,6 +296,7 @@ class TriggerAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         lastForegroundPackage = null
         forceForegroundReconcile = false
+        nativeTgkStartupCleanupComplete = false
         stopForegroundRootMonitor()
         foregroundHandler.removeCallbacksAndMessages(null)
         NativeTgkRuntimeState.clear()
