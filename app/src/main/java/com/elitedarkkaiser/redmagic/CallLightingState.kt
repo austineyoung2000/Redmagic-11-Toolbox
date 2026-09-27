@@ -124,10 +124,22 @@ internal object CallLightingState {
 
     fun readLed(context: Context, enabledKey: String, effectKey: String, colorKey: String, defaultEnabled: Boolean, defaultEffect: String, defaultColor: Int): LedState {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val savedEffect = prefs.getString(effectKey, defaultEffect) ?: defaultEffect
+        val savedColor = prefs.getInt(colorKey, defaultColor)
+        val isFanProfile = effectKey == INCOMING_FAN_EFFECT_KEY ||
+            effectKey == CONNECTED_FAN_EFFECT_KEY
         return LedState(
             enabled = prefs.getBoolean(enabledKey, defaultEnabled),
-            effect = prefs.getString(effectKey, defaultEffect) ?: defaultEffect,
-            color = prefs.getInt(colorKey, defaultColor)
+            effect = if (isFanProfile) {
+                FanLedPalette.normalizeEffect(savedEffect)
+            } else {
+                savedEffect
+            },
+            color = if (isFanProfile) {
+                FanLedPalette.normalizeColor(savedEffect, savedColor)
+            } else {
+                savedColor
+            }
         )
     }
 

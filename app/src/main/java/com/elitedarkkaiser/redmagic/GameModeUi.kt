@@ -47,8 +47,13 @@ internal object GameModeUi {
         var gmPumpEnabled = current.pumpEnabled
         var gmPumpProfile = current.pumpProfile
         var gmFanLedEnabled = current.fanLedEnabled
-        var gmFanLedEffect = current.fanLedEffect
-        var gmFanLedColor = current.fanLedColor
+        var gmFanLedEffect = FanLedPalette.normalizeEffect(
+            current.fanLedEffect
+        )
+        var gmFanLedColor = FanLedPalette.normalizeColor(
+            current.fanLedEffect,
+            current.fanLedColor
+        )
 
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -312,14 +317,14 @@ internal object GameModeUi {
             preset7.alpha = 1f
             preset8.alpha = 1f
 
-            preset1.background = presetRing(gmFanLedEffect == "preset:0x3002101")
-            preset2.background = presetRing(gmFanLedEffect == "preset:0x3002102")
-            preset3.background = presetRing(gmFanLedEffect == "preset:0x3002103")
-            preset4.background = presetRing(gmFanLedEffect == "preset:0x3002104")
-            preset5.background = presetRing(gmFanLedEffect == "preset:0x3002105")
-            preset6.background = presetRing(gmFanLedEffect == "preset:0x3002106")
-            preset7.background = presetRing(gmFanLedEffect == "preset:0x3002107")
-            preset8.background = presetRing(gmFanLedEffect == "preset:0x3002108")
+            preset1.background = presetRing(gmFanLedColor == 0x101)
+            preset2.background = presetRing(gmFanLedColor == 0x102)
+            preset3.background = presetRing(gmFanLedColor == 0x103)
+            preset4.background = presetRing(gmFanLedColor == 0x104)
+            preset5.background = presetRing(gmFanLedColor == 0x105)
+            preset6.background = presetRing(gmFanLedColor == 0x106)
+            preset7.background = presetRing(gmFanLedColor == 0x107)
+            preset8.background = presetRing(gmFanLedColor == 0x108)
         }
 
             fun gmPresetBubble(hex1: String, hex2: String, hex3: String, hex4: String, value: String): View {
@@ -338,6 +343,7 @@ internal object GameModeUi {
                 setOnClickListener {
                     GameModeActions.applyLedPreset(
                         value = value,
+                        currentEffect = gmFanLedEffect,
                         onEffectChanged = { gmFanLedEffect = it },
                         onColorChanged = { gmFanLedColor = it },
                         refreshEffectButtons = { refreshLedEffectButtons() },
@@ -382,7 +388,13 @@ internal object GameModeUi {
 
                 canvas.restoreToCount(save)
 
-                ringPaint.color = if (gmFanLedEffect == "preset:$value") {
+                ringPaint.color = if (
+                    FanLedPalette.isSelected(
+                        gmFanLedEffect,
+                        gmFanLedColor,
+                        value
+                    )
+                ) {
                     Color.WHITE
                 } else {
                     Color.TRANSPARENT

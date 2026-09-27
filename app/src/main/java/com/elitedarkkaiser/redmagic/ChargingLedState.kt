@@ -45,10 +45,22 @@ internal object ChargingLedState {
         defaultColor: Int
     ): Profile {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val savedEffect =
+            prefs.getString(effectKey, defaultEffect) ?: defaultEffect
+        val savedColor = prefs.getInt(colorKey, defaultColor)
+        val isFanProfile = effectKey == FAN_EFFECT_KEY
         return Profile(
             enabled = prefs.getBoolean(enabledKey, defaultEnabled),
-            effect = prefs.getString(effectKey, defaultEffect) ?: defaultEffect,
-            color = prefs.getInt(colorKey, defaultColor)
+            effect = if (isFanProfile) {
+                FanLedPalette.normalizeEffect(savedEffect)
+            } else {
+                savedEffect
+            },
+            color = if (isFanProfile) {
+                FanLedPalette.normalizeColor(savedEffect, savedColor)
+            } else {
+                savedColor
+            }
         )
     }
 

@@ -6,10 +6,12 @@ import com.elitedarkkaiser.redmagic.storage.AppPrefs
 
 fun savedFanLedStateStorage(context: Context): LedState {
     val prefs = context.getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+    val savedEffect = prefs.getString(AppPrefs.FAN_LED_EFFECT, "steady") ?: "steady"
+    val savedColor = prefs.getInt(AppPrefs.FAN_LED_COLOR, 5)
     return LedState(
         enabled = prefs.getBoolean(AppPrefs.FAN_LED_ENABLED, false),
-        effect = prefs.getString(AppPrefs.FAN_LED_EFFECT, "steady") ?: "steady",
-        color = prefs.getInt(AppPrefs.FAN_LED_COLOR, 5)
+        effect = FanLedPalette.normalizeEffect(savedEffect),
+        color = FanLedPalette.normalizeColor(savedEffect, savedColor)
     )
 }
 

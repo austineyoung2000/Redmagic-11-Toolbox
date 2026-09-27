@@ -60,8 +60,13 @@ internal class MainLightingController(
     fun applyMasterProfile(profile: MasterProfile) {
         val hardware = profile.hardware
         zoneState.fanEnabled = hardware.fanLedEnabled
-        zoneState.fanEffect = hardware.fanLedEffect
-        zoneState.fanColor = hardware.fanLedColor
+        zoneState.fanEffect = FanLedPalette.normalizeEffect(
+            hardware.fanLedEffect
+        )
+        zoneState.fanColor = FanLedPalette.normalizeColor(
+            hardware.fanLedEffect,
+            hardware.fanLedColor
+        )
         zoneState.logoEnabled = hardware.logoLedEnabled
         zoneState.logoEffect = hardware.logoLedEffect
         zoneState.logoColor = hardware.logoLedColor

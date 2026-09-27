@@ -228,14 +228,16 @@ internal object GameModeActions {
 
     fun applyLedPreset(
         value: String,
+        currentEffect: String,
         onEffectChanged: (String) -> Unit,
         onColorChanged: (Int) -> Unit,
         refreshEffectButtons: () -> Unit,
         refreshColorDots: () -> Unit,
         refreshPresetBubbles: () -> Unit
     ) {
-        onEffectChanged("preset:$value")
-        onColorChanged(-1)
+        val palette = FanLedPalette.fromStockPreset(value) ?: return
+        onEffectChanged(FanLedPalette.normalizeEffect(currentEffect))
+        onColorChanged(palette)
         refreshEffectButtons()
         refreshColorDots()
         refreshPresetBubbles()

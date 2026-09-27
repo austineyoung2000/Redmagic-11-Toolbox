@@ -188,8 +188,16 @@ internal object CallLightingProfileUi {
         onChanged: (LedState) -> Unit
     ): LinearLayout {
         var enabled = initial.enabled
-        var effect = initial.effect
-        var color = initial.color
+        var effect = if (showFanPresets) {
+            FanLedPalette.normalizeEffect(initial.effect)
+        } else {
+            initial.effect
+        }
+        var color = if (showFanPresets) {
+            FanLedPalette.normalizeColor(initial.effect, initial.color)
+        } else {
+            initial.color
+        }
 
         lateinit var steadyBtn: Button
         lateinit var breatheBtn: Button
@@ -268,9 +276,10 @@ internal object CallLightingProfileUi {
         }
 
         fun applyFanPreset(value: String) {
+            val palette = FanLedPalette.fromStockPreset(value) ?: return
             enabled = true
-            effect = "preset:$value"
-            color = -1
+            effect = FanLedPalette.normalizeEffect(effect)
+            color = palette
             refreshEffects()
             refreshColors()
             publish()
@@ -372,25 +381,25 @@ internal object CallLightingProfileUi {
 
             presetRow1 = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                addView(deps.fanPresetBubble("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00", "0x3002101", effect == "preset:0x3002101") { applyFanPreset("0x3002101") })
+                addView(deps.fanPresetBubble("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00", "0x3002101", color == 0x101) { applyFanPreset("0x3002101") })
                 addView(deps.space(deps.dp(10)))
-                addView(deps.fanPresetBubble("#1565FF", "#00E676", "#22D3EE", "#FF69B4", "0x3002102", effect == "preset:0x3002102") { applyFanPreset("0x3002102") })
+                addView(deps.fanPresetBubble("#1565FF", "#00E676", "#22D3EE", "#FF69B4", "0x3002102", color == 0x102) { applyFanPreset("0x3002102") })
                 addView(deps.space(deps.dp(10)))
-                addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FFD600", "#FF69B4", "0x3002103", effect == "preset:0x3002103") { applyFanPreset("0x3002103") })
+                addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FFD600", "#FF69B4", "0x3002103", color == 0x103) { applyFanPreset("0x3002103") })
                 addView(deps.space(deps.dp(10)))
-                addView(deps.fanPresetBubble("#00E676", "#FF69B4", "#FF8C00", "#22D3EE", "0x3002104", effect == "preset:0x3002104") { applyFanPreset("0x3002104") })
+                addView(deps.fanPresetBubble("#00E676", "#FF69B4", "#FF8C00", "#22D3EE", "0x3002104", color == 0x104) { applyFanPreset("0x3002104") })
             }
 
             presetRow2 = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, deps.dp(10), 0, 0)
-                addView(deps.fanPresetBubble("#00E676", "#A020F0", "#FF8C00", "#FF69B4", "0x3002105", effect == "preset:0x3002105") { applyFanPreset("0x3002105") })
+                addView(deps.fanPresetBubble("#00E676", "#A020F0", "#FF8C00", "#FF69B4", "0x3002105", color == 0x105) { applyFanPreset("0x3002105") })
                 addView(deps.space(deps.dp(10)))
-                addView(deps.fanPresetBubble("#FF0000", "#FF0000", "#FF0000", "#FF0000", "0x3002106", effect == "preset:0x3002106") { applyFanPreset("0x3002106") })
+                addView(deps.fanPresetBubble("#FF0000", "#FF0000", "#FF0000", "#FF0000", "0x3002106", color == 0x106) { applyFanPreset("0x3002106") })
                 addView(deps.space(deps.dp(10)))
-                addView(deps.fanPresetBubble("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0", "0x3002107", effect == "preset:0x3002107") { applyFanPreset("0x3002107") })
+                addView(deps.fanPresetBubble("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0", "0x3002107", color == 0x107) { applyFanPreset("0x3002107") })
                 addView(deps.space(deps.dp(10)))
-                addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FF8C00", "#00E676", "0x3002108", effect == "preset:0x3002108") { applyFanPreset("0x3002108") })
+                addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FF8C00", "#00E676", "0x3002108", color == 0x108) { applyFanPreset("0x3002108") })
             }
 
             card.addView(presetRow1)

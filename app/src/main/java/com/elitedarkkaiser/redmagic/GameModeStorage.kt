@@ -25,14 +25,20 @@ private val gameModeStorageLock = Any()
 
 fun getSavedGameModeProfileStorage(context: Context): GameModeProfile {
     val prefs = context.getSharedPreferences(GAME_PREFS_NAME, Context.MODE_PRIVATE)
+    val savedFanEffect =
+        prefs.getString(GAME_MODE_FAN_LED_EFFECT_KEY, "steady") ?: "steady"
+    val savedFanColor = prefs.getInt(GAME_MODE_FAN_LED_COLOR_KEY, 5)
     return GameModeProfile(
         fanEnabled = prefs.getBoolean(GAME_MODE_FAN_ENABLED_KEY, true),
         fanLevel = prefs.getInt(GAME_MODE_FAN_LEVEL_KEY, 3),
         pumpEnabled = prefs.getBoolean(GAME_MODE_PUMP_ENABLED_KEY, false),
         pumpProfile = prefs.getString(GAME_MODE_PUMP_PROFILE_KEY, "quick") ?: "quick",
         fanLedEnabled = prefs.getBoolean(GAME_MODE_FAN_LED_ENABLED_KEY, true),
-        fanLedEffect = prefs.getString(GAME_MODE_FAN_LED_EFFECT_KEY, "steady") ?: "steady",
-        fanLedColor = prefs.getInt(GAME_MODE_FAN_LED_COLOR_KEY, 5),
+        fanLedEffect = FanLedPalette.normalizeEffect(savedFanEffect),
+        fanLedColor = FanLedPalette.normalizeColor(
+            savedFanEffect,
+            savedFanColor
+        ),
         logoLedEnabled = prefs.getBoolean(GAME_MODE_LOGO_LED_ENABLED_KEY, true),
         logoLedEffect = prefs.getString(GAME_MODE_LOGO_LED_EFFECT_KEY, "steady") ?: "steady",
         logoLedColor = prefs.getInt(GAME_MODE_LOGO_LED_COLOR_KEY, 1),

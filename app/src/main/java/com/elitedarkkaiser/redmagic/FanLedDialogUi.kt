@@ -31,7 +31,15 @@ internal object FanLedDialogUi {
         val filterChip: (String, Boolean, () -> Unit) -> Button,
         val colorDot: (Int, String, () -> Unit) -> View,
         val colorDotDrawable: (String, Boolean) -> Drawable,
-        val fanPresetBubble: (String, String, String, String, String, () -> Unit) -> View
+        val fanPresetBubble: (
+            String,
+            String,
+            String,
+            String,
+            String,
+            () -> Boolean,
+            () -> Unit
+        ) -> View
     )
 
     fun showFanLedDialog(
@@ -251,28 +259,52 @@ internal object FanLedDialogUi {
         container.addView(effectLabel)
         container.addView(effectsRow)
 
+        fun presetBubble(
+            c1: String,
+            c2: String,
+            c3: String,
+            c4: String,
+            value: String
+        ): View {
+            return deps.fanPresetBubble(
+                c1,
+                c2,
+                c3,
+                c4,
+                value,
+                {
+                    FanLedPalette.isSelected(
+                        currentEffect(),
+                        currentColor(),
+                        value
+                    )
+                },
+                { applyFanPreset(value) }
+            )
+        }
+
         val presetBubbleRow1 = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, deps.dp(10), 0, 0)
-            addView(deps.fanPresetBubble("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00", "0x3002101") { applyFanPreset("0x3002101") })
+            addView(presetBubble("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00", "0x3002101"))
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#1565FF", "#00E676", "#22D3EE", "#FF69B4", "0x3002102") { applyFanPreset("0x3002102") })
+            addView(presetBubble("#1565FF", "#00E676", "#22D3EE", "#FF69B4", "0x3002102"))
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FFD600", "#FF69B4", "0x3002103") { applyFanPreset("0x3002103") })
+            addView(presetBubble("#22D3EE", "#FF0000", "#FFD600", "#FF69B4", "0x3002103"))
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#00E676", "#FF69B4", "#FF8C00", "#22D3EE", "0x3002104") { applyFanPreset("0x3002104") })
+            addView(presetBubble("#00E676", "#FF69B4", "#FF8C00", "#22D3EE", "0x3002104"))
         }
 
         val presetBubbleRow2 = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, deps.dp(10), 0, 0)
-            addView(deps.fanPresetBubble("#00E676", "#A020F0", "#FF8C00", "#FF69B4", "0x3002105") { applyFanPreset("0x3002105") })
+            addView(presetBubble("#00E676", "#A020F0", "#FF8C00", "#FF69B4", "0x3002105"))
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#FF0000", "#FF0000", "#FF0000", "#FF0000", "0x3002106") { applyFanPreset("0x3002106") })
+            addView(presetBubble("#FF0000", "#FF0000", "#FF0000", "#FF0000", "0x3002106"))
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0", "0x3002107") { applyFanPreset("0x3002107") })
+            addView(presetBubble("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0", "0x3002107"))
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FF8C00", "#00E676", "0x3002108") { applyFanPreset("0x3002108") })
+            addView(presetBubble("#22D3EE", "#FF0000", "#FF8C00", "#00E676", "0x3002108"))
         }
 
         container.addView(colorLabel)
@@ -378,7 +410,12 @@ internal object FanLedDialogUi {
         }
 
         fun updateColorDots() {
-            val presetActive = currentEffect().startsWith("preset:")
+            val presetActive = FanLedPalette.isPalette(
+                FanLedPalette.normalizeColor(
+                    currentEffect(),
+                    currentColor()
+                )
+            )
 
             (colorRow.getChildAt(0) as View).background = deps.colorDotDrawable("#FF0000", !presetActive && currentColor() == 1)
             (colorRow.getChildAt(2) as View).background = deps.colorDotDrawable("#FF8C00", !presetActive && currentColor() == 3)

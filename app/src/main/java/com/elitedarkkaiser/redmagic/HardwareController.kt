@@ -197,7 +197,7 @@ object HardwareController {
         FAN("3", true)
     }
 
-    private fun mapUnifiedLedColor(color: Int): Int {
+    private fun mapUnifiedLedColor(color: Int, allowFanPalette: Boolean): Int {
         return when (color) {
             1 -> 1  // red
             3 -> 3  // orange
@@ -207,24 +207,30 @@ object HardwareController {
             7 -> 7  // blue
             8 -> 8  // purple
             9 -> 9  // pink
+            in 0x101..0x108 -> if (allowFanPalette) color else 1
             else -> 1
         }
     }
 
-    private fun mapUnifiedLedEffect(effectName: String): String {
+    private fun mapUnifiedLedEffect(effectName: String): Int {
         return when (effectName.lowercase()) {
-            "steady" -> "00200"
-            "breathe" -> "00300"
-            "flashing" -> "00400"
-            "rapid" -> "00a00"
-            else -> "00200"
+            "steady" -> 0x002
+            "breathe" -> 0x003
+            "flashing" -> 0x004
+            "rapid" -> 0x00a
+            else -> 0x002
         }
     }
 
     private fun buildUnifiedLedEffectValue(zone: LedZone, effectName: String, color: Int): String {
-        val colorCode = mapUnifiedLedColor(color)
+        val colorCode = mapUnifiedLedColor(
+            color,
+            allowFanPalette = zone == LedZone.FAN
+        )
         val effectCode = mapUnifiedLedEffect(effectName)
-        return "0x${zone.zonePrefix}${effectCode}${Integer.toHexString(colorCode)}"
+        return "0x${zone.zonePrefix}" +
+            effectCode.toString(16).padStart(3, '0') +
+            colorCode.toString(16).padStart(3, '0')
     }
 
     private fun setUnifiedLedEffect(zone: LedZone, effectName: String, color: Int): Boolean {
@@ -268,7 +274,11 @@ object HardwareController {
     }
 
     fun setFanLedEffect(effectName: String, color: Int): Boolean {
-        return setUnifiedLedEffect(LedZone.FAN, effectName, color)
+        return setUnifiedLedEffect(
+            LedZone.FAN,
+            FanLedPalette.normalizeEffect(effectName),
+            FanLedPalette.normalizeColor(effectName, color)
+        )
     }
 
     fun setRgbCycleFrame(

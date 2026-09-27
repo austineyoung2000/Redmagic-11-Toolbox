@@ -124,7 +124,15 @@ object ChargingLedActions {
         filterChip: (String, Boolean, () -> Unit) -> android.widget.Button,
         colorDot: (Int, String, () -> Unit) -> android.view.View,
         colorDotDrawable: (String, Boolean) -> android.graphics.drawable.Drawable,
-        fanPresetBubble: (String, String, String, String, String, Boolean, () -> Unit) -> android.view.View
+        fanPresetBubble: (
+            String,
+            String,
+            String,
+            String,
+            String,
+            () -> Boolean,
+            () -> Unit
+        ) -> android.view.View
     ) {
         val chargingFanProfile = ChargingLedState.readProfile(
             activity,
@@ -139,10 +147,6 @@ object ChargingLedActions {
         var chargingFanEffect = chargingFanProfile.effect
         var chargingFanColor = chargingFanProfile.color
         var chargingFanDialogRefresh: (() -> Unit)? = null
-
-        if (chargingFanEffect.startsWith("preset:")) {
-            chargingFanColor = -1
-        }
 
         FanLedDialogUi.showFanLedDialog(
             activity = activity,
@@ -225,14 +229,23 @@ object ChargingLedActions {
             },
             anyLedEnabled = { ChargingLedState.isEnabled(activity) },
             applyFanPreset = { value ->
-                chargingFanEnabled = true
-                chargingFanEffect = "preset:$value"
-                chargingFanColor = -1
+                val palette =
+                    FanLedPalette.fromStockPreset(value)
+                if (palette != null) {
+                    chargingFanEnabled = true
+                    chargingFanEffect = FanLedPalette.normalizeEffect(
+                        chargingFanEffect
+                    )
+                    chargingFanColor = palette
 
-                runBackground {
-                    HardwareController.setFanLedStockPreset(value)
+                    runBackground {
+                        HardwareController.setFanLedEffect(
+                            chargingFanEffect,
+                            chargingFanColor
+                        )
+                    }
+                    chargingFanDialogRefresh?.invoke()
                 }
-                chargingFanDialogRefresh?.invoke()
             },
             setDialogRefresh = { callback -> chargingFanDialogRefresh = callback },
             deps = FanLedDialogUi.Deps(
@@ -250,14 +263,15 @@ object ChargingLedActions {
                 filterChip = filterChip,
                 colorDot = colorDot,
                 colorDotDrawable = colorDotDrawable,
-                fanPresetBubble = { c1, c2, c3, c4, presetValue, onClick ->
+                fanPresetBubble = {
+                        c1, c2, c3, c4, presetValue, selected, onClick ->
                     fanPresetBubble(
                         c1,
                         c2,
                         c3,
                         c4,
                         presetValue,
-                        chargingFanEffect == "preset:$presetValue",
+                        selected,
                         onClick
                     )
                 }

@@ -247,13 +247,14 @@ internal class MainLightingZoneDialogs(
                     ledViews.colorDotDrawable(hex, selected)
                 },
                 fanPresetBubble = {
-                        c1, c2, c3, c4, value, onClick ->
+                        c1, c2, c3, c4, value, selected, onClick ->
                     fanPresetBubble(
                         c1,
                         c2,
                         c3,
                         c4,
                         presetValue = value,
+                        selectedOverride = selected,
                         onClick = onClick
                     )
                 }
@@ -267,7 +268,7 @@ internal class MainLightingZoneDialogs(
         c3: String,
         c4: String,
         presetValue: String,
-        selected: Boolean,
+        selected: () -> Boolean,
         onClick: () -> Unit
     ): View {
         return fanPresetBubble(
@@ -276,8 +277,28 @@ internal class MainLightingZoneDialogs(
             c3,
             c4,
             presetValue = presetValue,
-            selectedOverride = { selected },
+            selectedOverride = selected,
             onClick = onClick
+        )
+    }
+
+    fun selectedFanPresetBubble(
+        c1: String,
+        c2: String,
+        c3: String,
+        c4: String,
+        presetValue: String,
+        selected: Boolean,
+        onClick: () -> Unit
+    ): View {
+        return selectedFanPresetBubble(
+            c1,
+            c2,
+            c3,
+            c4,
+            presetValue,
+            { selected },
+            onClick
         )
     }
 
@@ -356,9 +377,10 @@ internal class MainLightingZoneDialogs(
     }
 
     private fun applyFanPreset(effectValue: String) {
+        val palette = FanLedPalette.fromStockPreset(effectValue) ?: return
         state.fanEnabled = true
-        state.fanEffect = "preset:$effectValue"
-        state.fanColor = -1
+        state.fanEffect = FanLedPalette.normalizeEffect(state.fanEffect)
+        state.fanColor = palette
         applyFanSelection(state.fanEffect, state.fanColor)
         refreshFan?.invoke()
     }
@@ -386,7 +408,11 @@ internal class MainLightingZoneDialogs(
         return ledViews.fanPresetBubble(
             colors = colors.toList(),
             selected = selectedOverride ?: {
-                state.fanEffect == "preset:$presetValue"
+                FanLedPalette.isSelected(
+                    state.fanEffect,
+                    state.fanColor,
+                    presetValue
+                )
             },
             onClick = onClick
         )
