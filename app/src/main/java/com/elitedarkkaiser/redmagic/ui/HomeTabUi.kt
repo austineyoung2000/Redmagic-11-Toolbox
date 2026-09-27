@@ -2,11 +2,9 @@ package com.elitedarkkaiser.redmagic.ui
 
 import android.content.res.ColorStateList
 import android.view.Gravity
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.elitedarkkaiser.redmagic.DashboardSnapshot
 import com.elitedarkkaiser.redmagic.R
 import com.google.android.material.button.MaterialButton
 
@@ -17,7 +15,8 @@ object HomeTabUi {
         val deviceRamValue: TextView,
         val dashboardText: TextView,
         val activeModeText: TextView,
-        val thermalHistoryView: ThermalHistoryView
+        val thermalHistoryView: ThermalHistoryView,
+        val gameModeStatusText: TextView?
     )
 
     data class Result(
@@ -27,6 +26,7 @@ object HomeTabUi {
 
     fun create(deps: HomeTabDeps): Result {
         val container = deps.scrollTabContainer()
+        var gameModeStatusText: TextView? = null
 
         if (!deps.hasUsageStatsPermission()) {
             val usageCard = deps.sectionPanel().apply {
@@ -75,6 +75,7 @@ object HomeTabUi {
 
             deps.updateGameModeStatusUI(gameStatus)
             container.addView(gameStatus)
+            gameModeStatusText = gameStatus
         }
 
         val welcomeCard = deps.sectionPanel().apply {
@@ -200,38 +201,11 @@ object HomeTabUi {
                 )
             )
 
-            lateinit var refreshBtn: Button
-
-            fun refreshDashboard() {
-                refreshBtn.isEnabled = false
-                refreshBtn.text = "REFRESHING…"
-
-                val submitted = deps.runBackground {
-                    val summary =
-                        DashboardSnapshot.buildSummary(context)
-
-                    dashboardText.post {
-                        dashboardText.text = summary
-                        activeModeText.text =
-                            deps.activeModeSummary()
-                        refreshBtn.text = "REFRESH DASHBOARD"
-                        refreshBtn.isEnabled = true
-                    }
-                }
-
-                if (!submitted) {
-                    dashboardText.text =
-                        "Dashboard refresh unavailable"
-                    refreshBtn.text = "REFRESH DASHBOARD"
-                    refreshBtn.isEnabled = true
-                }
-            }
-
-            refreshBtn = deps.actionButton(
+            val refreshBtn = deps.actionButton(
                 "REFRESH DASHBOARD",
                 false
             ) {
-                refreshDashboard()
+                deps.requestStatusRefresh()
             }
 
             addView(dashboardText)
@@ -266,9 +240,6 @@ object HomeTabUi {
             addView(deps.space(deps.dp(8)))
             addView(deps.singleRow(refreshBtn))
 
-            dashboardText.post {
-                refreshDashboard()
-            }
         }
 
         container.addView(summaryCard)
@@ -284,7 +255,8 @@ object HomeTabUi {
                 deviceRamValue = deviceRamValue,
                 dashboardText = dashboardText,
                 activeModeText = activeModeText,
-                thermalHistoryView = thermalHistoryView
+                thermalHistoryView = thermalHistoryView,
+                gameModeStatusText = gameModeStatusText
             )
         )
     }

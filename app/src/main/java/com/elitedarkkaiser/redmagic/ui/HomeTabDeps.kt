@@ -19,7 +19,7 @@ data class HomeTabDeps(
     val segmentedChip: (String, Boolean, () -> Unit) -> Button,
     val space: (Int) -> TextView,
     val dp: (Int) -> Int,
-    val runBackground: (() -> Unit) -> Boolean,
+    val requestStatusRefresh: () -> Unit,
     val hasUsageStatsPermission: () -> Boolean,
     val openUsageStatsAccessSettings: () -> Unit,
     val showGamePickerDialog: () -> Unit,

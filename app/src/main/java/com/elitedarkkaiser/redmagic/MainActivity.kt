@@ -2,145 +2,143 @@ package com.elitedarkkaiser.redmagic
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Typeface
-import android.net.Uri
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import com.elitedarkkaiser.redmagic.ui.components.MainActivityUiKit
-import com.elitedarkkaiser.redmagic.ui.components.MainBottomNavigation
 
 class MainActivity : Activity() {
     private var useFahrenheit = true
+    private var uiLaunched = false
+    private var deviceCapabilities = DeviceCapabilities.unknown()
 
+    private lateinit var activityRuntime: MainActivityRuntime
+    private lateinit var tabHost: MainTabHost
 
-    private lateinit var deviceRomValue: TextView
-    private lateinit var deviceCpuValue: TextView
-    private lateinit var deviceRamValue: TextView
-    private lateinit var dashboardText: TextView
-    private lateinit var activeModeText: TextView
-    private lateinit var thermalHistoryView:
-        com.elitedarkkaiser.redmagic.ui.ThermalHistoryView
-    private var lastDisplayedRpm: Int = -1
-
-    private var coolingTabBuilt = false
-    private var controlsTabBuilt = false
-    private var hardwareTabBuilt = false
-    private var lightingTabBuilt = false
-
-    private lateinit var homeTab: LinearLayout
-    private lateinit var coolingTab: LinearLayout
-    private lateinit var controlsTab: LinearLayout
-    private lateinit var hardwareTab: LinearLayout
-    private lateinit var lightingTab: LinearLayout
-    private var magicKeyStatusLabelRef: TextView? = null
-    private var gameModeAppsTextRef: TextView? = null
-
-    private val bgColor get() = AppTheme.bgColor
-    private val panelColor get() = AppTheme.panelColor
-    private val panelPressed get() = AppTheme.panelPressed
-    private val borderColor get() = AppTheme.borderColor
-
-    private val accent get() = AppTheme.accentColor
-    private val textPrimary get() = AppTheme.textPrimary
-    private val textSecondary get() = AppTheme.textSecondary
-    private val typeface: Typeface? = Typeface.SANS_SERIF
-    private val highlightBorder get() = AppTheme.highlightBorder
-    private val mainUiKit by lazy(LazyThreadSafetyMode.NONE) {
+    private val uiKit: MainActivityUiKit by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
         MainActivityUiKit(this)
     }
-    private val ledControlViews by lazy(
+
+    private val ledViews: LedControlViewFactory by lazy(
         LazyThreadSafetyMode.NONE
     ) {
         LedControlViewFactory(this)
     }
-    private val bottomNavigation by lazy(
+
+    private val deviceGateActions: MainDeviceGateActions by lazy(
         LazyThreadSafetyMode.NONE
     ) {
-        MainBottomNavigation(this) { tab ->
-            switchTab(tab)
-        }
+        MainDeviceGateActions(this, uiKit)
     }
-    private val hardwareTabActions by lazy(
+
+    private val gameModeActions: MainGameModeActions by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainGameModeActions(this, uiKit, ledViews)
+    }
+
+    private val homeController: MainHomeController by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainHomeController(
+            activity = this,
+            uiKit = uiKit,
+            requestStatusRefresh = ::refreshStatus,
+            gameModeActions = gameModeActions
+        )
+    }
+
+    private val coolingController: MainCoolingTabActions by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainCoolingTabActions(
+            activity = this,
+            uiKit = uiKit,
+            runBackground = ::submitBackgroundTask,
+            refreshStatus = ::refreshStatus,
+            capabilities = { deviceCapabilities },
+            useFahrenheit = { useFahrenheit }
+        )
+    }
+
+    private val controlsController: MainControlsController by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainControlsController(
+            activity = this,
+            uiKit = uiKit,
+            runBackground = ::submitBackgroundTask,
+            refreshStatus = ::refreshStatus,
+            capabilities = { deviceCapabilities }
+        )
+    }
+
+    private val hardwareActions: MainHardwareTabActions by lazy(
         LazyThreadSafetyMode.NONE
     ) {
         MainHardwareTabActions(
             activity = this,
-            runBackground = { task ->
-                submitBackgroundTask(task)
-            },
-            onMasterProfileApplied = { profile ->
-                applyMasterProfileToUiState(profile)
-            }
+            runBackground = ::submitBackgroundTask,
+            onMasterProfileApplied = ::applyMasterProfileToUiState
         )
     }
-    private val lightingTabActions: MainLightingTabActions by lazy(
+
+    private val hardwareController: MainHardwareController by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainHardwareController(
+            activity = this,
+            uiKit = uiKit,
+            actions = hardwareActions,
+            runBackground = ::submitBackgroundTask,
+            refreshStatus = ::refreshStatus,
+            capabilities = { deviceCapabilities }
+        )
+    }
+
+    private val lightingActions: MainLightingTabActions by lazy(
         LazyThreadSafetyMode.NONE
     ) {
         MainLightingTabActions(
             activity = this,
-            runBackground = { task ->
-                submitBackgroundTask(task)
-            },
-            dp = { value -> mainUiKit.dp(value) },
+            runBackground = ::submitBackgroundTask,
+            dp = { value -> uiKit.dp(value) },
             filterChip = { label, selected, onClick ->
-                ledControlViews.filterChip(label, selected, onClick)
+                ledViews.filterChip(label, selected, onClick)
             },
             updateSelectableButton = { button, selected ->
-                mainUiKit.updateSelectableButton(button, selected)
+                uiKit.updateSelectableButton(button, selected)
             }
         )
     }
+
     private val lightingController: MainLightingController by lazy(
         LazyThreadSafetyMode.NONE
     ) {
         MainLightingController(
             activity = this,
-            uiKit = mainUiKit,
-            ledViews = ledControlViews,
-            actions = lightingTabActions,
-            runBackground = { task ->
-                submitBackgroundTask(task)
-            },
+            uiKit = uiKit,
+            ledViews = ledViews,
+            actions = lightingActions,
+            runBackground = ::submitBackgroundTask,
             capabilities = { deviceCapabilities },
             showGameModeAppPicker = {
-                showGamePickerDialog()
+                gameModeActions.showAppPicker()
             },
             showGameModeProfileDialog = {
-                showGameModeProfileDialog()
+                gameModeActions.showProfileDialog()
             }
         )
     }
-    private val coolingTabActions by lazy(
-        LazyThreadSafetyMode.NONE
-    ) {
-        MainCoolingTabActions(
-            activity = this,
-            uiKit = mainUiKit,
-            runBackground = { task ->
-                submitBackgroundTask(task)
-            },
-            refreshStatus = { refreshStatus() },
-            capabilities = { deviceCapabilities },
-            useFahrenheit = { useFahrenheit }
-        )
-    }
-    private var mainUiReady = false
-    private var deviceCapabilities =
-        DeviceCapabilities.unknown()
-    private lateinit var activityRuntime: MainActivityRuntime
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppTheme.configure(this)
 
         if (!DeviceCompatibility.isSupportedDevice()) {
-            showUnsupportedDeviceDialog()
+            deviceGateActions.showUnsupportedDevice()
             return
         }
 
@@ -148,10 +146,9 @@ class MainActivity : Activity() {
             activity = this,
             onStatusSnapshot = ::applyStatusSnapshot
         )
-        
+
         initDefaultTriggerMappingsStorage(this)
-        deviceCapabilities =
-            deviceCapabilitiesStorage(this)
+        deviceCapabilities = deviceCapabilitiesStorage(this)
 
         val needsFirstInstallSetup =
             !isFirstInstallPermissionsPromptedStorage(this) ||
@@ -162,10 +159,9 @@ class MainActivity : Activity() {
                 setCachedRootAccessStorage(this, true)
                 launchMainUi()
             }
-            return
+        } else {
+            verifyRootAndLaunch()
         }
-
-        verifyRootAndLaunch()
     }
 
     @Deprecated("Legacy result API retained for Android 9 compatibility")
@@ -187,45 +183,17 @@ class MainActivity : Activity() {
             return
         }
 
-        if (
-            MasterProfileDocumentTransfer.handleActivityResult(
-                activity = this,
-                requestCode = requestCode,
-                resultCode = resultCode,
-                data = data,
-                runBackground = { task ->
-                    submitBackgroundTask(task)
-                }
-            )
-        ) {
-            return
-        }
+        MasterProfileDocumentTransfer.handleActivityResult(
+            activity = this,
+            requestCode = requestCode,
+            resultCode = resultCode,
+            data = data,
+            runBackground = ::submitBackgroundTask
+        )
     }
-
-    private fun verifyRootAndLaunch() {
-        if (hasCachedRootAccessStorage(this)) {
-            launchMainUi()
-            return
-        }
-
-        val submitted = activityRuntime.verifyRoot { rooted ->
-            if (rooted) {
-                setCachedRootAccessStorage(this, true)
-                launchMainUi()
-            } else {
-                showRootRequiredDialog()
-            }
-        }
-
-        if (!submitted && !isFinishing && !isDestroyed) {
-            showRootRequiredDialog()
-        }
-    }
-
 
     override fun onStart() {
         super.onStart()
-
         if (::activityRuntime.isInitialized) {
             activityRuntime.onStart()
         }
@@ -237,9 +205,7 @@ class MainActivity : Activity() {
         val savedUnit = isUseFahrenheitStorage(this)
         if (savedUnit != useFahrenheit) {
             useFahrenheit = savedUnit
-            if (mainUiReady) {
-                refreshStatus()
-            }
+            if (uiLaunched) refreshStatus()
         }
     }
 
@@ -257,746 +223,108 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun showMagicKeyAppPicker(
-        targetButton: Button,
-        shortcutButton: Button?
-    ) {
-        MagicKeyAppPickerDialog.show(
-            activity = this,
-            targetButton = targetButton,
-            statusLabel = magicKeyStatusLabelRef,
-            applyLaunchAppMagicKeyMode = { pkg, label, statusLabel, sliderButton ->
-                MagicKeyActions.applyLaunchAppMode(
-                    activity = this,
-                    pkg = pkg,
-                    label = label,
-                    statusLabel = statusLabel,
-                    sliderButton = sliderButton,
-                    shortcutButton = shortcutButton,
-                    runBackground = { task ->
-                            submitBackgroundTask(task)
-                        },
-                        refreshStatus = { refreshStatus() }
-                )
-            },
-            deps = magicKeyPickerDeps()
-        )
-    }
+    private fun verifyRootAndLaunch() {
+        if (hasCachedRootAccessStorage(this)) {
+            launchMainUi()
+            return
+        }
 
-    private fun magicKeyPickerDeps() =
-        MagicKeyAppPickerDialog.Deps(
-            textPrimary = textPrimary,
-            textSecondary = textSecondary,
-            panelColor = panelColor,
-            borderColor = borderColor,
-            typeface = typeface,
-            dp = { value -> mainUiKit.dp(value) },
-            roundedBg = { fill, stroke, radius ->
-                mainUiKit.roundedBg(fill, stroke, radius)
-            },
-            roundedFill = { color, radius ->
-                mainUiKit.roundedFill(color, radius)
-            },
-            space = { value -> mainUiKit.space(value) }
-        )
-
-    private fun showSliderDualAppDialog(targetButton: Button) {
-        val status = magicKeyStatusLabelRef ?: return
-
-        SliderDualAppDialog.show(
-            activity = this,
-            statusLabel = status,
-            pickerDeps = magicKeyPickerDeps(),
-            runBackground = { task ->
-                submitBackgroundTask(task)
-            },
-            onSaved = {
-                targetButton.text =
-                    SliderDualAppStorage.summary(this)
-                refreshStatus()
+        val submitted = activityRuntime.verifyRoot { rooted ->
+            if (rooted) {
+                setCachedRootAccessStorage(this, true)
+                launchMainUi()
+            } else {
+                deviceGateActions.showRootRequired()
             }
-        )
+        }
+
+        if (!submitted && !isFinishing && !isDestroyed) {
+            deviceGateActions.showRootRequired()
+        }
     }
 
-    private fun showMagicKeyShortcutPicker(
-        targetButton: Button,
-        appButton: Button?
-    ) {
-        MagicKeyShortcutDialog.show(
+    private fun launchMainUi() {
+        if (uiLaunched || isFinishing || isDestroyed) return
+
+        lightingController.loadSavedState()
+        coolingController.loadSavedPumpState()
+        useFahrenheit = isUseFahrenheitStorage(this)
+
+        tabHost = MainTabHost(
             activity = this,
-            targetButton = targetButton,
-            appButton = appButton,
-            statusLabel = magicKeyStatusLabelRef,
-            pickerDeps = magicKeyPickerDeps(),
-            runBackground = { task ->
-                submitBackgroundTask(task)
-            },
-            refreshStatus = { refreshStatus() }
+            topInset = uiKit.getStatusBarHeight(),
+            backgroundColor = AppTheme.bgColor,
+            dp = { value -> uiKit.dp(value) },
+            createHome = { homeController.createView() },
+            createCooling = { coolingController.createView() },
+            createControls = { controlsController.createView() },
+            createHardware = { hardwareController.createView() },
+            createLighting = { lightingController.createView() }
         )
+        tabHost.launch()
+        uiLaunched = true
+
+        coolingController.startAutoPumpIfEnabled()
+        lightingController.startRgbStudioIfEnabled()
+        startTriggerAutoStartIfEnabled()
+        activityRuntime.onUiReady()
+        startCapabilityScan()
     }
 
-    private fun applyMasterProfileToUiState(
-        profile: MasterProfile
-    ) {
-        val hardware = profile.hardware
-        coolingTabActions.applyMasterProfile(hardware)
+    private fun startCapabilityScan() {
+        DeviceScanActions.runBackgroundScan(this) { capabilities ->
+            deviceCapabilities = capabilities
+
+            runOnUiThread {
+                if (
+                    uiLaunched &&
+                    ::tabHost.isInitialized &&
+                    !isFinishing &&
+                    !isDestroyed
+                ) {
+                    tabHost.refreshBuiltTabs()
+                }
+            }
+        }
+    }
+
+    private fun startTriggerAutoStartIfEnabled() {
+        if (!readTriggerPrefsSnapshot(this).triggersAutoStart) return
+
+        submitBackgroundTask {
+            HardwareServiceActions.startTriggersIfAutoStartEnabled(this)
+            refreshStatus()
+        }
+    }
+
+    private fun applyMasterProfileToUiState(profile: MasterProfile) {
+        coolingController.applyMasterProfile(profile.hardware)
         lightingController.applyMasterProfile(profile)
         useFahrenheit = profile.useFahrenheit
         refreshStatus()
     }
 
-    private fun showRootRequiredDialog() {
-        DeviceGateDialogs.showRootRequiredDialog(
-            activity = this,
-            onClose = { finish() },
-            deps = DeviceGateDialogs.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) }
-            )
+    private fun applyStatusSnapshot(snapshot: MainStatusSnapshot) {
+        coolingController.applyTemperature(
+            snapshot.telemetry.temperatureF
         )
-    }
-
-    private fun showUnsupportedDeviceDialog() {
-        DeviceGateDialogs.showUnsupportedDeviceDialog(
-            activity = this,
-            model = DeviceCompatibility
-                .identity()
-                .detectedModel,
-            onClose = { finish() },
-            deps = DeviceGateDialogs.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius ->
-                    mainUiKit.roundedBg(fill, stroke, radius)
-                },
-                roundedFill = { color, radius ->
-                    mainUiKit.roundedFill(color, radius)
-                }
-            )
+        homeController.applyStatusSnapshot(
+            snapshot,
+            useFahrenheit
         )
-    }
-
-    private fun startCapabilityScan() {
-        DeviceScanActions.runBackgroundScan(this) {
-            capabilities ->
-            deviceCapabilities = capabilities
-
-            runOnUiThread {
-                if (!isFinishing && !isDestroyed) {
-                    refreshCapabilityAwareTabs()
-                }
-            }
-        }
-    }
-
-    private fun launchMainUi() {
-        startCapabilityScan()
-
-        lightingController.loadSavedState()
-        coolingTabActions.loadSavedPumpState()
-        useFahrenheit = isUseFahrenheitStorage(this)
-
-        val result = MainUiLauncher.launch(
-            activity = this,
-            topInset = mainUiKit.getStatusBarHeight(),
-            bgColor = bgColor,
-            dp = { value -> mainUiKit.dp(value) },
-            createHomeTab = { createHomeTab() },
-            createCoolingTab = { createCoolingTab() },
-            createControlsTab = { createControlsTab() },
-            createHardwareTab = { createHardwareTab() },
-            createLightingTab = { createLightingTab() },
-            bottomNavBar = {
-                bottomNavigation.createView()
-            }
-        )
-
-        homeTab = result.homeTab
-        coolingTab = result.coolingTab
-        controlsTab = result.controlsTab
-        hardwareTab = result.hardwareTab
-        lightingTab = result.lightingTab
-
-        coolingTabBuilt = false
-        controlsTabBuilt = false
-        hardwareTabBuilt = false
-        lightingTabBuilt = false
-
-        coolingTabActions.startAutoPumpIfEnabled()
-
-        lightingController.startRgbStudioIfEnabled()
-
-        if (readTriggerPrefsSnapshot(this).triggersAutoStart) {
-            submitBackgroundTask {
-                HardwareServiceActions
-                    .startTriggersIfAutoStartEnabled(this)
-                refreshStatus()
-            }
-        }
-
-        switchTab("home")
-        mainUiReady = true
-        activityRuntime.onUiReady()
-        // Do not start background services just because the UI opened.
-        // Game Mode starts from selected-app foreground events.
-        // Charging Mode starts from boot, plug state, or explicit toggle.
-    }
-
-    private fun submitBackgroundTask(
-        task: () -> Unit
-    ): Boolean {
-        return activityRuntime.submit(task)
-    }
-
-    private fun createHomeTab(): LinearLayout {
-        val result = com.elitedarkkaiser.redmagic.ui.HomeTabUi.create(
-            com.elitedarkkaiser.redmagic.ui.HomeTabDeps(
-                scrollTabContainer = { mainUiKit.scrollTabContainer() },
-                sectionPanel = { mainUiKit.sectionPanel() },
-                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
-                subtitleText = { text -> mainUiKit.subtitleText(text) },
-                bodyText = { text -> mainUiKit.bodyText(text) },
-                ledTitleText = { text -> mainUiKit.ledTitleText(text) },
-                infoValue = { mainUiKit.infoValue() },
-                infoRow = { label, valueView -> mainUiKit.infoRow(label, valueView) },
-                statusChip = { text -> mainUiKit.statusChip(text) },
-                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
-                singleRow = { button -> mainUiKit.singleRow(button) },
-                segmentedChip = { label, selected, onClick -> mainUiKit.segmentedChip(label, selected, onClick) },
-                space = { width -> mainUiKit.space(width) },
-                dp = { value -> mainUiKit.dp(value) },
-                runBackground = { task ->
-                    submitBackgroundTask(task)
-                },
-                hasUsageStatsPermission = { PermissionActions.hasUsageStatsPermission(this) },
-                openUsageStatsAccessSettings = { PermissionActions.openUsageStatsAccessSettings(this) },
-                showGamePickerDialog = { showGamePickerDialog() },
-                updateGameModeStatusUI = { textView -> updateGameModeStatusUI(textView) },
-                openSettings = {
-                    startActivity(
-                        Intent(this, SettingsActivity::class.java)
-                    )
-                },
-                openUrl = { url -> openUrl(url) },
-                deviceScanSummary = {
-                    deviceScanSummaryStorage(this)
-                },
-                activeModeSummary = {
-                    ActiveModeInspector.summary(this)
-                }
-            )
-        )
-
-        deviceRomValue = result.refs.deviceRomValue
-        deviceCpuValue = result.refs.deviceCpuValue
-        deviceRamValue = result.refs.deviceRamValue
-        dashboardText = result.refs.dashboardText
-        activeModeText = result.refs.activeModeText
-        thermalHistoryView =
-            result.refs.thermalHistoryView
-
-        return result.view
-    }
-
-    private fun createCoolingTab(): LinearLayout {
-        return coolingTabActions.createView()
-    }
-
-    private fun createControlsTab(): LinearLayout {
-        val result = com.elitedarkkaiser.redmagic.ui.ControlsTabUi.create(
-            this,
-            com.elitedarkkaiser.redmagic.ui.ControlsTabDeps(
-                scrollTabContainer = { mainUiKit.scrollTabContainer() },
-                sectionPanel = { mainUiKit.sectionPanel() },
-                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
-                bodyText = { text -> mainUiKit.bodyText(text) },
-                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
-                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
-                smallActionButton = { text, isDanger, onClick -> mainUiKit.smallActionButton(text, isDanger, onClick) },
-                singleRow = { button -> mainUiKit.singleRow(button) },
-                row = { left, right -> mainUiKit.row(left, right) },
-                flowRow = { views -> mainUiKit.flowRow(*views) },
-                space = { width -> mainUiKit.space(width) },
-                spacer = { height -> mainUiKit.spacer(height) },
-                dp = { value -> mainUiKit.dp(value) },
-                runBackground = { task ->
-                    submitBackgroundTask(task)
-                },
-                capabilities = deviceCapabilities,
-
-                refreshStatus = { refreshStatus() },
-                readMagicKeyModeLabel = {
-                    if (SliderDualAppStorage.read(this).enabled) {
-                        "Dual App Slider"
-                    } else {
-                        MagicKeyActions.readModeLabel()
-                    }
-                },
-                applyStockMagicKeyMode = { label, action, statusLabel, sliderButton, shortcutButton ->
-                    MagicKeyActions.applyStockMode(
-                        activity = this,
-                        label = label,
-                        applyMode = action,
-                        statusLabel = statusLabel,
-                        sliderButton = sliderButton,
-                        shortcutButton = shortcutButton,
-                        runBackground = { task ->
-                            submitBackgroundTask(task)
-                        },
-                        refreshStatus = { refreshStatus() }
-                    )
-                },
-                disableMagicKeyMode = { statusLabel, sliderButton, shortcutButton ->
-                    MagicKeyActions.disableMode(
-                        activity = this,
-                        statusLabel = statusLabel,
-                        sliderButton = sliderButton,
-                        shortcutButton = shortcutButton,
-                        runBackground = { task ->
-                            submitBackgroundTask(task)
-                        },
-                        refreshStatus = { refreshStatus() }
-                    )
-                },
-                resolveMagicKeyAppLabel = { pkg -> MagicKeyActions.resolveAppLabel(this, pkg) },
-                savedMagicKeyAppPackage = { savedMagicKeyAppPackageStorage(this) },
-                showMagicKeyAppPicker = { button, shortcutButton ->
-                    showMagicKeyAppPicker(button, shortcutButton)
-                },
-                savedMagicKeyShortcut = {
-                    savedMagicKeyShortcutStorage(this)?.label
-                },
-                showMagicKeyShortcutPicker = { button, appButton ->
-                    showMagicKeyShortcutPicker(button, appButton)
-                },
-                sliderDualAppSummary = {
-                    SliderDualAppStorage.summary(this)
-                },
-                showSliderDualAppDialog = { button ->
-                    showSliderDualAppDialog(button)
-                }
-            )
-        )
-
-        magicKeyStatusLabelRef = result.refs.magicKeyStatusLabel
-        return result.view
-    }
-
-    private fun createHardwareTab(): LinearLayout {
-        return com.elitedarkkaiser.redmagic.ui.HardwareTabUi.create(
-            this,
-            com.elitedarkkaiser.redmagic.ui.HardwareTabDeps(
-                scrollTabContainer = { mainUiKit.scrollTabContainer() },
-                sectionPanel = { mainUiKit.sectionPanel() },
-                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
-                bodyText = { text -> mainUiKit.bodyText(text) },
-                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
-                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
-                singleRow = { button -> mainUiKit.singleRow(button) },
-                row = { left, right -> mainUiKit.row(left, right) },
-                space = { width -> mainUiKit.space(width) },
-                dp = { value -> mainUiKit.dp(value) },
-                capabilities = deviceCapabilities,
-
-                showTriggerSetupDialog = { showTriggerSetupDialog() },
-                showNativeTgkProfileDialog = {
-                    showNativeTgkProfileDialog()
-                },
-                showNativeTgkDiagnosticsDialog = {
-                    NativeTgkDiagnosticsDialog.show(this)
-                },
-                triggerSafetySummary = {
-                    triggerSafetySummaryStorage(this)
-                },
-                showTriggerSafetyDialog = { onSaved ->
-                    showTriggerSafetyDialog(onSaved)
-                },
-                enableTriggersAndService = { onComplete ->
-                    val submitted = submitBackgroundTask {
-                        val enabled =
-                            HardwareServiceActions
-                                .enableTriggersManually(
-                                    this
-                                )
-
-                        if (enabled) {
-                            refreshStatus()
-                        }
-
-                        runOnUiThread {
-                            if (isFinishing || isDestroyed) {
-                                return@runOnUiThread
-                            }
-                            onComplete(enabled)
-                        }
-                    }
-
-                    if (!submitted) {
-                        onComplete(false)
-                    }
-                },
-                disableTriggersAndService = { onComplete ->
-                    val submitted = submitBackgroundTask {
-                        val disabled =
-                            HardwareServiceActions
-                                .disableTriggersUntilRestart(
-                                    this
-                                )
-
-                        refreshStatus()
-
-                        runOnUiThread {
-                            if (isFinishing || isDestroyed) {
-                                return@runOnUiThread
-                            }
-                            onComplete(disabled)
-                        }
-                    }
-
-                    if (!submitted) {
-                        onComplete(false)
-                    }
-                },
-
-                readChargeSeparation = { onComplete ->
-                    hardwareTabActions.readChargeSeparation(
-                        onComplete
-                    )
-                },
-                setChargeSeparation = { enabled, onComplete ->
-                    hardwareTabActions.setChargeSeparation(
-                        enabled,
-                        onComplete
-                    )
-                },
-                showRefreshRateProfiles = {
-                    RefreshRateProfileDialog.show(this)
-                },
-                showTouchTuningProfiles = {
-                    TouchTuningProfileDialog.show(this)
-                },
-                showPerformanceModeProfiles = {
-                    PerformanceModeProfileDialog.show(this)
-                },
-
-                loadMasterProfiles = {
-                    hardwareTabActions.loadMasterProfiles()
-                },
-                saveMasterProfile = { name, onComplete ->
-                    hardwareTabActions.saveMasterProfile(
-                        name,
-                        onComplete
-                    )
-                },
-                applyMasterProfile = { profile ->
-                    hardwareTabActions.applyMasterProfile(
-                        profile
-                    )
-                },
-                deleteMasterProfile = { name ->
-                    hardwareTabActions.deleteMasterProfile(name)
-                },
-                exportMasterBackup = {
-                    hardwareTabActions.requestMasterBackupExport()
-                },
-                importMasterBackup = {
-                    hardwareTabActions.requestMasterBackupImport()
-                },
-                automationRulesSummary = {
-                    AutomationRulesStorage.summary(this)
-                },
-                showAutomationRulesDialog = { onSaved ->
-                    AutomationRulesDialog.show(
-                        this,
-                        onSaved
-                    )
-                }
-            )
-        )
-    }
-
-    private fun createLightingTab(): LinearLayout {
-        return lightingController.createView()
-    }
-
-    private fun showNativeTgkProfileDialog() {
-        NativeTgkProfileDialog.show(this)
-    }
-
-    private fun showTriggerSetupDialog() {
-        TriggerSetupDialog.show(
-            activity = this,
-            deps = TriggerSetupDialog.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                space = { value -> mainUiKit.space(value) }
-            )
-        )
-    }
-
-    private fun showTriggerSafetyDialog(
-        onSaved: () -> Unit
-    ) {
-        TriggerSafetyDialog.show(
-            activity = this,
-            deps = TriggerSafetyDialog.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius ->
-                    mainUiKit.roundedBg(fill, stroke, radius)
-                },
-                space = { value -> mainUiKit.space(value) }
-            ),
-            onSaved = onSaved
-        )
-    }
-
-    private fun showGameModeProfileDialog() {
-        GameModeUi.showGameModeProfileDialog(
-            activity = this,
-            current = getSavedGameModeProfileStorage(this),
-            deps = GameModeUi.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-                space = { value -> mainUiKit.space(value) },
-                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
-                colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
-            ),
-            onSaveProfile = { profile ->
-                saveGameModeProfileStorage(this, profile)
-                GameModeActions.applySavedProfileThroughService(this)
-            }
-        )
-    }
-
-    private fun refreshCapabilityAwareTabs() {
-        if (
-            !mainUiReady ||
-            !::homeTab.isInitialized
-        ) {
-            return
-        }
-
-        val parent = homeTab.parent as? ViewGroup
-            ?: return
-
-        fun replaceBuiltTab(
-            oldTab: LinearLayout,
-            newTab: LinearLayout
-        ): LinearLayout {
-            val index = parent.indexOfChild(oldTab)
-
-            if (index < 0) {
-                return oldTab
-            }
-
-            newTab.visibility = oldTab.visibility
-            parent.removeViewAt(index)
-            parent.addView(newTab, index)
-            return newTab
-        }
-
-        if (coolingTabBuilt) {
-            coolingTab = replaceBuiltTab(
-                coolingTab,
-                createCoolingTab()
-            )
-        }
-
-        if (controlsTabBuilt) {
-            controlsTab = replaceBuiltTab(
-                controlsTab,
-                createControlsTab()
-            )
-        }
-
-        if (hardwareTabBuilt) {
-            hardwareTab = replaceBuiltTab(
-                hardwareTab,
-                createHardwareTab()
-            )
-        }
-
-        if (lightingTabBuilt) {
-            lightingTab = replaceBuiltTab(
-                lightingTab,
-                createLightingTab()
-            )
-        }
-    }
-
-    private fun switchTab(tab: String) {
-        val parent = homeTab.parent as ViewGroup
-
-        fun replaceTab(
-            oldTab: LinearLayout,
-            newTab: LinearLayout
-        ): LinearLayout {
-            val index = parent.indexOfChild(oldTab)
-            if (index < 0) {
-                parent.addView(newTab)
-                return newTab
-            }
-
-            parent.removeViewAt(index)
-            parent.addView(newTab, index)
-            return newTab
-        }
-
-        when (tab) {
-            "cooling" -> {
-                if (!coolingTabBuilt) {
-                    coolingTab = replaceTab(
-                        coolingTab,
-                        createCoolingTab()
-                    )
-                    coolingTabBuilt = true
-                }
-            }
-
-            "controls" -> {
-                if (!controlsTabBuilt) {
-                    controlsTab = replaceTab(
-                        controlsTab,
-                        createControlsTab()
-                    )
-                    controlsTabBuilt = true
-                }
-            }
-
-            "hardware" -> {
-                if (!hardwareTabBuilt) {
-                    hardwareTab = replaceTab(
-                        hardwareTab,
-                        createHardwareTab()
-                    )
-                    hardwareTabBuilt = true
-                }
-            }
-
-            "lighting" -> {
-                if (!lightingTabBuilt) {
-                    lightingTab = replaceTab(
-                        lightingTab,
-                        createLightingTab()
-                    )
-                    lightingTabBuilt = true
-                }
-            }
-        }
-
-        homeTab.visibility = if (tab == "home") View.VISIBLE else View.GONE
-        coolingTab.visibility = if (tab == "cooling") View.VISIBLE else View.GONE
-        controlsTab.visibility = if (tab == "controls") View.VISIBLE else View.GONE
-        hardwareTab.visibility = if (tab == "hardware") View.VISIBLE else View.GONE
-        lightingTab.visibility = if (tab == "lighting") View.VISIBLE else View.GONE
-
-        bottomNavigation.select(tab)
     }
 
     private fun refreshStatus() {
-        activityRuntime.requestStatusRefresh()
-    }
-
-    private fun applyStatusSnapshot(
-        snapshot: MainStatusSnapshot
-    ) {
-        val telemetry = snapshot.telemetry
-        val rpmRaw = telemetry.fanRpm
-        val tempF = telemetry.temperatureF
-
-        val rpm = when {
-            rpmRaw == null ->
-                lastDisplayedRpm.takeIf { it >= 0 }
-            lastDisplayedRpm < 0 -> rpmRaw
-            else ->
-                ((lastDisplayedRpm * 0.7) + (rpmRaw * 0.3))
-                    .toInt()
-        }
-
-        if (rpm != null) {
-            lastDisplayedRpm = rpm
-        }
-
-        coolingTabActions.applyTemperature(tempF)
-
-        deviceRomValue.text = snapshot.deviceInfo.rom
-        deviceCpuValue.text = snapshot.deviceInfo.cpu
-        deviceRamValue.text = snapshot.deviceInfo.ram
-
-        if (::dashboardText.isInitialized) {
-            dashboardText.text = snapshot.dashboardSummary
-        }
-
-        if (::activeModeText.isInitialized) {
-            activeModeText.text = snapshot.activeModeSummary
-        }
-
-        if (::thermalHistoryView.isInitialized) {
-            thermalHistoryView.setHistory(
-                snapshot.temperatureHistory,
-                useFahrenheit
-            )
-        }
-
-    }
-
-    private fun openUrl(url: String) {
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        } catch (_: Throwable) {
+        if (::activityRuntime.isInitialized) {
+            activityRuntime.requestStatusRefresh()
         }
     }
 
-    private fun showGamePickerDialog() {
-        showGamePickerDialogUI(this) {
-            gameModeAppsTextRef?.text = gameModeAppsSummaryStorage(this)
+    private fun submitBackgroundTask(task: () -> Unit): Boolean {
+        return if (::activityRuntime.isInitialized) {
+            activityRuntime.submit(task)
+        } else {
+            false
         }
     }
-
-
-
-
-    private fun updateGameModeStatusUI(textView: TextView) {
-        textView.text = getGameModeStatusTextStorage(this)
-    }
-
-
 }

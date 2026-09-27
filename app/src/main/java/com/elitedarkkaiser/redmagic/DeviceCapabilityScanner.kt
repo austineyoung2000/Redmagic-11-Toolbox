@@ -3,6 +3,7 @@ package com.elitedarkkaiser.redmagic
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import java.io.File
 
 data class DeviceCapabilityReport(
     val model: String,
@@ -35,18 +36,57 @@ object DeviceCapabilityScanner {
         return RootShell.execForOutput(command)?.trim().orEmpty()
     }
 
-    private fun exists(path: String): Boolean {
-        val safe = path.replace("'", "'\\''")
-        return output("[ -e '$safe' ] && echo yes || echo no") == "yes"
-    }
-
     private fun prop(name: String): String {
         return output("getprop $name")
     }
 
-    private fun packageInstalled(packageName: String): Boolean {
-        val safe = packageName.replace("'", "'\\''")
-        return output("pm path '$safe'").startsWith("package:")
+    @Suppress("DEPRECATION")
+    private fun packageInstalled(
+        context: Context,
+        packageName: String
+    ): Boolean {
+        return runCatching {
+            context.packageManager.getApplicationInfo(
+                packageName,
+                0
+            )
+        }.isSuccess
+    }
+
+    /**
+     * Check every vendor path directly first, then confirm all paths hidden
+     * by SELinux with one read-only root command instead of one shell call
+     * per path.
+     */
+    private fun probePaths(paths: Set<String>): Map<String, Boolean> {
+        val direct = paths.associateWith { path ->
+            runCatching { File(path).exists() }.getOrDefault(false)
+        }
+        val unresolved = direct.filterValues { exists -> !exists }.keys
+        if (unresolved.isEmpty()) return direct
+
+        val ordered = unresolved.toList()
+        val command = ordered.mapIndexed { index, path ->
+            val safe = path.replace("'", "'\\''")
+            "[ -e '$safe' ] && printf '$index=1\\n' || " +
+                "printf '$index=0\\n'"
+        }.joinToString("; ")
+        val rooted = output(command)
+            .lineSequence()
+            .mapNotNull { line ->
+                val parts = line.split('=', limit = 2)
+                val index = parts.getOrNull(0)?.toIntOrNull()
+                    ?: return@mapNotNull null
+                index to (parts.getOrNull(1) == "1")
+            }
+            .toMap()
+
+        return paths.associateWith { path ->
+            direct[path] == true ||
+                ordered.indexOf(path).let { index ->
+                    index >= 0 && rooted[index] == true
+                }
+        }
     }
 
     private fun handlesIntent(
@@ -75,6 +115,27 @@ object DeviceCapabilityScanner {
         val model = identity.detectedModel
         val marketName = identity.marketName
         val fingerprint = Build.FINGERPRINT.orEmpty().ifBlank { prop("ro.build.fingerprint") }
+
+        val vendorPaths = setOf(
+            DeviceCompatibility.Paths.FAN_ENABLE,
+            DeviceCompatibility.Paths.FAN_LEVEL,
+            DeviceCompatibility.Paths.FAN_RPM,
+            DeviceCompatibility.Paths.PUMP_ENABLE,
+            DeviceCompatibility.Paths.PUMP_FREQ,
+            DeviceCompatibility.Paths.PUMP_SPEED,
+            DeviceCompatibility.Paths.LED_EFFECT,
+            DeviceCompatibility.Paths.LED_CFG,
+            DeviceCompatibility.Paths.SAR0_MODE,
+            DeviceCompatibility.Paths.SAR1_MODE,
+            DeviceCompatibility.Paths.GYRO_ENABLE,
+            DeviceCompatibility.Paths.GYRO_X,
+            DeviceCompatibility.Paths.GYRO_Y,
+            "/proc/driver/slider"
+        )
+        val availablePaths = probePaths(vendorPaths)
+        fun exists(path: String): Boolean {
+            return availablePaths[path] == true
+        }
 
         val fanAvailable =
             exists(DeviceCompatibility.Paths.FAN_ENABLE) &&
@@ -111,9 +172,11 @@ object DeviceCapabilityScanner {
         val stockFirmware =
             DeviceCompatibility.isStockRedmagicFirmware()
         val gameSpaceInstalled = packageInstalled(
+            context,
             "cn.nubia.gamelauncher"
         )
         val gameAssistInstalled = packageInstalled(
+            context,
             "cn.nubia.gameassist"
         )
         val stockGameSuiteAvailable =
