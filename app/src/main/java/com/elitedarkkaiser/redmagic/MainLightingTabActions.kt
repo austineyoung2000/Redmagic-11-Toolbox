@@ -1,11 +1,10 @@
 package com.elitedarkkaiser.redmagic
 
-import android.app.Activity
 import android.widget.Button
 import com.elitedarkkaiser.redmagic.state.LedState
 
-class MainLightingTabActions(
-    private val activity: Activity,
+internal class MainLightingTabActions(
+    private val activity: MainActivity,
     private val runBackground: (() -> Unit) -> Boolean,
     private val dp: (Int) -> Int,
     private val filterChip:
