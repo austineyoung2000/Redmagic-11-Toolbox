@@ -101,6 +101,7 @@ class TriggerAccessibilityService : AccessibilityService() {
                 deactivateNativeTgk("screen off")
                 RefreshRateOverlay.hide()
                 RefreshRateCoordinator.clearRuntimeState()
+                dispatchPerformanceReset("screen off")
             } else if (intent.action == Intent.ACTION_SCREEN_ON) {
                 forceForegroundReconcile = true
                 if (nativeTgkStartupCleanupComplete) {
@@ -180,13 +181,19 @@ class TriggerAccessibilityService : AccessibilityService() {
         val editorNeedsStop =
             NativeTgkEditorRuntime
                 .shouldStopForForeground(packageName)
+        val performanceNeedsApply =
+            PerformanceModeCoordinator.needsReconcile(
+                this,
+                packageName
+            )
         val force = forceForegroundReconcile
 
         if (
             force ||
             packageName != lastForegroundPackage ||
             mappingNeedsApply ||
-            editorNeedsStop
+            editorNeedsStop ||
+            performanceNeedsApply
         ) {
             forceForegroundReconcile = false
             handleForegroundPackage(packageName)
@@ -241,6 +248,9 @@ class TriggerAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {
         RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
+        dispatchPerformanceReset(
+            "accessibility service interrupted"
+        )
         deactivateNativeTgk(
             "accessibility service interrupted"
         )
@@ -266,6 +276,15 @@ class TriggerAccessibilityService : AccessibilityService() {
         NativeTgkRuntimeState.clear()
         RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
+        runCatching {
+            refreshRateExecutor.execute {
+                PerformanceModeCoordinator
+                    .recoverAndResetIfManaged(
+                        applicationContext,
+                        "accessibility service connected"
+                    )
+            }
+        }
         nativeTgkTask = nativeTgkExecutor.submit {
             NativeTgkCoordinator.disable(
                 applicationContext,
@@ -302,6 +321,8 @@ class TriggerAccessibilityService : AccessibilityService() {
         NativeTgkRuntimeState.clear()
         RefreshRateOverlay.hide()
         RefreshRateCoordinator.clearRuntimeState()
+        val resetPerformanceMode =
+            PerformanceModeCoordinator.isActive()
 
         nativeTgkTask?.cancel(true)
         nativeTgkTask = null
@@ -315,6 +336,18 @@ class TriggerAccessibilityService : AccessibilityService() {
 
         nativeTgkExecutor.shutdownNow()
         refreshRateExecutor.shutdownNow()
+
+        if (resetPerformanceMode) {
+            Thread(
+                {
+                    PerformanceModeCoordinator.resetIfOwned(
+                        applicationContext,
+                        "accessibility service destroyed"
+                    )
+                },
+                "RedMagicPerformanceCleanup"
+            ).start()
+        }
 
         Thread(
             {
@@ -436,6 +469,22 @@ class TriggerAccessibilityService : AccessibilityService() {
                 RefreshRateCoordinator.onForegroundPackage(
                     applicationContext,
                     packageName
+                )
+                PerformanceModeCoordinator.onForegroundPackage(
+                    applicationContext,
+                    packageName
+                )
+                RefreshRateOverlay.refresh()
+            }
+        }
+    }
+
+    private fun dispatchPerformanceReset(reason: String) {
+        runCatching {
+            refreshRateExecutor.execute {
+                PerformanceModeCoordinator.resetIfOwned(
+                    applicationContext,
+                    reason
                 )
             }
         }
@@ -580,6 +629,9 @@ class TriggerAccessibilityService : AccessibilityService() {
             NativeTgkStorage.enabledPackages(this).isNotEmpty() ||
             RefreshRateStorage.readProfiles(this).any {
                 it.enabled || it.pendingReset
+            } ||
+            PerformanceModeStorage.readProfiles(this).any {
+                it.enabled
             }
     }
 

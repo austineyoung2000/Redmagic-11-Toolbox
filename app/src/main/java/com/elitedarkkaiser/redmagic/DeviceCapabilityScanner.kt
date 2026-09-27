@@ -135,7 +135,9 @@ object DeviceCapabilityScanner {
             RefreshRateBridge.probe(context).compatible
         val touchTuningAvailable =
             TouchTuningController.probe(context).compatible
-        val performanceModesAvailable = stockGameSuiteAvailable
+        val performanceModesAvailable =
+            stockGameSuiteAvailable &&
+                PerformanceModeController.probe(context).compatible
         val superResolutionAvailable = stockGameSuiteAvailable
         val fpsMonitorAvailable = stockGameSuiteAvailable
         val dtsEqualizerAvailable =

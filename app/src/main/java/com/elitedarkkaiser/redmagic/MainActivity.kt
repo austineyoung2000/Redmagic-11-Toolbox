@@ -1198,6 +1198,9 @@ class MainActivity : Activity() {
                 showTouchTuningProfiles = {
                     TouchTuningProfileDialog.show(this)
                 },
+                showPerformanceModeProfiles = {
+                    PerformanceModeProfileDialog.show(this)
+                },
 
                 loadMasterProfiles = { MasterProfileStorage.loadProfiles(this) },
                 saveMasterProfile = { name, onComplete ->

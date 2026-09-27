@@ -70,6 +70,14 @@ object RefreshRateOverlay {
         mainHandler.post { hideOnMainThread() }
     }
 
+    fun refresh() {
+        mainHandler.post {
+            if (overlayView != null) {
+                updateText()
+            }
+        }
+    }
+
     private fun hideOnMainThread() {
         mainHandler.removeCallbacks(updateRunnable)
         val view = overlayView
@@ -95,10 +103,14 @@ object RefreshRateOverlay {
             ?.let { TouchTuningStorage.getProfile(context, it) }
             ?.takeIf { it.enabled }
             ?.let { "Touch: ${it.sampleRateHz} Hz" }
+        val performanceLine = foregroundPackage
+            ?.let { PerformanceModeCoordinator.activeLabel(it) }
+            ?.let { "Performance: $it" }
 
         overlayView?.text = listOfNotNull(
             displayLine,
-            touchLine
+            touchLine,
+            performanceLine
         ).joinToString("\n")
     }
 

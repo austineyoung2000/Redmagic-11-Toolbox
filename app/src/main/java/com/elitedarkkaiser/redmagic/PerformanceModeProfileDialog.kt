@@ -4,9 +4,6 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -20,7 +17,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 
-object RefreshRateProfileDialog {
+object PerformanceModeProfileDialog {
     private data class LaunchableApp(
         val packageName: String,
         val label: String
@@ -28,11 +25,11 @@ object RefreshRateProfileDialog {
 
     fun show(activity: Activity) {
         AppTheme.configure(activity)
-        val supportedRates = RefreshRateStorage.supportedRates(activity)
-        if (supportedRates.isEmpty()) {
+        val probe = PerformanceModeController.probe(activity)
+        if (!probe.compatible) {
             Toast.makeText(
                 activity,
-                "No supported display refresh rates were detected",
+                probe.message,
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -40,19 +37,23 @@ object RefreshRateProfileDialog {
 
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(activity, 18), dp(activity, 16),
-                dp(activity, 18), dp(activity, 18))
+            setPadding(
+                dp(activity, 18),
+                dp(activity, 16),
+                dp(activity, 18),
+                dp(activity, 18)
+            )
         }
         root.addView(TextView(activity).apply {
-            text = "Per-App Refresh Rate"
+            text = "Per-App Performance Mode"
             textSize = 20f
             setTextColor(AppTheme.textPrimary)
             setTypeface(typeface, Typeface.BOLD)
         })
         root.addView(TextView(activity).apply {
-            text = "Choose a display rate for each app. The stock " +
-                "REDMAGIC service applies it only when that app is " +
-                "foreground; 0 means follow the system setting."
+            text = "Choose one of the verified stock REDMAGIC modes. " +
+                "The mode is applied only while that app is foreground " +
+                "and returns to the stock default when you leave it."
             textSize = 13f
             setTextColor(AppTheme.textSecondary)
             setPadding(0, dp(activity, 5), 0, dp(activity, 14))
@@ -61,7 +62,7 @@ object RefreshRateProfileDialog {
         val addButton = actionButton(activity, "ADD APP", true)
         root.addView(addButton)
         root.addView(TextView(activity).apply {
-            text = "SAVED APP RATES"
+            text = "SAVED APP MODES"
             textSize = 12f
             setTextColor(AppTheme.textSecondary)
             setTypeface(typeface, Typeface.BOLD)
@@ -74,47 +75,57 @@ object RefreshRateProfileDialog {
 
         val scroll = ScrollView(activity).apply {
             isFillViewport = true
-            addView(root, ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ))
+            addView(
+                root,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
         }
         lateinit var dialog: AlertDialog
+        lateinit var renderProfiles: () -> Unit
 
-        fun chooseRate(
+        fun chooseMode(
             app: LaunchableApp,
-            existing: RefreshRateProfile? = null,
-            onSaved: () -> Unit
+            existing: PerformanceModeProfile?
         ) {
-            val choices = listOf(0) + supportedRates
-            val labels = choices.map {
-                if (it == 0) "Follow system" else "$it Hz"
+            val modes = RedmagicPerformanceMode.entries
+            val labels = modes.map { mode ->
+                when (mode) {
+                    RedmagicPerformanceMode.ECO ->
+                        "Eco — lower power and heat"
+                    RedmagicPerformanceMode.BALANCE ->
+                        "Balance — stock balanced tuning"
+                    RedmagicPerformanceMode.RISE ->
+                        "Rise — higher performance"
+                }
             }.toTypedArray()
-            val selected = choices.indexOf(
-                existing?.refreshRateHz ?: 0
+            val selected = modes.indexOf(
+                existing?.mode ?: RedmagicPerformanceMode.BALANCE
             ).coerceAtLeast(0)
 
             MaterialAlertDialogBuilder(activity)
-                .setTitle("${app.label} refresh rate")
+                .setTitle("${app.label} performance")
                 .setSingleChoiceItems(labels, selected) {
                         picker, which ->
-                    val saved = RefreshRateStorage.saveProfile(
+                    val saved = PerformanceModeStorage.saveProfile(
                         activity,
-                        RefreshRateProfile(
+                        PerformanceModeProfile(
                             packageName = app.packageName,
                             appLabel = app.label,
-                            refreshRateHz = choices[which],
+                            mode = modes[which],
                             enabled = existing?.enabled ?: true
                         )
                     )
                     if (saved) {
-                        RefreshRateCoordinator.clearRuntimeState()
+                        PerformanceModeCoordinator.clearRuntimeState()
                         picker.dismiss()
-                        onSaved()
+                        renderProfiles()
                     } else {
                         Toast.makeText(
                             activity,
-                            "Could not save the refresh-rate profile",
+                            "Could not save the performance profile",
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -123,30 +134,41 @@ object RefreshRateProfileDialog {
                 .show()
         }
 
-        fun renderProfiles() {
+        renderProfiles = {
             profilesContainer.removeAllViews()
-            val profiles = RefreshRateStorage.readProfiles(activity)
-                .filterNot { it.pendingReset }
+            val profiles = PerformanceModeStorage.readProfiles(activity)
             if (profiles.isEmpty()) {
                 profilesContainer.addView(TextView(activity).apply {
-                    text = "No per-app refresh rates saved yet."
+                    text = "No per-app performance modes saved yet."
                     textSize = 13f
                     setTextColor(AppTheme.textSecondary)
-                    setPadding(dp(activity, 4), dp(activity, 8),
-                        dp(activity, 4), dp(activity, 8))
+                    setPadding(
+                        dp(activity, 4),
+                        dp(activity, 8),
+                        dp(activity, 4),
+                        dp(activity, 8)
+                    )
                 })
-                return
             }
 
             profiles.forEachIndexed { index, profile ->
                 if (index > 0) {
-                    profilesContainer.addView(View(activity),
-                        LinearLayout.LayoutParams(1, dp(activity, 10)))
+                    profilesContainer.addView(
+                        View(activity),
+                        LinearLayout.LayoutParams(
+                            1,
+                            dp(activity, 10)
+                        )
+                    )
                 }
                 val card = LinearLayout(activity).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(dp(activity, 14), dp(activity, 13),
-                        dp(activity, 14), dp(activity, 13))
+                    setPadding(
+                        dp(activity, 14),
+                        dp(activity, 13),
+                        dp(activity, 14),
+                        dp(activity, 13)
+                    )
                     background = panelBackground(activity)
                 }
                 card.addView(TextView(activity).apply {
@@ -161,114 +183,84 @@ object RefreshRateProfileDialog {
                     textSize = 11f
                     setTextColor(AppTheme.textSecondary)
                     maxLines = 1
-                    setPadding(0, dp(activity, 2), 0, dp(activity, 8))
+                    setPadding(0, dp(activity, 2), 0, dp(activity, 7))
                 })
 
-                val enabledSwitch = MaterialSwitch(activity).apply {
-                    text = if (profile.refreshRateHz == 0) {
-                        "Follow system"
-                    } else {
-                        "Use ${profile.refreshRateHz} Hz"
-                    }
+                card.addView(MaterialSwitch(activity).apply {
+                    text = "Use ${profile.mode.label} mode"
                     textSize = 14f
                     setTextColor(AppTheme.textPrimary)
                     isChecked = profile.enabled
                     setOnCheckedChangeListener { _, checked ->
-                        RefreshRateStorage.saveProfile(
+                        PerformanceModeStorage.saveProfile(
                             activity,
-                            (
-                                RefreshRateStorage.getProfile(
-                                    activity,
-                                    profile.packageName
-                                ) ?: profile
-                                ).copy(enabled = checked)
+                            profile.copy(enabled = checked)
                         )
-                        RefreshRateCoordinator.clearRuntimeState()
+                        PerformanceModeCoordinator.clearRuntimeState()
                     }
-                }
-                card.addView(enabledSwitch)
-
-                val overlaySwitch = MaterialSwitch(activity).apply {
-                    text = "Show live performance overlay"
-                    textSize = 14f
-                    setTextColor(AppTheme.textPrimary)
-                    isChecked = profile.showOverlay
-                    setOnCheckedChangeListener { button, checked ->
-                        if (checked && !Settings.canDrawOverlays(activity)) {
-                            button.isChecked = false
-                            Toast.makeText(
-                                activity,
-                                "Allow display over other apps, then enable the overlay again",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            activity.startActivity(
-                                Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${activity.packageName}")
-                                )
-                            )
-                            return@setOnCheckedChangeListener
-                        }
-                        RefreshRateStorage.saveProfile(
-                            activity,
-                            (
-                                RefreshRateStorage.getProfile(
-                                    activity,
-                                    profile.packageName
-                                ) ?: profile
-                                ).copy(showOverlay = checked)
-                        )
-                        if (!checked) RefreshRateOverlay.hide()
-                        RefreshRateCoordinator.clearRuntimeState()
-                    }
-                }
-                card.addView(overlaySwitch)
+                })
 
                 val row = LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(0, dp(activity, 8), 0, 0)
                 }
-                val change = actionButton(activity, "CHANGE RATE", false)
-                change.setOnClickListener {
-                    chooseRate(
-                        LaunchableApp(
-                            profile.packageName,
-                            profile.appLabel
-                        ),
-                        profile
-                    ) { renderProfiles() }
+                val change = actionButton(
+                    activity,
+                    "CHANGE MODE",
+                    false
+                ).apply {
+                    setOnClickListener {
+                        chooseMode(
+                            LaunchableApp(
+                                profile.packageName,
+                                profile.appLabel
+                            ),
+                            profile
+                        )
+                    }
                 }
-                val delete = actionButton(activity, "DELETE", false).apply {
+                val delete = actionButton(
+                    activity,
+                    "DELETE",
+                    false
+                ).apply {
                     setTextColor(Color.rgb(255, 110, 110))
                     setOnClickListener {
                         MaterialAlertDialogBuilder(activity)
                             .setTitle("Delete ${profile.appLabel}?")
                             .setMessage(
-                                "Its saved refresh-rate setting will be removed."
+                                "Its saved performance mode will be removed."
                             )
                             .setNegativeButton("Cancel", null)
                             .setPositiveButton("Delete") { _, _ ->
-                                RefreshRateStorage.removeProfile(
+                                PerformanceModeStorage.removeProfile(
                                     activity,
                                     profile.packageName
                                 )
-                                RefreshRateCoordinator.clearRuntimeState()
+                                PerformanceModeCoordinator
+                                    .clearRuntimeState()
                                 renderProfiles()
                             }
                             .show()
                     }
                 }
-                row.addView(change, LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply { marginEnd = dp(activity, 6) })
-                row.addView(delete, LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                ))
+                row.addView(
+                    change,
+                    LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f
+                    ).apply { marginEnd = dp(activity, 6) }
+                )
+                row.addView(
+                    delete,
+                    LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f
+                    )
+                )
                 card.addView(row)
                 profilesContainer.addView(card)
             }
@@ -295,20 +287,22 @@ object RefreshRateProfileDialog {
                 .distinctBy { it.packageName }
                 .sortedBy { it.label.lowercase() }
                 .toList()
-            val labels = apps.map {
-                "${it.label}\n${it.packageName}"
-            }.toTypedArray()
+
             MaterialAlertDialogBuilder(activity)
-                .setTitle("Select an app or game")
-                .setItems(labels) { _, which ->
+                .setTitle("Choose app")
+                .setItems(
+                    apps.map {
+                        "${it.label}\n${it.packageName}"
+                    }.toTypedArray()
+                ) { _, which ->
                     val app = apps[which]
-                    chooseRate(
+                    chooseMode(
                         app,
-                        RefreshRateStorage.getProfile(
+                        PerformanceModeStorage.getProfile(
                             activity,
                             app.packageName
                         )
-                    ) { renderProfiles() }
+                    )
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
@@ -325,30 +319,34 @@ object RefreshRateProfileDialog {
     private fun actionButton(
         activity: Activity,
         label: String,
-        primary: Boolean
+        filled: Boolean
     ): MaterialButton {
-        return MaterialButton(activity).apply {
+        return MaterialButton(
+            activity,
+            null,
+            if (filled) {
+                com.google.android.material.R.attr.materialButtonStyle
+            } else {
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            }
+        ).apply {
             text = label
             isAllCaps = false
-            textSize = 13f
-            cornerRadius = dp(activity, 14)
             setTextColor(AppTheme.textPrimary)
-            backgroundTintList = android.content.res.ColorStateList.valueOf(
-                if (primary) AppTheme.accentColor else AppTheme.chipOnColor
-            )
+            cornerRadius = dp(activity, 14)
+            minHeight = dp(activity, 46)
         }
     }
 
     private fun panelBackground(activity: Activity): GradientDrawable {
         return GradientDrawable().apply {
-            cornerRadius = dp(activity, 18).toFloat()
+            cornerRadius = dp(activity, 16).toFloat()
             setColor(AppTheme.panelColor)
             setStroke(dp(activity, 1), AppTheme.borderColor)
         }
     }
 
     private fun dp(activity: Activity, value: Int): Int {
-        return (value * activity.resources.displayMetrics.density)
-            .toInt()
+        return (value * activity.resources.displayMetrics.density).toInt()
     }
 }

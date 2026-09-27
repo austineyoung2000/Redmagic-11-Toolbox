@@ -34,6 +34,7 @@ data class HardwareTabDeps(
         (Boolean, (ChargeSeparationResult) -> Unit) -> Unit,
     val showRefreshRateProfiles: () -> Unit,
     val showTouchTuningProfiles: () -> Unit,
+    val showPerformanceModeProfiles: () -> Unit,
 
     val loadMasterProfiles: () -> List<MasterProfile>,
     val saveMasterProfile:

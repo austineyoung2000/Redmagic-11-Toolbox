@@ -399,6 +399,50 @@ object HardwareTabUi {
         }
         container.addView(touchTuningCard)
 
+        val performanceModeButton = deps.actionButton(
+            "MANAGE APP PERFORMANCE MODES",
+            false
+        ) {
+            deps.showPerformanceModeProfiles()
+        }
+        val performanceModeCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("⚙", "GAME PERFORMANCE MODE"))
+            addView(
+                deps.bodyText(
+                    "Assign the verified stock REDMAGIC Eco, Balance, " +
+                        "or Rise mode to each app. The selected mode is " +
+                        "active only while that app is foreground."
+                )
+            )
+            addView(deps.space(deps.dp(8)))
+            addView(deps.singleRow(performanceModeButton))
+            addView(deps.space(deps.dp(6)))
+            addView(
+                deps.bodyText(
+                    "Uses Android's settings interface first and one " +
+                        "batched root fallback only when the protected " +
+                        "stock settings reject an ordinary app write."
+                )
+            )
+        }
+        if (
+            !deps.capabilities.scanComplete ||
+            !deps.capabilities.performanceModesAvailable
+        ) {
+            performanceModeCard.addView(
+                deps.bodyText(
+                    if (deps.capabilities.scanComplete) {
+                        "Unavailable: stock REDMAGIC Android 16 " +
+                            "performance services are required."
+                    } else {
+                        "Unavailable until the compatibility scan completes."
+                    }
+                )
+            )
+            CapabilityUi.disableInteractions(performanceModeCard)
+        }
+        container.addView(performanceModeCard)
+
         val hapticSummary = deps.subtleLabel("")
         var selectedHapticStrength =
             HapticFeedback.Strength.fromKey(

@@ -100,6 +100,11 @@ object MasterProfileActions {
                 TouchTuningStorage.createExportJson(
                     context = context,
                     allowEmpty = true
+                ),
+            performanceModeProfilesJson =
+                PerformanceModeStorage.createExportJson(
+                    context = context,
+                    allowEmpty = true
                 )
         )
     }
@@ -202,6 +207,21 @@ object MasterProfileActions {
                     context,
                     previousPackages
                 )
+            }
+        }
+
+        if (profile.schemaVersion >= 11) {
+            profile.performanceModeProfilesJson?.let {
+                PerformanceModeCoordinator.resetIfOwned(
+                    context,
+                    "master profile applied"
+                )
+                PerformanceModeStorage.importProfilesJson(
+                    context = context,
+                    raw = it,
+                    replaceAll = true
+                )
+                PerformanceModeCoordinator.clearRuntimeState()
             }
         }
 
