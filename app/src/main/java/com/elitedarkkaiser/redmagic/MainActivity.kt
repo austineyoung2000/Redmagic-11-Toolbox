@@ -1,15 +1,10 @@
 package com.elitedarkkaiser.redmagic
 
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -156,47 +151,10 @@ class MainActivity : Activity() {
             }
         )
     }
-    private val statusRefreshHandler =
-        Handler(Looper.getMainLooper())
-
-    private val statusRefreshExecutor: ExecutorService =
-        Executors.newSingleThreadExecutor { task ->
-            Thread({
-                android.os.Process.setThreadPriority(
-                    android.os.Process.THREAD_PRIORITY_BACKGROUND
-                )
-                task.run()
-            }, "RedMagicStatusRefresh")
-        }
-
-    private val statusRefreshRunning = AtomicBoolean(false)
-    private val statusRefreshPending = AtomicBoolean(false)
-
-    private val statusRefreshRunnable = object : Runnable {
-        override fun run() {
-            refreshStatus()
-            statusRefreshHandler.postDelayed(this, 30_000L)
-        }
-    }
-
     private var mainUiReady = false
     private var deviceCapabilities =
         DeviceCapabilities.unknown()
-    private var temperatureSubscription:
-        DeviceTemperatureMonitor.Subscription? = null
-
-    private val initialStatusRefreshRunnable = Runnable {
-        if (
-            !mainUiReady ||
-            isFinishing ||
-            isDestroyed
-        ) {
-            return@Runnable
-        }
-
-        refreshStatus()
-        startStatusRefreshLoop()
-    }
+    private lateinit var activityRuntime: MainActivityRuntime
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -206,6 +164,11 @@ class MainActivity : Activity() {
             showUnsupportedDeviceDialog()
             return
         }
+
+        activityRuntime = MainActivityRuntime(
+            activity = this,
+            onStatusSnapshot = ::applyStatusSnapshot
+        )
         
         initDefaultTriggerMappingsStorage(this)
         deviceCapabilities =
@@ -266,67 +229,26 @@ class MainActivity : Activity() {
             return
         }
 
-        runCatching {
-            statusRefreshExecutor.execute {
-                val rooted = RootShell.hasRoot()
-
-                runOnUiThread {
-                    if (isFinishing || isDestroyed) {
-                        return@runOnUiThread
-                    }
-
-                    if (rooted) {
-                        setCachedRootAccessStorage(this, true)
-                        launchMainUi()
-                    } else {
-                        showRootRequiredDialog()
-                    }
-                }
-            }
-        }.onFailure {
-            if (!isFinishing && !isDestroyed) {
+        val submitted = activityRuntime.verifyRoot { rooted ->
+            if (rooted) {
+                setCachedRootAccessStorage(this, true)
+                launchMainUi()
+            } else {
                 showRootRequiredDialog()
             }
         }
-    }
 
-    private fun startStatusRefreshLoop() {
-        statusRefreshHandler.removeCallbacks(statusRefreshRunnable)
-        statusRefreshHandler.postDelayed(
-            statusRefreshRunnable,
-            30_000L
-        )
-    }
-
-    private fun startLiveTemperatureUpdates() {
-        if (temperatureSubscription != null) return
-
-        temperatureSubscription =
-            DeviceTemperatureMonitor.subscribe(
-                this,
-                DeviceTemperatureMonitor.SamplingMode.FOREGROUND
-            ) {
-                refreshStatus()
-            }
-    }
-
-    private fun stopLiveTemperatureUpdates() {
-        temperatureSubscription?.close()
-        temperatureSubscription = null
+        if (!submitted && !isFinishing && !isDestroyed) {
+            showRootRequiredDialog()
+        }
     }
 
 
     override fun onStart() {
         super.onStart()
 
-        if (mainUiReady) {
-            startLiveTemperatureUpdates()
-            statusRefreshHandler.removeCallbacks(
-                initialStatusRefreshRunnable
-            )
-            statusRefreshHandler.post(
-                initialStatusRefreshRunnable
-            )
+        if (::activityRuntime.isInitialized) {
+            activityRuntime.onStart()
         }
     }
 
@@ -343,27 +265,16 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
-        stopLiveTemperatureUpdates()
-        statusRefreshHandler.removeCallbacks(
-            initialStatusRefreshRunnable
-        )
-        statusRefreshHandler.removeCallbacks(
-            statusRefreshRunnable
-        )
-        statusRefreshPending.set(false)
+        if (::activityRuntime.isInitialized) {
+            activityRuntime.onStop()
+        }
         super.onStop()
     }
 
     override fun onDestroy() {
-        stopLiveTemperatureUpdates()
-        statusRefreshHandler.removeCallbacks(
-            statusRefreshRunnable
-        )
-        statusRefreshHandler.removeCallbacks(
-            initialStatusRefreshRunnable
-        )
-        statusRefreshPending.set(false)
-        statusRefreshExecutor.shutdownNow()
+        if (::activityRuntime.isInitialized) {
+            activityRuntime.destroy()
+        }
         super.onDestroy()
     }
 
@@ -742,11 +653,7 @@ class MainActivity : Activity() {
 
         switchTab("home")
         mainUiReady = true
-        startLiveTemperatureUpdates()
-        statusRefreshHandler.postDelayed(
-            initialStatusRefreshRunnable,
-            2_500L
-        )
+        activityRuntime.onUiReady()
         // Do not start background services just because the UI opened.
         // Game Mode starts from selected-app foreground events.
         // Charging Mode starts from boot, plug state, or explicit toggle.
@@ -784,10 +691,7 @@ class MainActivity : Activity() {
     private fun submitBackgroundTask(
         task: () -> Unit
     ): Boolean {
-        return runCatching {
-            statusRefreshExecutor.execute(task)
-            true
-        }.getOrDefault(false)
+        return activityRuntime.submit(task)
     }
 
     private fun createHomeTab(): LinearLayout {
@@ -1866,128 +1770,73 @@ class MainActivity : Activity() {
     }
 
     private fun refreshStatus() {
-        if (!statusRefreshRunning.compareAndSet(false, true)) {
-            statusRefreshPending.set(true)
-            return
-        }
-
-        runCatching {
-            statusRefreshExecutor.execute {
-                try {
-                    do {
-                        statusRefreshPending.set(false)
-                        refreshStatusOnce()
-                    } while (statusRefreshPending.getAndSet(false))
-                } finally {
-                    statusRefreshRunning.set(false)
-
-                    /*
-                     * Cover a request arriving after the loop's final pending
-                     * check but before the running flag was cleared.
-                     */
-                    if (statusRefreshPending.getAndSet(false)) {
-                        refreshStatus()
-                    }
-                }
-            }
-        }.onFailure {
-            statusRefreshRunning.set(false)
-        }
+        activityRuntime.requestStatusRefresh()
     }
 
-    private fun refreshStatusOnce() {
-        val rooted =
-            hasCachedRootAccessStorage(this) || RootShell.hasRoot()
-
-        val telemetry = HardwareTelemetry.read()
+    private fun applyStatusSnapshot(
+        snapshot: MainStatusSnapshot
+    ) {
+        val telemetry = snapshot.telemetry
         val rpmRaw = telemetry.fanRpm
         val tempF = telemetry.temperatureF
 
-        val cachedDeviceInfo = loadDeviceInfoCacheStorage(this)
-        val deviceInfo = cachedDeviceInfo ?: DeviceInfoCache(
-            rom = HardwareController.readShortRomFingerprint(),
-            cpu = HardwareController.readCpuModel(),
-            ram = HardwareController.readRamInfo()
-        ).also {
-            saveDeviceInfoCacheStorage(this, it)
+        val rpm = when {
+            rpmRaw == null ->
+                lastDisplayedRpm.takeIf { it >= 0 }
+            lastDisplayedRpm < 0 -> rpmRaw
+            else ->
+                ((lastDisplayedRpm * 0.7) + (rpmRaw * 0.3))
+                    .toInt()
         }
 
-        val romText = deviceInfo.rom
-        val cpuText = deviceInfo.cpu
-        val ramText = deviceInfo.ram
+        if (rpm != null) {
+            lastDisplayedRpm = rpm
+        }
 
-        val dashboardSummary =
-            DashboardSnapshot.buildSummary(
-                context = this,
-                hardware = telemetry,
-                rooted = rooted
+        val previousTempF = lastDisplayedTempF
+        val tempTrend = when {
+            tempF == null || previousTempF == null -> ""
+            tempF > previousTempF + 1f -> " ↑"
+            tempF < previousTempF - 1f -> " ↓"
+            else -> " →"
+        }
+
+        if (tempF != null) {
+            lastDisplayedTempF = tempF
+        }
+
+        refreshSmartPumpStatusViews()
+
+        deviceRomValue.text = snapshot.deviceInfo.rom
+        deviceCpuValue.text = snapshot.deviceInfo.cpu
+        deviceRamValue.text = snapshot.deviceInfo.ram
+
+        if (::dashboardText.isInitialized) {
+            dashboardText.text = snapshot.dashboardSummary
+        }
+
+        if (::activeModeText.isInitialized) {
+            activeModeText.text = snapshot.activeModeSummary
+        }
+
+        if (::thermalHistoryView.isInitialized) {
+            thermalHistoryView.setHistory(
+                snapshot.temperatureHistory,
+                useFahrenheit
             )
+        }
 
-        runOnUiThread {
-            if (isFinishing || isDestroyed) {
-                return@runOnUiThread
+        if (::tempText.isInitialized) {
+            tempText.text = if (tempF != null) {
+                "Current temp: ${
+                    TempFormat.formatDisplayTempFromF(
+                        tempF,
+                        useFahrenheit
+                    )
+                }$tempTrend"
+            } else {
+                "Current temp: --"
             }
-
-            val rpm = when {
-                rpmRaw == null ->
-                    lastDisplayedRpm.takeIf { it >= 0 }
-                lastDisplayedRpm < 0 -> rpmRaw
-                else ->
-                    ((lastDisplayedRpm * 0.7) + (rpmRaw * 0.3))
-                        .toInt()
-            }
-
-            if (rpm != null) {
-                lastDisplayedRpm = rpm
-            }
-
-            val previousTempF = lastDisplayedTempF
-            val tempTrend = when {
-                tempF == null || previousTempF == null -> ""
-                tempF > previousTempF + 1f -> " ↑"
-                tempF < previousTempF - 1f -> " ↓"
-                else -> " →"
-            }
-
-            if (tempF != null) {
-                lastDisplayedTempF = tempF
-            }
-
-            refreshSmartPumpStatusViews()
-
-            deviceRomValue.text = romText
-            deviceCpuValue.text = cpuText
-            deviceRamValue.text = ramText
-
-            if (::dashboardText.isInitialized) {
-                dashboardText.text = dashboardSummary
-            }
-
-            if (::activeModeText.isInitialized) {
-                activeModeText.text =
-                    ActiveModeInspector.summary(this)
-            }
-
-            if (::thermalHistoryView.isInitialized) {
-                thermalHistoryView.setHistory(
-                    TemperatureHistory.snapshot(),
-                    useFahrenheit
-                )
-            }
-
-            if (::tempText.isInitialized) {
-                tempText.text = if (tempF != null) {
-                    "Current temp: ${
-                        TempFormat.formatDisplayTempFromF(
-                            tempF,
-                            useFahrenheit
-                        )
-                    }$tempTrend"
-                } else {
-                    "Current temp: --"
-                }
-            }
-
         }
     }
 
