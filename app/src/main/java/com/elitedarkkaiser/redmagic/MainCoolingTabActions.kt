@@ -47,10 +47,6 @@ internal class MainCoolingTabActions(
         autoPumpEnabled = state.autoEnabled
     }
 
-    fun setAutoPumpEnabled(enabled: Boolean) {
-        autoPumpEnabled = enabled
-    }
-
     fun applyMasterProfile(hardware: HardwareSettingsSnapshot) {
         autoFanCurveEnabled = hardware.autoFanEnabled
         selectedCurve = hardware.fanCurveMode

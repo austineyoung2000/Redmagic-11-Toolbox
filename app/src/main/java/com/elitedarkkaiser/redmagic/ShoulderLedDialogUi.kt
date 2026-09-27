@@ -389,6 +389,9 @@ internal object ShoulderLedDialogUi {
 
         dialogRefresh = { refreshUi() }
         setDialogRefresh(dialogRefresh)
+        dialog.setOnDismissListener {
+            setDialogRefresh(null)
+        }
 
         cancelBtn.setOnClickListener {
             ShoulderLedActions.restoreOriginalState(

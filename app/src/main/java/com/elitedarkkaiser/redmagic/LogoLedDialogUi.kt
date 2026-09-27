@@ -363,6 +363,9 @@ internal object LogoLedDialogUi {
 
         dialogRefresh = { refreshUi() }
         setDialogRefresh(dialogRefresh)
+        dialog.setOnDismissListener {
+            setDialogRefresh(null)
+        }
 
         refreshUi()
         dialog.show()

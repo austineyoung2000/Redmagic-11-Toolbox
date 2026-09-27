@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.elitedarkkaiser.redmagic.state.LedState
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import com.elitedarkkaiser.redmagic.ui.components.MainActivityUiKit
@@ -40,24 +39,7 @@ class MainActivity : Activity() {
     private lateinit var hardwareTab: LinearLayout
     private lateinit var lightingTab: LinearLayout
     private var magicKeyStatusLabelRef: TextView? = null
-    private var dialogRefreshShoulderLed: (() -> Unit)? = null
-    private var dialogRefreshLogoLed: (() -> Unit)? = null
-    private var dialogRefreshFanLed: (() -> Unit)? = null
     private var gameModeAppsTextRef: TextView? = null
-
-    private var realTimePreviewEnabled = true
-
-    private var fanLedEnabled = true
-    private var fanLedEffect = "steady"
-    private var fanLedColor = 1
-
-    private var logoLedEnabled = true
-    private var logoLedEffect = "steady"
-    private var logoLedColor = 1
-
-    private var shoulderLedEnabled = true
-    private var shoulderLedEffect = "breathe"
-    private var shoulderLedColor = 8
 
     private val bgColor get() = AppTheme.bgColor
     private val panelColor get() = AppTheme.panelColor
@@ -113,15 +95,30 @@ class MainActivity : Activity() {
                 mainUiKit.updateSelectableButton(button, selected)
             },
             onAllLedStateApplied = { effect, color ->
-                fanLedEnabled = true
-                fanLedEffect = effect
-                fanLedColor = color
-                logoLedEnabled = true
-                logoLedEffect = effect
-                logoLedColor = color
-                shoulderLedEnabled = true
-                shoulderLedEffect = effect
-                shoulderLedColor = color
+                lightingController.applyAllLedState(
+                    effect,
+                    color
+                )
+            }
+        )
+    }
+    private val lightingController by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainLightingController(
+            activity = this,
+            uiKit = mainUiKit,
+            ledViews = ledControlViews,
+            actions = lightingTabActions,
+            runBackground = { task ->
+                submitBackgroundTask(task)
+            },
+            capabilities = { deviceCapabilities },
+            showGameModeAppPicker = {
+                showGamePickerDialog()
+            },
+            showGameModeProfileDialog = {
+                showGameModeProfileDialog()
             }
         )
     }
@@ -344,43 +341,12 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun applyFanLedSelection(
-        effect: String,
-        color: Int
-    ) {
-        submitBackgroundTask {
-            applyFanLedSelectionNow(effect, color)
-        }
-    }
-
-    private fun applyFanLedSelectionNow(
-        effect: String,
-        color: Int
-    ) {
-        if (effect.startsWith("preset:")) {
-            HardwareController.setFanLedStockPreset(
-                effect.removePrefix("preset:")
-            )
-        } else {
-            HardwareController.setFanLedEffect(effect, color)
-        }
-    }
-
     private fun applyMasterProfileToUiState(
         profile: MasterProfile
     ) {
         val hardware = profile.hardware
         coolingTabActions.applyMasterProfile(hardware)
-        fanLedEnabled = hardware.fanLedEnabled
-        fanLedEffect = hardware.fanLedEffect
-        fanLedColor = hardware.fanLedColor
-        logoLedEnabled = hardware.logoLedEnabled
-        logoLedEffect = hardware.logoLedEffect
-        logoLedColor = hardware.logoLedColor
-        shoulderLedEnabled = hardware.shoulderLedEnabled
-        shoulderLedEffect = hardware.shoulderLedEffect
-        shoulderLedColor = hardware.shoulderLedColor
-        realTimePreviewEnabled = profile.realtimePreviewEnabled
+        lightingController.applyMasterProfile(profile)
         useFahrenheit = profile.useFahrenheit
         refreshStatus()
     }
@@ -446,37 +412,9 @@ class MainActivity : Activity() {
     private fun launchMainUi() {
         startCapabilityScan()
 
-        MainUiStartup.applySavedHardwareState(
-            applySavedFanLedStateOnLaunch = {
-                val state = savedFanLedStateStorage(this)
-                fanLedEnabled = state.enabled
-                fanLedEffect = state.effect
-                fanLedColor = state.color
-            },
-            applySavedLogoLedStateOnLaunch = {
-                val state = savedLogoLedStateStorage(this)
-                logoLedEnabled = state.enabled
-                logoLedEffect = state.effect
-                logoLedColor = state.color
-            },
-            applySavedShoulderLedStateOnLaunch = {
-                val state = savedShoulderLedStateStorage(this)
-                shoulderLedEnabled = state.enabled
-                shoulderLedEffect = state.effect
-                shoulderLedColor = state.color
-            },
-            applySavedPumpStateOnLaunch = {
-                coolingTabActions.loadSavedPumpState()
-            },
-            setRealTimePreviewEnabled = { value -> realTimePreviewEnabled = value },
-            isRealTimePreviewEnabledSaved = { isRealTimePreviewEnabledStorage(this) },
-            setUseFahrenheit = { value -> useFahrenheit = value },
-            isUseFahrenheitSaved = { isUseFahrenheitStorage(this) },
-            setAutoPumpEnabled = { value ->
-                coolingTabActions.setAutoPumpEnabled(value)
-            },
-            isAutoPumpEnabledSaved = { savedPumpStateStorage(this).autoEnabled }
-        )
+        lightingController.loadSavedState()
+        coolingTabActions.loadSavedPumpState()
+        useFahrenheit = isUseFahrenheitStorage(this)
 
         val result = MainUiLauncher.launch(
             activity = this,
@@ -506,9 +444,7 @@ class MainActivity : Activity() {
 
         coolingTabActions.startAutoPumpIfEnabled()
 
-        if (RgbStudioStorage.isEnabled(this)) {
-            HardwareServiceActions.startRgbCycle(this)
-        }
+        lightingController.startRgbStudioIfEnabled()
 
         if (readTriggerPrefsSnapshot(this).triggersAutoStart) {
             submitBackgroundTask {
@@ -584,60 +520,6 @@ class MainActivity : Activity() {
 
     private fun createCoolingTab(): LinearLayout {
         return coolingTabActions.createView()
-    }
-
-    private fun applyFanLedPreviewIfEnabled() {
-        if (!realTimePreviewEnabled) return
-
-        val enabled = fanLedEnabled
-        val effect = fanLedEffect
-        val color = fanLedColor
-
-        if (enabled) {
-            applyFanLedSelection(effect, color)
-        } else {
-            submitBackgroundTask {
-                HardwareController.setFanLedEnabled(false)
-            }
-        }
-    }
-
-    private fun applyLogoLedPreviewIfEnabled() {
-        if (!realTimePreviewEnabled) return
-
-        val enabled = logoLedEnabled
-        val effect = logoLedEffect
-        val color = logoLedColor
-
-        submitBackgroundTask {
-            if (enabled) {
-                HardwareController.setLogoLedEffect(
-                    effect,
-                    color
-                )
-            } else {
-                HardwareController.setLogoLedEnabled(false)
-            }
-        }
-    }
-
-    private fun applyShoulderLedPreviewIfEnabled() {
-        if (!realTimePreviewEnabled) return
-
-        val enabled = shoulderLedEnabled
-        val effect = shoulderLedEffect
-        val color = shoulderLedColor
-
-        submitBackgroundTask {
-            if (enabled) {
-                HardwareController.setShoulderLedEffect(
-                    effect,
-                    color
-                )
-            } else {
-                HardwareController.setShoulderLedEnabled(false)
-            }
-        }
     }
 
     private fun createControlsTab(): LinearLayout {
@@ -854,170 +736,7 @@ class MainActivity : Activity() {
     }
 
     private fun createLightingTab(): LinearLayout {
-        return com.elitedarkkaiser.redmagic.ui.LightingTabUi.create(
-            this,
-            com.elitedarkkaiser.redmagic.ui.LightingTabDeps(
-                scrollTabContainer = { mainUiKit.scrollTabContainer() },
-                sectionPanel = { mainUiKit.sectionPanel() },
-                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
-                bodyText = { text -> mainUiKit.bodyText(text) },
-                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
-                infoRow = { label, valueView -> mainUiKit.infoRow(label, valueView) },
-                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
-                filterChip = { label, selected, onClick ->
-                    ledControlViews.filterChip(label, selected, onClick)
-                },
-                updateSelectableButton = { button, selected ->
-                    mainUiKit.updateSelectableButton(button, selected)
-                },
-                singleRow = { button -> mainUiKit.singleRow(button) },
-                row = { left, right -> mainUiKit.row(left, right) },
-                dp = { value -> mainUiKit.dp(value) },
-                capabilities = deviceCapabilities,
-
-                getRealTimePreviewEnabled = { realTimePreviewEnabled },
-                setRealTimePreviewEnabled = { value -> realTimePreviewEnabled = value },
-                saveRealTimePreviewEnabled = { value -> saveRealTimePreviewEnabledStorage(this, value) },
-
-                showFanLedDialog = { showFanLedDialog() },
-                showLogoLedDialog = { showLogoLedDialog() },
-                showShoulderLedDialog = { showShoulderLedDialog() },
-                rgbStudioSummary = {
-                    lightingTabActions.rgbStudioSummary()
-                },
-                showRgbStudioDialog = { onUpdated ->
-                    lightingTabActions.showRgbStudioDialog(
-                        onUpdated
-                    )
-                },
-                showGameModeAppPicker = { showGamePickerDialog() },
-                showGameModeProfileDialog = { showGameModeProfileDialog() },
-                gameModeAppsSummary = { gameModeAppsSummaryStorage(this) },
-
-                getChargingLedEnabled = {
-                    lightingTabActions.isChargingLedEnabled()
-                },
-                setChargingLedEnabled = { enabled ->
-                    lightingTabActions.setChargingLedEnabled(
-                        enabled
-                    )
-                },
-                showChargingFanLedDialog = {
-                    ChargingLedActions.showFanDialog(
-                        activity = this,
-                        runBackground = { task ->
-                            submitBackgroundTask(task)
-                        },
-                        textPrimary = textPrimary,
-                        textSecondary = textSecondary,
-                        panelColor = panelColor,
-                        borderColor = borderColor,
-                        panelPressed = panelPressed,
-                        accent = accent,
-                        typeface = typeface,
-                        dp = { value -> mainUiKit.dp(value) },
-                        roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                        roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                        space = { value -> mainUiKit.space(value) },
-                        filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-                        colorDot = { colorId, hex, onClick -> colorDot(colorId, hex, onClick) },
-                        colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
-                        fanPresetBubble = { c1, c2, c3, c4, presetValue, selected, onClick ->
-                            selectedFanPresetBubble(c1, c2, c3, c4, presetValue, selected, onClick)
-                        }
-                    )
-                },
-                showChargingLogoLedDialog = {
-                    ChargingLedActions.showLogoDialog(
-                        activity = this,
-                        runBackground = { task ->
-                            submitBackgroundTask(task)
-                        },
-                        deps = chargingLedDialogDeps()
-                    )
-                },
-                showChargingShoulderLedDialog = {
-                    ChargingLedActions.showShoulderDialog(
-                        activity = this,
-                        runBackground = { task ->
-                            submitBackgroundTask(task)
-                        },
-                        deps = chargingLedDialogDeps()
-                    )
-                },
-                getCallLightingEnabled = {
-                    lightingTabActions.isCallLightingEnabled()
-                },
-                setCallLightingEnabled = { enabled ->
-                    lightingTabActions.setCallLightingEnabled(
-                        enabled
-                    )
-                },
-                getPauseFanDuringCalls = {
-                    lightingTabActions.shouldPauseFanDuringCalls()
-                },
-                setPauseFanDuringCalls = { enabled ->
-                    lightingTabActions.setPauseFanDuringCalls(
-                        enabled
-                    )
-                },
-                showIncomingCallProfileDialog = {
-                    lightingTabActions
-                        .showIncomingCallProfileDialog(
-                            callLightingProfileDeps()
-                        )
-                },
-                showConnectedCallProfileDialog = {
-                    lightingTabActions
-                        .showConnectedCallProfileDialog(
-                            callLightingProfileDeps()
-                        )
-                }
-            )
-        )
-    }
-
-    private fun callLightingProfileDeps(): CallLightingProfileUi.Deps {
-        return CallLightingProfileUi.Deps(
-            textPrimary = textPrimary,
-            textSecondary = textSecondary,
-            panelColor = panelColor,
-            borderColor = borderColor,
-            panelPressed = panelPressed,
-            accent = accent,
-            typeface = typeface,
-            dp = { value -> mainUiKit.dp(value) },
-            roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-            roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-            filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-            space = { value -> mainUiKit.space(value) },
-            colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
-            colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
-            fanPresetBubble = { c1, c2, c3, c4, presetValue, selected, onClick ->
-                selectedFanPresetBubble(c1, c2, c3, c4, presetValue, selected, onClick)
-            }
-        )
-    }
-
-    private fun chargingLedDialogDeps(): ChargingLedProfileDialog.Deps {
-        return ChargingLedProfileDialog.Deps(
-            textPrimary = textPrimary,
-            textSecondary = textSecondary,
-            panelColor = panelColor,
-            borderColor = borderColor,
-            panelPressed = panelPressed,
-            accent = accent,
-            typeface = typeface,
-            dp = { value -> mainUiKit.dp(value) },
-            roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-            roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-            space = { value -> mainUiKit.space(value) },
-            colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
-            colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
-            fanPresetBubble = { h1, h2, h3, h4, value, selected, onClick ->
-                selectedFanPresetBubble(h1, h2, h3, h4, value, selected, onClick)
-            }
-        )
+        return lightingController.createView()
     }
 
     private fun showNativeTgkProfileDialog() {
@@ -1090,263 +809,6 @@ class MainActivity : Activity() {
                 saveGameModeProfileStorage(this, profile)
                 GameModeActions.applySavedProfileThroughService(this)
             }
-        )
-    }
-
-    private fun showShoulderLedDialog() {
-        ShoulderLedDialogUi.showShoulderLedDialog(
-            activity = this,
-            originalEnabled = shoulderLedEnabled,
-            originalEffect = shoulderLedEffect,
-            originalColor = shoulderLedColor,
-            currentEnabled = { shoulderLedEnabled },
-            currentEffect = { shoulderLedEffect },
-            currentColor = { shoulderLedColor },
-            setEnabled = { value -> shoulderLedEnabled = value },
-            setEffect = { value -> shoulderLedEffect = value },
-            setColor = { value -> shoulderLedColor = value },
-            applyPreviewIfEnabled = {
-                disableRgbStudioForManualLedControl()
-                applyShoulderLedPreviewIfEnabled()
-            },
-            applyEffect = { effect, color ->
-                disableRgbStudioForManualLedControl()
-                submitBackgroundTask {
-                    HardwareController.setShoulderLedEffect(
-                        effect,
-                        color
-                    )
-                }
-            },
-            disableLed = {
-                disableRgbStudioForManualLedControl()
-                submitBackgroundTask {
-                    HardwareController.setShoulderLedEnabled(false)
-                }
-            },
-            saveState = { saveShoulderLedStateStorage(this, LedState(shoulderLedEnabled, shoulderLedEffect, shoulderLedColor)) },
-            startFanLedService = {
-                submitBackgroundTask {
-                    HardwareServiceActions.startFanLed(this)
-                }
-            },
-            stopFanLedService = {
-                submitBackgroundTask {
-                    HardwareServiceActions.stopFanLed(this)
-                }
-            },
-            anyLedEnabled = { fanLedEnabled || logoLedEnabled || shoulderLedEnabled },
-            setDialogRefresh = { callback -> dialogRefreshShoulderLed = callback },
-            deps = ShoulderLedDialogUi.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                space = { value -> mainUiKit.space(value) },
-                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-                colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
-                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) }
-            )
-        )
-    }
-
-    private fun showLogoLedDialog() {
-        LogoLedDialogUi.showLogoLedDialog(
-            activity = this,
-            originalEnabled = logoLedEnabled,
-            originalEffect = logoLedEffect,
-            originalColor = logoLedColor,
-            currentEnabled = { logoLedEnabled },
-            currentEffect = { logoLedEffect },
-            currentColor = { logoLedColor },
-            setEnabled = { value -> logoLedEnabled = value },
-            setEffect = { value -> logoLedEffect = value },
-            setColor = { value -> logoLedColor = value },
-            applyPreviewIfEnabled = {
-                disableRgbStudioForManualLedControl()
-                applyLogoLedPreviewIfEnabled()
-            },
-            applyEffect = { effect, color ->
-                disableRgbStudioForManualLedControl()
-                submitBackgroundTask {
-                    HardwareController.setLogoLedEffect(
-                        effect,
-                        color
-                    )
-                }
-            },
-            disableLed = {
-                disableRgbStudioForManualLedControl()
-                submitBackgroundTask {
-                    HardwareController.setLogoLedEnabled(false)
-                }
-            },
-            saveState = { saveLogoLedStateStorage(this, LedState(logoLedEnabled, logoLedEffect, logoLedColor)) },
-            startFanLedService = {
-                submitBackgroundTask {
-                    HardwareServiceActions.startFanLed(this)
-                }
-            },
-            stopFanLedService = {
-                submitBackgroundTask {
-                    HardwareServiceActions.stopFanLed(this)
-                }
-            },
-            anyLedEnabled = { fanLedEnabled || logoLedEnabled || shoulderLedEnabled },
-            setDialogRefresh = { callback -> dialogRefreshLogoLed = callback },
-            deps = LogoLedDialogUi.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                space = { value -> mainUiKit.space(value) },
-                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-                colorDotGeneric = { hex, selected, onClick -> ledControlViews.colorDot(hex, selected, onClick) },
-                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) }
-            )
-        )
-    }
-
-    private fun showFanLedDialog() {
-        FanLedDialogUi.showFanLedDialog(
-            activity = this,
-            originalEnabled = fanLedEnabled,
-            originalEffect = fanLedEffect,
-            originalColor = fanLedColor,
-            currentEnabled = { fanLedEnabled },
-            currentEffect = { fanLedEffect },
-            currentColor = { fanLedColor },
-            setEnabled = { value -> fanLedEnabled = value },
-            setEffect = { value -> fanLedEffect = value },
-            setColor = { value -> fanLedColor = value },
-            applyPreviewIfEnabled = {
-                disableRgbStudioForManualLedControl()
-                applyFanLedPreviewIfEnabled()
-            },
-            applySelection = { effect, color ->
-                disableRgbStudioForManualLedControl()
-                applyFanLedSelection(effect, color)
-            },
-            disableLed = {
-                disableRgbStudioForManualLedControl()
-                submitBackgroundTask {
-                    HardwareController.setFanLedEnabled(false)
-                }
-            },
-            saveState = { saveFanLedStateStorage(this, LedState(fanLedEnabled, fanLedEffect, fanLedColor)) },
-            startFanLedService = {
-                submitBackgroundTask {
-                    HardwareServiceActions.startFanLed(this)
-                }
-            },
-            stopFanLedService = {
-                submitBackgroundTask {
-                    HardwareServiceActions.stopFanLed(this)
-                }
-            },
-            anyLedEnabled = { fanLedEnabled || logoLedEnabled || shoulderLedEnabled },
-            applyFanPreset = { preset -> applyFanPreset(preset) },
-            setDialogRefresh = { callback -> dialogRefreshFanLed = callback },
-            deps = FanLedDialogUi.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                accent = accent,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                space = { value -> mainUiKit.space(value) },
-                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-                colorDot = { colorId, hex, onClick -> colorDot(colorId, hex, onClick) },
-                colorDotDrawable = { hex, selected -> ledControlViews.colorDotDrawable(hex, selected) },
-                fanPresetBubble = { c1, c2, c3, c4, presetValue, onClick ->
-                    fanPresetBubble(c1, c2, c3, c4, presetValue = presetValue, onClick = onClick)
-                }
-            )
-        )
-    }
-
-    private fun disableRgbStudioForManualLedControl() {
-        if (!RgbStudioStorage.isEnabled(this)) return
-
-        RgbStudioStorage.setEnabled(this, false)
-        HardwareServiceActions.stopRgbCycle(
-            this,
-            restoreNormalLeds = false
-        )
-    }
-
-    private fun applyFanPreset(effectValue: String) {
-        fanLedEnabled = true
-        fanLedEffect = "preset:$effectValue"
-        fanLedColor = -1
-
-        applyFanLedSelection(
-            effect = fanLedEffect,
-            color = fanLedColor
-        )
-        dialogRefreshFanLed?.invoke()
-    }
-
-    private fun selectedFanPresetBubble(
-        c1: String,
-        c2: String,
-        c3: String,
-        c4: String,
-        presetValue: String,
-        selected: Boolean,
-        onClick: () -> Unit
-    ): View {
-        return fanPresetBubble(
-            c1,
-            c2,
-            c3,
-            c4,
-            presetValue = presetValue,
-            selectedOverride = { selected },
-            onClick = onClick
-        )
-    }
-
-    private fun fanPresetBubble(
-        vararg hexes: String,
-        presetValue: String,
-        selectedOverride: (() -> Boolean)? = null,
-        onClick: () -> Unit
-    ): View {
-        return ledControlViews.fanPresetBubble(
-            colors = hexes.toList(),
-            selected = selectedOverride ?: {
-                fanLedEffect == "preset:$presetValue"
-            },
-            onClick = onClick
-        )
-    }
-
-    private fun colorDot(
-        colorId: Int,
-        hex: String,
-        onClick: () -> Unit
-    ): View {
-        return ledControlViews.colorDot(
-            hex = hex,
-            selected = fanLedColor == colorId,
-            onClick = onClick
         )
     }
 
