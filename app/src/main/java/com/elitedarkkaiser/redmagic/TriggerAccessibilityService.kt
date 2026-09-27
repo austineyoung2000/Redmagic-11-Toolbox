@@ -12,11 +12,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 
 class TriggerAccessibilityService : AccessibilityService() {
 
@@ -43,7 +44,22 @@ class TriggerAccessibilityService : AccessibilityService() {
             }
         }
 
-    private var nativeTgkTask: Future<*>? = null
+    /*
+     * Foreground transitions are serialized on nativeTgkExecutor.
+     * A generation invalidates work that has not started without
+     * interrupting an operation already talking to system_server.
+     * Interrupting the vendor setup delay can leave its enable state
+     * only partially applied, so completed operations are followed by
+     * the newest queued transition instead.
+     */
+    private val nativeTgkGeneration = AtomicLong(0L)
+
+    @Volatile
+    private var nativeHealthCheckInFlight = false
+
+    @Volatile
+    private var lastNativeHealthCheckAt = 0L
+
     private var screenReceiverRegistered = false
 
     @Volatile
@@ -174,10 +190,23 @@ class TriggerAccessibilityService : AccessibilityService() {
                     packageName = packageName,
                     orientation = orientation
                 ) &&
-                !NativeTgkRuntimeState.matches(
+                (
+                    !NativeTgkRuntimeState.matches(
+                        packageName,
+                        orientation
+                    ) ||
+                        overlayNeedsRecovery(
+                            packageName,
+                            orientation
+                        )
+                    )
+        val nativeHealthCheckDue =
+            !NativeTgkEditorRuntime.isEditing() &&
+                NativeTgkRuntimeState.matches(
                     packageName,
                     orientation
-                )
+                ) &&
+                isNativeHealthCheckDue()
         val editorNeedsStop =
             NativeTgkEditorRuntime
                 .shouldStopForForeground(packageName)
@@ -192,6 +221,7 @@ class TriggerAccessibilityService : AccessibilityService() {
             force ||
             packageName != lastForegroundPackage ||
             mappingNeedsApply ||
+            nativeHealthCheckDue ||
             editorNeedsStop ||
             performanceNeedsApply
         ) {
@@ -285,14 +315,21 @@ class TriggerAccessibilityService : AccessibilityService() {
                     )
             }
         }
-        nativeTgkTask = nativeTgkExecutor.submit {
+        val startupGeneration =
+            nativeTgkGeneration.incrementAndGet()
+
+        nativeTgkExecutor.submit {
             NativeTgkCoordinator.disable(
                 applicationContext,
                 "accessibility service connected"
             )
 
             foregroundHandler.post {
-                if (nativeTgkExecutor.isShutdown) {
+                if (
+                    nativeTgkExecutor.isShutdown ||
+                    nativeTgkGeneration.get() !=
+                    startupGeneration
+                ) {
                     return@post
                 }
 
@@ -324,8 +361,8 @@ class TriggerAccessibilityService : AccessibilityService() {
         val resetPerformanceMode =
             PerformanceModeCoordinator.isActive()
 
-        nativeTgkTask?.cancel(true)
-        nativeTgkTask = null
+        val cleanupGeneration =
+            nativeTgkGeneration.incrementAndGet()
 
         if (screenReceiverRegistered) {
             runCatching {
@@ -334,7 +371,20 @@ class TriggerAccessibilityService : AccessibilityService() {
             screenReceiverRegistered = false
         }
 
-        nativeTgkExecutor.shutdownNow()
+        runCatching {
+            nativeTgkExecutor.submit {
+                if (
+                    nativeTgkGeneration.get() ==
+                    cleanupGeneration
+                ) {
+                    NativeTgkCoordinator.disable(
+                        applicationContext,
+                        "accessibility service destroyed"
+                    )
+                }
+            }
+        }
+        nativeTgkExecutor.shutdown()
         refreshRateExecutor.shutdownNow()
 
         if (resetPerformanceMode) {
@@ -348,16 +398,6 @@ class TriggerAccessibilityService : AccessibilityService() {
                 "RedMagicPerformanceCleanup"
             ).start()
         }
-
-        Thread(
-            {
-                NativeTgkCoordinator.disable(
-                    applicationContext,
-                    "accessibility service destroyed"
-                )
-            },
-            "RedMagicNativeTgkCleanup"
-        ).start()
 
         rootExecutor.shutdownNow()
         super.onDestroy()
@@ -378,11 +418,7 @@ class TriggerAccessibilityService : AccessibilityService() {
                     )
                 )
             }
-            if (NativeTgkRuntimeState.isActive()) {
-                deactivateNativeTgk(
-                    "target editor active"
-                )
-            }
+            invalidateNativeTgkWorkForEditor()
             return
         }
 
@@ -411,6 +447,23 @@ class TriggerAccessibilityService : AccessibilityService() {
                 orientation
             )
         ) {
+            if (
+                overlayNeedsRecovery(
+                    packageName,
+                    orientation
+                )
+            ) {
+                scheduleNativeTgkApply(
+                    packageName,
+                    orientation,
+                    "gameplay overlay missing"
+                )
+            } else {
+                scheduleNativeHealthCheck(
+                    packageName,
+                    orientation
+                )
+            }
             return
         }
 
@@ -419,46 +472,185 @@ class TriggerAccessibilityService : AccessibilityService() {
          * setup delay so the legacy F7/F8 readers cannot perform
          * quick actions during the transition.
          */
+        scheduleNativeTgkApply(
+            packageName,
+            orientation,
+            "foreground mapping changed"
+        )
+    }
+
+    private fun scheduleNativeTgkApply(
+        packageName: String,
+        orientation: NativeTgkOrientation,
+        reason: String
+    ) {
         NativeTgkRuntimeState.markActive(
             packageName,
             orientation
         )
 
-        nativeTgkTask?.cancel(true)
-        nativeTgkTask = nativeTgkExecutor.submit {
-            val result =
-                NativeTgkCoordinator.applyForegroundMapping(
-                    context = applicationContext,
-                    packageName = packageName,
-                    orientation = orientation
-                )
+        val generation =
+            nativeTgkGeneration.incrementAndGet()
+        lastNativeHealthCheckAt = SystemClock.elapsedRealtime()
 
-            if (!result.success) {
-                NativeTgkRuntimeState.clearIfMatches(
-                    packageName,
-                    orientation
-                )
+        android.util.Log.i(
+            "RedmagicForeground",
+            "Queueing native mapping generation=$generation " +
+                "package=$packageName orientation=$orientation " +
+                "reason=$reason"
+        )
+
+        runCatching {
+            nativeTgkExecutor.submit nativeApply@{
+                if (
+                    nativeTgkGeneration.get() != generation ||
+                    !NativeTgkRuntimeState.matches(
+                        packageName,
+                        orientation
+                    )
+                ) {
+                    return@nativeApply
+                }
+
+                val result =
+                    NativeTgkCoordinator.applyForegroundMapping(
+                        context = applicationContext,
+                        packageName = packageName,
+                        orientation = orientation
+                    )
+
+                if (
+                    !result.success &&
+                    nativeTgkGeneration.get() == generation
+                ) {
+                    NativeTgkRuntimeState.clearIfMatches(
+                        packageName,
+                        orientation
+                    )
+                }
             }
+        }.onFailure {
+            NativeTgkRuntimeState.clearIfMatches(
+                packageName,
+                orientation
+            )
+            NativeTgkGameplayOverlay.hide()
         }
     }
 
     private fun deactivateNativeTgk(reason: String) {
-        if (!NativeTgkRuntimeState.isActive()) {
-            NativeTgkGameplayOverlay.hide()
+        NativeTgkRuntimeState.clear()
+        NativeTgkGameplayOverlay.hide()
+
+        val generation =
+            nativeTgkGeneration.incrementAndGet()
+        lastNativeHealthCheckAt = 0L
+
+        runCatching {
+            nativeTgkExecutor.submit {
+                if (
+                    nativeTgkGeneration.get() == generation
+                ) {
+                    NativeTgkCoordinator.disable(
+                        applicationContext,
+                        reason
+                    )
+                }
+            }
+        }
+    }
+
+    private fun invalidateNativeTgkWorkForEditor() {
+        nativeTgkGeneration.incrementAndGet()
+        lastNativeHealthCheckAt = 0L
+        NativeTgkRuntimeState.clear()
+        NativeTgkGameplayOverlay.hide()
+    }
+
+    private fun isNativeHealthCheckDue(): Boolean {
+        return !nativeHealthCheckInFlight &&
+            SystemClock.elapsedRealtime() -
+            lastNativeHealthCheckAt >=
+            NATIVE_HEALTH_CHECK_INTERVAL_MS
+    }
+
+    private fun scheduleNativeHealthCheck(
+        packageName: String,
+        orientation: NativeTgkOrientation
+    ) {
+        if (!isNativeHealthCheckDue()) {
             return
         }
 
-        NativeTgkRuntimeState.clear()
-        nativeTgkTask?.cancel(true)
+        val generation = nativeTgkGeneration.get()
+        lastNativeHealthCheckAt = SystemClock.elapsedRealtime()
+        nativeHealthCheckInFlight = true
 
-        nativeTgkTask = runCatching {
-            nativeTgkExecutor.submit {
-                NativeTgkCoordinator.disable(
-                    applicationContext,
-                    reason
-                )
+        runCatching {
+            nativeTgkExecutor.submit nativeHealth@{
+                try {
+                    if (
+                        nativeTgkGeneration.get() != generation ||
+                        !NativeTgkRuntimeState.matches(
+                            packageName,
+                            orientation
+                        )
+                    ) {
+                        return@nativeHealth
+                    }
+
+                    val liveState = NativeTgkBridge.readState(
+                        applicationContext
+                    )
+                    val mappingEnabled =
+                        liveState.success &&
+                            liveState.state?.mappingEnabled() == true
+
+                    if (!mappingEnabled && liveState.success) {
+                        foregroundHandler.post {
+                            if (
+                                nativeTgkGeneration.get() ==
+                                generation &&
+                                NativeTgkRuntimeState.matches(
+                                    packageName,
+                                    orientation
+                                )
+                            ) {
+                                scheduleNativeTgkApply(
+                                    packageName,
+                                    orientation,
+                                    "live mapping state disabled"
+                                )
+                            }
+                        }
+                    }
+                } finally {
+                    nativeHealthCheckInFlight = false
+                }
             }
-        }.getOrNull()
+        }.onFailure {
+            nativeHealthCheckInFlight = false
+        }
+    }
+
+    private fun overlayNeedsRecovery(
+        packageName: String,
+        orientation: NativeTgkOrientation
+    ): Boolean {
+        /*
+         * Runtime ownership alone is insufficient: Android can remove
+         * either overlay window while the system mapping remains active.
+         * Treat detached windows as a broken foreground session so the
+         * normal apply path restores the views and verifies the mapping.
+         */
+        return NativeTgkCoordinator.expectsGameplayOverlay(
+            this,
+            packageName,
+            orientation
+        ) && !NativeTgkGameplayOverlay.isVisibleFor(
+            packageName,
+            orientation
+        )
     }
 
     private fun dispatchRefreshRateForForeground(
@@ -670,6 +862,8 @@ class TriggerAccessibilityService : AccessibilityService() {
             15_000L
         private const val FOREGROUND_MONITOR_INTERVAL_MS =
             750L
+        private const val NATIVE_HEALTH_CHECK_INTERVAL_MS =
+            10_000L
 
         private val ROOT_FOREGROUND_MONITOR_COMMAND = """
             while true; do

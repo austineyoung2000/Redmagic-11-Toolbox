@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -17,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 
 /**
@@ -24,11 +26,40 @@ import kotlin.math.roundToInt
  * The window is tied to the same foreground lifecycle as native TGK.
  */
 object NativeTgkGameplayOverlay {
+    private const val TAG = "RedmagicGameplayOverlay"
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /* Ignore main-thread work posted by an older foreground session. */
+    private val requestGeneration = AtomicLong(0L)
+
+    @Volatile
     private var windowManager: WindowManager? = null
+
+    @Volatile
     private var overlayRoot: View? = null
+
+    @Volatile
     private var editRoot: View? = null
+
+    @Volatile
+    private var ownerPackageName: String? = null
+
+    @Volatile
+    private var ownerOrientation: NativeTgkOrientation? = null
+
+    fun isVisibleFor(
+        packageName: String,
+        orientation: NativeTgkOrientation
+    ): Boolean {
+        val targets = overlayRoot
+        val editor = editRoot
+
+        return ownerPackageName == packageName &&
+            ownerOrientation == orientation &&
+            targets?.isAttachedToWindow == true &&
+            editor?.isAttachedToWindow == true
+    }
 
     fun show(
         context: Context,
@@ -39,8 +70,13 @@ object NativeTgkGameplayOverlay {
         displayHeight: Int
     ) {
         val appContext = context.applicationContext
+        val generation = requestGeneration.incrementAndGet()
 
         mainHandler.post {
+            if (requestGeneration.get() != generation) {
+                return@post
+            }
+
             hideOnMainThread()
 
             if (
@@ -108,24 +144,48 @@ object NativeTgkGameplayOverlay {
             }
 
             runCatching {
-                manager.addView(root, params)
-            }.onSuccess {
-                windowManager = manager
-                overlayRoot = root
+                if (requestGeneration.get() != generation) {
+                    false
+                } else {
+                    manager.addView(root, params)
+                    true
+                }
+            }.onSuccess { targetAdded ->
+                if (targetAdded) {
+                    windowManager = manager
+                    overlayRoot = root
 
-                showEditControl(
-                    context = appContext,
-                    manager = manager,
-                    profile = profile,
-                    orientation = orientation
+                    val editorAdded = showEditControl(
+                        context = appContext,
+                        manager = manager,
+                        profile = profile,
+                        orientation = orientation
+                    )
+                    if (editorAdded) {
+                        ownerPackageName = profile.packageName
+                        ownerOrientation = orientation
+                    } else {
+                        hideOnMainThread()
+                    }
+                }
+            }.onFailure { error ->
+                Log.e(
+                    TAG,
+                    "Could not attach saved targets for " +
+                        profile.packageName,
+                    error
                 )
             }
         }
     }
 
     fun hide() {
+        val generation = requestGeneration.incrementAndGet()
+
         mainHandler.post {
-            hideOnMainThread()
+            if (requestGeneration.get() == generation) {
+                hideOnMainThread()
+            }
         }
     }
 
@@ -137,6 +197,8 @@ object NativeTgkGameplayOverlay {
         overlayRoot = null
         editRoot = null
         windowManager = null
+        ownerPackageName = null
+        ownerOrientation = null
 
         if (root != null && manager != null) {
             runCatching {
@@ -156,7 +218,7 @@ object NativeTgkGameplayOverlay {
         manager: WindowManager,
         profile: NativeTgkProfile,
         orientation: NativeTgkOrientation
-    ) {
+    ): Boolean {
         val dragHandle = TextView(context).apply {
             text = "⠿"
             contentDescription = "Drag to move the edit control"
@@ -235,11 +297,24 @@ object NativeTgkGameplayOverlay {
             orientation = orientation
         )
 
-        runCatching {
+        return runCatching {
             manager.addView(edit, params)
-        }.onSuccess {
             editRoot = edit
-        }
+            true
+        }.onSuccess {
+            Log.d(
+                TAG,
+                "Attached gameplay controls for " +
+                    profile.packageName
+            )
+        }.onFailure { error ->
+            Log.e(
+                TAG,
+                "Could not attach gameplay editor control for " +
+                    profile.packageName,
+                error
+            )
+        }.getOrDefault(false)
     }
 
     private fun openEditor(

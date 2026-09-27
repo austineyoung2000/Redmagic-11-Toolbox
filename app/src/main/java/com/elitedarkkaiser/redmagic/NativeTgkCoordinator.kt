@@ -2,6 +2,7 @@ package com.elitedarkkaiser.redmagic
 
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import android.util.Size
 import android.view.WindowManager
 
@@ -95,6 +96,22 @@ object NativeTgkCoordinator {
 
         return profile.enabled &&
             profile.hasCompleteMapping(orientation)
+    }
+
+    fun expectsGameplayOverlay(
+        context: Context,
+        packageName: String,
+        orientation: NativeTgkOrientation
+    ): Boolean {
+        val profile = NativeTgkStorage.getProfile(
+            context,
+            packageName
+        ) ?: return false
+
+        return profile.enabled &&
+            profile.showSavedTargets &&
+            profile.hasCompleteMapping(orientation) &&
+            Settings.canDrawOverlays(context)
     }
 
     fun applyForegroundMapping(
