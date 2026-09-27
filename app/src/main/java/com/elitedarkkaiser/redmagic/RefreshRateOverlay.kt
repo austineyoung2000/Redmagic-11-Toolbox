@@ -60,6 +60,8 @@ object RefreshRateOverlay {
                 overlayView = view
             }
 
+            VendorFpsMonitor.start(packageName)
+            PerformanceOverlayTelemetry.start(contextForApp)
             overlayView?.visibility = View.VISIBLE
             mainHandler.removeCallbacks(updateRunnable)
             updateRunnable.run()
@@ -86,6 +88,8 @@ object RefreshRateOverlay {
         windowManager = null
         appContext = null
         foregroundPackage = null
+        VendorFpsMonitor.stop()
+        PerformanceOverlayTelemetry.stop()
         if (view != null && manager != null) {
             runCatching { manager.removeViewImmediate(view) }
         }
@@ -106,11 +110,28 @@ object RefreshRateOverlay {
         val performanceLine = foregroundPackage
             ?.let { PerformanceModeCoordinator.activeLabel(it) }
             ?.let { "Performance: $it" }
+        val fpsLine = foregroundPackage
+            ?.let { VendorFpsMonitor.currentFps(it) }
+            ?.let { "FPS: $it" }
+        val telemetry = PerformanceOverlayTelemetry.snapshot()
+        val temperatureLine = telemetry.temperatureC?.let {
+            if (isUseFahrenheitStorage(context)) {
+                "Temperature: %.1f°F".format((it * 9f / 5f) + 32f)
+            } else {
+                "Temperature: %.1f°C".format(it)
+            }
+        }
+        val fanLine = telemetry.fanRpm
+            ?.takeIf { it >= 0 }
+            ?.let { "Fan: $it RPM" }
 
         overlayView?.text = listOfNotNull(
+            fpsLine,
             displayLine,
             touchLine,
-            performanceLine
+            performanceLine,
+            temperatureLine,
+            fanLine
         ).joinToString("\n")
     }
 
