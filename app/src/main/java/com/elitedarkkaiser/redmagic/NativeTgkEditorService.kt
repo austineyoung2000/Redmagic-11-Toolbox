@@ -6,11 +6,13 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -20,7 +22,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import com.google.android.material.button.MaterialButton
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -66,6 +67,8 @@ object NativeTgkEditorRuntime {
 class NativeTgkEditorService : Service() {
 
     companion object {
+        private const val TAG = "RedmagicTargetEditor"
+
         const val EXTRA_PACKAGE_NAME =
             "native_tgk_editor_package"
         const val EXTRA_APP_LABEL =
@@ -238,7 +241,21 @@ class NativeTgkEditorService : Service() {
             NativeTgkCoordinator.currentOrientation(this)
 
         if (current == requestedOrientation) {
-            showEditorOverlay()
+            runCatching {
+                showEditorOverlay()
+            }.onFailure { error ->
+                Log.e(
+                    TAG,
+                    "Could not construct target editor overlay",
+                    error
+                )
+                Toast.makeText(
+                    this,
+                    "Could not display the trigger editor",
+                    Toast.LENGTH_LONG
+                ).show()
+                finishWithoutMapping()
+            }
             return
         }
 
@@ -809,36 +826,45 @@ class NativeTgkEditorService : Service() {
     private fun editorActionButton(
         label: String,
         emphasized: Boolean
-    ): MaterialButton {
+    ): TextView {
         val fill = if (emphasized) {
             getColor(R.color.redmagic_accent)
         } else {
             getColor(R.color.redmagic_panel_pressed)
         }
+        val stroke = if (emphasized) {
+            getColor(R.color.redmagic_accent)
+        } else {
+            getColor(R.color.redmagic_border)
+        }
 
-        return MaterialButton(this).apply {
+        return TextView(this).apply {
             text = label
             textSize = 10f
-            isAllCaps = false
+            gravity = Gravity.CENTER
             minWidth = 0
             minHeight = 0
-            insetTop = 0
-            insetBottom = 0
-            cornerRadius = dp(10)
             setPadding(dp(7), 0, dp(7), 0)
-            setTextColor(Color.WHITE)
-            backgroundTintList = ColorStateList.valueOf(fill)
-            strokeColor = ColorStateList.valueOf(
+            setTextColor(
                 if (emphasized) {
-                    getColor(R.color.redmagic_accent)
+                    Color.WHITE
                 } else {
-                    getColor(R.color.redmagic_border)
+                    getColor(R.color.redmagic_text_primary)
                 }
             )
-            strokeWidth = dp(1)
-            rippleColor = ColorStateList.valueOf(
-                getColor(R.color.redmagic_ripple)
+            background = RippleDrawable(
+                ColorStateList.valueOf(
+                    getColor(R.color.redmagic_ripple)
+                ),
+                roundedBackground(
+                    color = fill,
+                    radius = dp(10).toFloat(),
+                    strokeColor = stroke
+                ),
+                null
             )
+            isClickable = true
+            isFocusable = true
         }
     }
 
