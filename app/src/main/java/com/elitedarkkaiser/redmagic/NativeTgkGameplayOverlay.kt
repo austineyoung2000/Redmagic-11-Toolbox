@@ -197,7 +197,7 @@ object NativeTgkGameplayOverlay {
         }
 
         val edit = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            this.orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             alpha = 0.48f
             background = GradientDrawable().apply {
