@@ -79,7 +79,7 @@ class MainActivity : Activity() {
             }
         )
     }
-    private val lightingTabActions by lazy(
+    private val lightingTabActions: MainLightingTabActions by lazy(
         LazyThreadSafetyMode.NONE
     ) {
         MainLightingTabActions(
@@ -93,16 +93,10 @@ class MainActivity : Activity() {
             },
             updateSelectableButton = { button, selected ->
                 mainUiKit.updateSelectableButton(button, selected)
-            },
-            onAllLedStateApplied = { effect, color ->
-                lightingController.applyAllLedState(
-                    effect,
-                    color
-                )
             }
         )
     }
-    private val lightingController by lazy(
+    private val lightingController: MainLightingController by lazy(
         LazyThreadSafetyMode.NONE
     ) {
         MainLightingController(

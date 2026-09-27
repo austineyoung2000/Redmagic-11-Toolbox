@@ -148,7 +148,10 @@ internal class MainLightingController(
             showShoulderLedDialog = { showShoulderLedDialog() },
             rgbStudioSummary = { actions.rgbStudioSummary() },
             showRgbStudioDialog = { onUpdated ->
-                actions.showRgbStudioDialog(onUpdated)
+                actions.showRgbStudioDialog(
+                    onUpdated = onUpdated,
+                    onAllLedStateApplied = ::applyAllLedState
+                )
             },
             showGameModeAppPicker = showGameModeAppPicker,
             showGameModeProfileDialog = showGameModeProfileDialog,

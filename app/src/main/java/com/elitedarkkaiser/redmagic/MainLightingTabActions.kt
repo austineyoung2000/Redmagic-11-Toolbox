@@ -10,15 +10,16 @@ internal class MainLightingTabActions(
     private val filterChip:
         (String, Boolean, () -> Unit) -> Button,
     private val updateSelectableButton:
-        (Button, Boolean) -> Unit,
-    private val onAllLedStateApplied:
-        (effect: String, color: Int) -> Unit
+        (Button, Boolean) -> Unit
 ) {
     fun rgbStudioSummary(): String {
         return RgbStudioStorage.summary(activity)
     }
 
-    fun showRgbStudioDialog(onUpdated: () -> Unit) {
+    fun showRgbStudioDialog(
+        onUpdated: () -> Unit,
+        onAllLedStateApplied: (String, Int) -> Unit
+    ) {
         RgbStudioDialog.show(
             activity = activity,
             initial = RgbStudioStorage.read(activity),
@@ -44,6 +45,7 @@ internal class MainLightingTabActions(
                     applyEffectToAllZones(
                         effect,
                         color,
+                        onAllLedStateApplied,
                         onUpdated
                     )
                 },
@@ -171,6 +173,7 @@ internal class MainLightingTabActions(
     private fun applyEffectToAllZones(
         effect: String,
         color: Int,
+        onAllLedStateApplied: (String, Int) -> Unit,
         onUpdated: () -> Unit
     ) {
         RgbStudioStorage.setEnabled(activity, false)
