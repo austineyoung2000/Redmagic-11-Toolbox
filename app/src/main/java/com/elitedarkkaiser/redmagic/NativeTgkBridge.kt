@@ -36,6 +36,7 @@ object NativeTgkBridge {
     const val LEFT_KEY_CODE = 137
     const val RIGHT_KEY_CODE = 138
 
+    private const val STOCK_TGK_VERSION = 40
     private const val CONFIG_SETTLE_MS = 2_000L
     private const val ENABLE_SETTLE_MS = 1_000L
 
@@ -139,6 +140,8 @@ object NativeTgkBridge {
 
             try {
                 backend.disable()
+                backend.setDriveEnabled(true)
+                backend.setVersion(STOCK_TGK_VERSION)
 
                 backend.setPoint(
                     LEFT_KEY_CODE,
@@ -379,6 +382,8 @@ object NativeTgkBridge {
             keyCode: Int
         )
 
+        fun setDriveEnabled(enabled: Boolean)
+        fun setVersion(version: Int)
         fun setConsumeKeys(enabled: Boolean)
         fun setHaptics(enabled: Boolean)
         fun setLeftEnabled(enabled: Boolean)
@@ -387,6 +392,7 @@ object NativeTgkBridge {
         fun readState(): NativeTgkState
 
         fun disable() {
+            setDriveEnabled(false)
             setGlobalEnabled(false)
             setLeftEnabled(false)
             setRightEnabled(false)
@@ -448,6 +454,22 @@ object NativeTgkBridge {
                 ),
                 count,
                 keyCode
+            )
+        }
+
+        override fun setDriveEnabled(enabled: Boolean) {
+            call(
+                "enableTgkDrive",
+                arrayOf(java.lang.Boolean.TYPE),
+                enabled
+            )
+        }
+
+        override fun setVersion(version: Int) {
+            call(
+                "setTgkVersion",
+                arrayOf(Integer.TYPE),
+                version
             )
         }
 
@@ -588,6 +610,18 @@ object NativeTgkBridge {
                 144,
                 "i32", count.toString(),
                 "i32", keyCode.toString()
+            )
+        }
+
+        override fun setDriveEnabled(enabled: Boolean) {
+            callBooleanSetter(146, enabled)
+        }
+
+        override fun setVersion(version: Int) {
+            call(
+                142,
+                "i32",
+                version.toString()
             )
         }
 
