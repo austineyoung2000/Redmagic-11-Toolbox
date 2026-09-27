@@ -8,11 +8,8 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.LinearLayout
-import com.google.android.material.slider.Slider
 import android.widget.TextView
-import com.elitedarkkaiser.redmagic.storage.AppPrefs
 import com.elitedarkkaiser.redmagic.state.LedState
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
@@ -23,15 +20,6 @@ class MainActivity : Activity() {
     private var useFahrenheit = true
 
 
-    private lateinit var tempText: TextView
-    private lateinit var curveStatusText: TextView
-    private lateinit var fanSeek: Slider
-    private lateinit var autoCurveCheck: CheckBox
-
-    private lateinit var quietCurveButton: Button
-    private lateinit var balancedCurveButton: Button
-    private lateinit var turboCurveButton: Button
-
     private lateinit var deviceRomValue: TextView
     private lateinit var deviceCpuValue: TextView
     private lateinit var deviceRamValue: TextView
@@ -40,7 +28,6 @@ class MainActivity : Activity() {
     private lateinit var thermalHistoryView:
         com.elitedarkkaiser.redmagic.ui.ThermalHistoryView
     private var lastDisplayedRpm: Int = -1
-    private var lastDisplayedTempF: Float? = null
 
     private var coolingTabBuilt = false
     private var controlsTabBuilt = false
@@ -53,17 +40,11 @@ class MainActivity : Activity() {
     private lateinit var hardwareTab: LinearLayout
     private lateinit var lightingTab: LinearLayout
     private var magicKeyStatusLabelRef: TextView? = null
-    private var dialogRefreshPump: (() -> Unit)? = null
     private var dialogRefreshShoulderLed: (() -> Unit)? = null
     private var dialogRefreshLogoLed: (() -> Unit)? = null
     private var dialogRefreshFanLed: (() -> Unit)? = null
     private var gameModeAppsTextRef: TextView? = null
 
-    private var smartPumpStatusView: TextView? = null
-    private var smartPumpSpeedView: TextView? = null
-
-    private var selectedCurve = "balanced"
-    private var autoFanCurveEnabled = false
     private var realTimePreviewEnabled = true
 
     private var fanLedEnabled = true
@@ -77,13 +58,6 @@ class MainActivity : Activity() {
     private var shoulderLedEnabled = true
     private var shoulderLedEffect = "breathe"
     private var shoulderLedColor = 8
-
-    private var pumpEnabled = false
-    private var pumpProfile = "quick"
-    private var autoPumpEnabled = false
-
-
-
 
     private val bgColor get() = AppTheme.bgColor
     private val panelColor get() = AppTheme.panelColor
@@ -149,6 +123,20 @@ class MainActivity : Activity() {
                 shoulderLedEffect = effect
                 shoulderLedColor = color
             }
+        )
+    }
+    private val coolingTabActions by lazy(
+        LazyThreadSafetyMode.NONE
+    ) {
+        MainCoolingTabActions(
+            activity = this,
+            uiKit = mainUiKit,
+            runBackground = { task ->
+                submitBackgroundTask(task)
+            },
+            refreshStatus = { refreshStatus() },
+            capabilities = { deviceCapabilities },
+            useFahrenheit = { useFahrenheit }
         )
     }
     private var mainUiReady = false
@@ -378,38 +366,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun buildAutoPumpStatusText(): Pair<String, String> {
-        val tempF = lastDisplayedTempF
-        if (tempF == null) {
-            return "Pump Mode: AUTO • Unknown temp" to "Speed: ? • Freq: ?"
-        }
-
-        val profile = when {
-            tempF >= 105f -> "Quick"
-            tempF >= 90f -> "Medium"
-            else -> "Slow"
-        }
-
-        val speed = when (profile) {
-            "Quick" -> 80
-            "Medium" -> 60
-            else -> 40
-        }
-
-        return "Pump Mode: AUTO • $profile (${TempFormat.formatDisplayTempFromF(tempF, useFahrenheit)})" to
-            "Speed: $speed • Freq: 4"
-    }
-
-
     private fun applyMasterProfileToUiState(
         profile: MasterProfile
     ) {
         val hardware = profile.hardware
-        autoFanCurveEnabled = hardware.autoFanEnabled
-        selectedCurve = hardware.fanCurveMode
-        pumpEnabled = hardware.pumpEnabled
-        pumpProfile = hardware.pumpProfile
-        autoPumpEnabled = hardware.autoPumpEnabled
+        coolingTabActions.applyMasterProfile(hardware)
         fanLedEnabled = hardware.fanLedEnabled
         fanLedEffect = hardware.fanLedEffect
         fanLedColor = hardware.fanLedColor
@@ -421,81 +382,7 @@ class MainActivity : Activity() {
         shoulderLedColor = hardware.shoulderLedColor
         realTimePreviewEnabled = profile.realtimePreviewEnabled
         useFahrenheit = profile.useFahrenheit
-        fanSeek.value = hardware.fanLevel.toFloat()
-        restoreFanCurveUiState()
-        refreshSmartPumpStatusViews()
         refreshStatus()
-    }
-
-    private fun refreshSmartPumpStatusViews() {
-        val statusView = smartPumpStatusView ?: return
-        val speedView = smartPumpSpeedView ?: return
-
-        if (autoPumpEnabled) {
-            val status = buildAutoPumpStatusText()
-            statusView.text = status.first
-            speedView.text = status.second
-        } else {
-            val manualLabel = pumpProfile.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase() else it.toString()
-            }
-            val manualSpeed = when (pumpProfile.lowercase()) {
-                "slow" -> 40
-                "medium" -> 60
-                "quick" -> 80
-                "experimental" -> 90
-                else -> 60
-            }
-            statusView.text = "Pump Mode: MANUAL • $manualLabel"
-            speedView.text = "Speed: $manualSpeed • Freq: 4"
-        }
-    }
-
-    private fun applyPumpProfile(profile: String) {
-        pumpProfile = profile
-        pumpEnabled = true
-        autoPumpEnabled = false
-        savePumpStateStorage(this, pumpEnabled, pumpProfile)
-        saveAutoPumpStateStorage(this, autoPumpEnabled)
-        refreshSmartPumpStatusViews()
-
-        submitBackgroundTask {
-            HardwareServiceActions.stopAutoPump(this)
-            HardwareController.setPumpProfile(profile)
-            refreshStatus()
-        }
-    }
-
-    private fun confirmExperimentalPumpThenApply(
-        onApplied: () -> Unit = {}
-    ) {
-        if (savedPumpStateStorage(this).experimentalAccepted) {
-            applyPumpProfile("experimental")
-            onApplied()
-            return
-        }
-
-        ExperimentalPumpDialog.show(
-            activity = this,
-            onCancel = { },
-            onConfirm = {
-                setPumpExperimentalAcceptedStorage(this, true)
-                applyPumpProfile("experimental")
-                onApplied()
-            },
-            deps = ExperimentalPumpDialog.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                space = { value -> mainUiKit.space(value) }
-            )
-        )
     }
 
     private fun showRootRequiredDialog() {
@@ -579,16 +466,15 @@ class MainActivity : Activity() {
                 shoulderLedColor = state.color
             },
             applySavedPumpStateOnLaunch = {
-                val state = savedPumpStateStorage(this)
-                pumpEnabled = state.enabled
-                pumpProfile = state.profile
-                autoPumpEnabled = state.autoEnabled
+                coolingTabActions.loadSavedPumpState()
             },
             setRealTimePreviewEnabled = { value -> realTimePreviewEnabled = value },
             isRealTimePreviewEnabledSaved = { isRealTimePreviewEnabledStorage(this) },
             setUseFahrenheit = { value -> useFahrenheit = value },
             isUseFahrenheitSaved = { isUseFahrenheitStorage(this) },
-            setAutoPumpEnabled = { value -> autoPumpEnabled = value },
+            setAutoPumpEnabled = { value ->
+                coolingTabActions.setAutoPumpEnabled(value)
+            },
             isAutoPumpEnabledSaved = { savedPumpStateStorage(this).autoEnabled }
         )
 
@@ -618,26 +504,7 @@ class MainActivity : Activity() {
         hardwareTabBuilt = false
         lightingTabBuilt = false
 
-        MainUiStartup.applyLaunchHardware(
-            fanLedEnabled = fanLedEnabled,
-            fanLedEffect = fanLedEffect,
-            fanLedColor = fanLedColor,
-            logoLedEnabled = logoLedEnabled,
-            logoLedEffect = logoLedEffect,
-            logoLedColor = logoLedColor,
-            shoulderLedEnabled = shoulderLedEnabled,
-            shoulderLedEffect = shoulderLedEffect,
-            shoulderLedColor = shoulderLedColor,
-            pumpEnabled = pumpEnabled,
-            pumpProfile = pumpProfile,
-            applyFanLedSelection = { effect, color -> applyFanLedSelection(effect, color) },
-            startFanLedService = { HardwareServiceActions.startFanLed(this) },
-            stopFanLedService = { HardwareServiceActions.stopFanLed(this) }
-        )
-
-        if (autoPumpEnabled) {
-            HardwareServiceActions.startAutoPump(this)
-        }
+        coolingTabActions.startAutoPumpIfEnabled()
 
         if (RgbStudioStorage.isEnabled(this)) {
             HardwareServiceActions.startRgbCycle(this)
@@ -657,35 +524,6 @@ class MainActivity : Activity() {
         // Do not start background services just because the UI opened.
         // Game Mode starts from selected-app foreground events.
         // Charging Mode starts from boot, plug state, or explicit toggle.
-    }
-
-    private fun restoreFanCurveUiState() {
-        selectedCurve = selectedCurveStorage(this)
-        autoFanCurveEnabled = isAutoFanEnabledStorage(this)
-        val fanAvailable =
-            !deviceCapabilities.scanComplete ||
-                deviceCapabilities.fanAvailable
-
-        if (fanAvailable) {
-            autoCurveCheck.isChecked =
-                autoFanCurveEnabled
-        }
-
-        if (!fanAvailable) {
-            curveStatusText.text =
-                "Fan controls unavailable on this ROM"
-        } else if (autoFanCurveEnabled) {
-            curveStatusText.text = "Auto fan curve active • Running in background service"
-        } else {
-            curveStatusText.text = "Selected curve: $selectedCurve • Manual control"
-        }
-
-        when (selectedCurve) {
-            "quiet" -> setActiveMode(quietCurveButton)
-            "turbo" -> setActiveMode(turboCurveButton)
-            else -> setActiveMode(balancedCurveButton)
-        }
-        updateManualCurveUiState()
     }
 
     private fun submitBackgroundTask(
@@ -745,79 +583,7 @@ class MainActivity : Activity() {
     }
 
     private fun createCoolingTab(): LinearLayout {
-        val result = com.elitedarkkaiser.redmagic.ui.CoolingTabUi.create(coolingTabDeps())
-
-        assignCoolingRefs(result.refs)
-
-        return result.view
-    }
-
-    private fun coolingTabDeps(): com.elitedarkkaiser.redmagic.ui.CoolingTabDeps {
-        return com.elitedarkkaiser.redmagic.ui.CoolingTabDeps(
-                scrollTabContainer = { mainUiKit.scrollTabContainer() },
-                sectionPanel = { mainUiKit.sectionPanel() },
-                sectionHeader = { icon, text -> mainUiKit.sectionHeader(icon, text) },
-                subtleLabel = { text -> mainUiKit.subtleLabel(text) },
-                bodyText = { text -> mainUiKit.bodyText(text) },
-                segmentedChip = { label, selected, onClick -> mainUiKit.segmentedChip(label, selected, onClick) },
-                updateSelectableButton = { button, selected ->
-                    mainUiKit.updateSelectableButton(button, selected)
-                },
-                actionButton = { text, isDanger, onClick -> mainUiKit.actionButton(text, isDanger, onClick) },
-                row = { left, right -> mainUiKit.row(left, right) },
-                singleRow = { button -> mainUiKit.singleRow(button) },
-                space = { width -> mainUiKit.space(width) },
-                spacer = { height -> mainUiKit.spacer(height) },
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radiusDp -> mainUiKit.roundedBg(fill, stroke, radiusDp) },
-                runBackground = { task ->
-                    submitBackgroundTask(task)
-                },
-                capabilities = deviceCapabilities,
-
-                getSelectedCurve = { selectedCurve },
-                setSelectedCurve = { value -> selectedCurve = value },
-                setSelectedCurveSaved = { value -> saveSelectedCurveStorage(this, value) },
-
-                getAutoFanCurveEnabled = { autoFanCurveEnabled },
-                setAutoFanCurveEnabled = { value -> autoFanCurveEnabled = value },
-                setAutoFanEnabledSaved = { value -> saveAutoFanEnabledStorage(this, value) },
-
-                getPumpEnabled = { pumpEnabled },
-                setPumpEnabled = { value -> pumpEnabled = value },
-                getPumpProfile = { pumpProfile },
-                setPumpProfileValue = { value -> pumpProfile = value },
-                getAutoPumpEnabled = { autoPumpEnabled },
-                setAutoPumpEnabled = { value -> autoPumpEnabled = value },
-
-                setSelectedFanProgress = { value -> fanSeek.value = value.toFloat() },
-                startAutoFanService = { HardwareServiceActions.startAutoFan(this) },
-                stopAutoFanService = { HardwareServiceActions.stopAutoFan(this) },
-                startAutoPumpService = { HardwareServiceActions.startAutoPump(this) },
-                stopAutoPumpService = { HardwareServiceActions.stopAutoPump(this) },
-                savePumpState = { savePumpStateStorage(this, pumpEnabled, pumpProfile) },
-                saveAutoPumpState = { saveAutoPumpStateStorage(this, autoPumpEnabled) },
-                refreshStatus = { refreshStatus() },
-                refreshSmartPumpStatusViews = { refreshSmartPumpStatusViews() },
-                buildAutoPumpStatusText = { buildAutoPumpStatusText() },
-                applyPumpProfile = { profile -> applyPumpProfile(profile) },
-                confirmExperimentalPumpThenApply = { onApplied ->
-                    confirmExperimentalPumpThenApply(onApplied)
-                },
-                updateManualCurveUiState = { updateManualCurveUiState() }
-            )
-    }
-
-    private fun assignCoolingRefs(refs: com.elitedarkkaiser.redmagic.ui.CoolingTabUi.Refs) {
-        tempText = refs.tempText
-        curveStatusText = refs.curveStatusText
-        fanSeek = refs.fanSeek
-        autoCurveCheck = refs.autoCurveCheck
-        quietCurveButton = refs.quietCurveButton
-        balancedCurveButton = refs.balancedCurveButton
-        turboCurveButton = refs.turboCurveButton
-        smartPumpStatusView = refs.smartPumpStatusView
-        smartPumpSpeedView = refs.smartPumpSpeedView
+        return coolingTabActions.createView()
     }
 
     private fun applyFanLedPreviewIfEnabled() {
@@ -1327,43 +1093,6 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun showPumpProfileDialog() {
-        PumpDialogUi.showPumpProfileDialog(
-            activity = this,
-            originalEnabled = pumpEnabled,
-            originalProfile = pumpProfile,
-            currentProfile = { pumpProfile },
-            setPumpEnabled = { value -> pumpEnabled = value },
-            setPumpProfile = { value -> pumpProfile = value },
-            applyHardwareProfile = { value ->
-                submitBackgroundTask {
-                    HardwareController.setPumpProfile(value)
-                }
-            },
-            disablePump = {
-                submitBackgroundTask {
-                    HardwareController.enablePump(false)
-                }
-            },
-            savePumpState = { savePumpStateStorage(this, pumpEnabled, pumpProfile) },
-            confirmExperimentalPumpThenApply = { confirmExperimentalPumpThenApply() },
-            setDialogRefreshPump = { callback -> dialogRefreshPump = callback },
-            deps = PumpDialogUi.Deps(
-                textPrimary = textPrimary,
-                textSecondary = textSecondary,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                panelPressed = panelPressed,
-                typeface = typeface,
-                dp = { value -> mainUiKit.dp(value) },
-                roundedBg = { fill, stroke, radius -> mainUiKit.roundedBg(fill, stroke, radius) },
-                roundedFill = { color, radius -> mainUiKit.roundedFill(color, radius) },
-                filterChip = { label, selected, onClick -> ledControlViews.filterChip(label, selected, onClick) },
-                space = { value -> mainUiKit.space(value) }
-            )
-        )
-    }
-
     private fun showShoulderLedDialog() {
         ShoulderLedDialogUi.showShoulderLedDialog(
             activity = this,
@@ -1653,7 +1382,6 @@ class MainActivity : Activity() {
                 coolingTab,
                 createCoolingTab()
             )
-            restoreFanCurveUiState()
         }
 
         if (controlsTabBuilt) {
@@ -1704,7 +1432,6 @@ class MainActivity : Activity() {
                         createCoolingTab()
                     )
                     coolingTabBuilt = true
-                    restoreFanCurveUiState()
                 }
             }
 
@@ -1748,27 +1475,6 @@ class MainActivity : Activity() {
         bottomNavigation.select(tab)
     }
 
-    private fun updateManualCurveUiState() {
-        val fanAvailable =
-            !deviceCapabilities.scanComplete ||
-                deviceCapabilities.fanAvailable
-        val manualEnabled =
-            fanAvailable && !autoFanCurveEnabled
-        val alpha = if (manualEnabled) 1f else 0.40f
-
-        quietCurveButton.alpha = alpha
-        balancedCurveButton.alpha = alpha
-        turboCurveButton.alpha = alpha
-
-        quietCurveButton.isEnabled = manualEnabled
-        balancedCurveButton.isEnabled = manualEnabled
-        turboCurveButton.isEnabled = manualEnabled
-
-        quietCurveButton.isClickable = manualEnabled
-        balancedCurveButton.isClickable = manualEnabled
-        turboCurveButton.isClickable = manualEnabled
-    }
-
     private fun refreshStatus() {
         activityRuntime.requestStatusRefresh()
     }
@@ -1793,19 +1499,7 @@ class MainActivity : Activity() {
             lastDisplayedRpm = rpm
         }
 
-        val previousTempF = lastDisplayedTempF
-        val tempTrend = when {
-            tempF == null || previousTempF == null -> ""
-            tempF > previousTempF + 1f -> " ↑"
-            tempF < previousTempF - 1f -> " ↓"
-            else -> " →"
-        }
-
-        if (tempF != null) {
-            lastDisplayedTempF = tempF
-        }
-
-        refreshSmartPumpStatusViews()
+        coolingTabActions.applyTemperature(tempF)
 
         deviceRomValue.text = snapshot.deviceInfo.rom
         deviceCpuValue.text = snapshot.deviceInfo.cpu
@@ -1826,18 +1520,6 @@ class MainActivity : Activity() {
             )
         }
 
-        if (::tempText.isInitialized) {
-            tempText.text = if (tempF != null) {
-                "Current temp: ${
-                    TempFormat.formatDisplayTempFromF(
-                        tempF,
-                        useFahrenheit
-                    )
-                }$tempTrend"
-            } else {
-                "Current temp: --"
-            }
-        }
     }
 
     private fun openUrl(url: String) {
@@ -1845,21 +1527,6 @@ class MainActivity : Activity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (_: Throwable) {
         }
-    }
-
-    private fun setActiveMode(active: Button) {
-        mainUiKit.updateSelectableButton(
-            quietCurveButton,
-            active === quietCurveButton
-        )
-        mainUiKit.updateSelectableButton(
-            balancedCurveButton,
-            active === balancedCurveButton
-        )
-        mainUiKit.updateSelectableButton(
-            turboCurveButton,
-            active === turboCurveButton
-        )
     }
 
     private fun showGamePickerDialog() {

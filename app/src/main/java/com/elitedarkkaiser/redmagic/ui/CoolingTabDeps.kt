@@ -38,7 +38,6 @@ data class CoolingTabDeps(
     val getAutoPumpEnabled: () -> Boolean,
     val setAutoPumpEnabled: (Boolean) -> Unit,
 
-    val setSelectedFanProgress: (Int) -> Unit,
     val startAutoFanService: () -> Unit,
     val stopAutoFanService: () -> Unit,
     val startAutoPumpService: () -> Unit,

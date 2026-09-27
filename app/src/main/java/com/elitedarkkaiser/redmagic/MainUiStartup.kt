@@ -25,24 +25,4 @@ internal object MainUiStartup {
         setUseFahrenheit(isUseFahrenheitSaved())
         setAutoPumpEnabled(isAutoPumpEnabledSaved())
     }
-
-    fun applyLaunchHardware(
-        fanLedEnabled: Boolean,
-        fanLedEffect: String,
-        fanLedColor: Int,
-        logoLedEnabled: Boolean,
-        logoLedEffect: String,
-        logoLedColor: Int,
-        shoulderLedEnabled: Boolean,
-        shoulderLedEffect: String,
-        shoulderLedColor: Int,
-        pumpEnabled: Boolean,
-        pumpProfile: String,
-        applyFanLedSelection: (String, Int) -> Unit,
-        startFanLedService: () -> Unit,
-        stopFanLedService: () -> Unit
-    ) {
-        // Do not write hardware on every app launch.
-        // Services and user actions apply hardware state.
-    }
 }
