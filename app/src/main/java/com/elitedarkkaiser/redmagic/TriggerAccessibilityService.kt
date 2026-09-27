@@ -46,38 +46,31 @@ class TriggerAccessibilityService : AccessibilityService() {
     private var nativeTgkTask: Future<*>? = null
     private var screenReceiverRegistered = false
 
+    @Volatile
+    private var foregroundRootProcess: Process? = null
+
+    @Volatile
+    private var foregroundRootReader: Thread? = null
+
+    @Volatile
+    private var forceForegroundReconcile = false
+
+    private val foregroundPackagePattern = Regex(
+        """[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+"""
+    )
+
     private val foregroundMonitor = object : Runnable {
         override fun run() {
             if (isScreenInteractive()) {
-                latestResumedPackage()?.let { packageName ->
-                    val orientation =
-                        NativeTgkCoordinator.currentOrientation(
-                            this@TriggerAccessibilityService
-                        )
-                    val mappingNeedsApply =
-                        !NativeTgkEditorRuntime.isEditing() &&
-                            NativeTgkCoordinator.hasReadyMapping(
-                                context =
-                                    this@TriggerAccessibilityService,
-                                packageName = packageName,
-                                orientation = orientation
-                            ) &&
-                            !NativeTgkRuntimeState.matches(
-                                packageName,
-                                orientation
-                            )
-                    val editorNeedsStop =
-                        NativeTgkEditorRuntime
-                            .shouldStopForForeground(packageName)
+                ensureForegroundRootMonitor()
 
-                    if (
-                        packageName != lastForegroundPackage ||
-                        mappingNeedsApply ||
-                        editorNeedsStop
-                    ) {
-                        handleForegroundPackage(packageName)
+                if (foregroundRootProcess?.isAlive != true) {
+                    latestResumedPackage()?.let { packageName ->
+                        reconcileDetectedPackage(packageName)
                     }
                 }
+            } else {
+                stopForegroundRootMonitor()
             }
 
             foregroundHandler.postDelayed(
@@ -97,11 +90,14 @@ class TriggerAccessibilityService : AccessibilityService() {
         ) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
                 lastForegroundPackage = null
+                forceForegroundReconcile = false
+                stopForegroundRootMonitor()
                 deactivateNativeTgk("screen off")
                 RefreshRateOverlay.hide()
                 RefreshRateCoordinator.clearRuntimeState()
             } else if (intent.action == Intent.ACTION_SCREEN_ON) {
-                reconcileForeground(force = true)
+                forceForegroundReconcile = true
+                ensureForegroundRootMonitor()
             }
         }
     }
@@ -118,6 +114,17 @@ class TriggerAccessibilityService : AccessibilityService() {
             ?: return
 
         if (reportedPackage.isBlank()) {
+            return
+        }
+
+        ensureForegroundRootMonitor()
+
+        /*
+         * When available, topResumedActivity is the authoritative
+         * source on REDMAGIC firmware. Do not race it with delayed or
+         * missing Usage Events.
+         */
+        if (foregroundRootProcess?.isAlive == true) {
             return
         }
 
@@ -139,7 +146,39 @@ class TriggerAccessibilityService : AccessibilityService() {
                 reportedPackage
             }
 
-        handleForegroundPackage(pkg)
+        reconcileDetectedPackage(pkg)
+    }
+
+    private fun reconcileDetectedPackage(
+        packageName: String
+    ) {
+        val orientation =
+            NativeTgkCoordinator.currentOrientation(this)
+        val mappingNeedsApply =
+            !NativeTgkEditorRuntime.isEditing() &&
+                NativeTgkCoordinator.hasReadyMapping(
+                    context = this,
+                    packageName = packageName,
+                    orientation = orientation
+                ) &&
+                !NativeTgkRuntimeState.matches(
+                    packageName,
+                    orientation
+                )
+        val editorNeedsStop =
+            NativeTgkEditorRuntime
+                .shouldStopForForeground(packageName)
+        val force = forceForegroundReconcile
+
+        if (
+            force ||
+            packageName != lastForegroundPackage ||
+            mappingNeedsApply ||
+            editorNeedsStop
+        ) {
+            forceForegroundReconcile = false
+            handleForegroundPackage(packageName)
+        }
     }
 
     private fun handleForegroundPackage(pkg: String) {
@@ -182,8 +221,9 @@ class TriggerAccessibilityService : AccessibilityService() {
     ) {
         super.onConfigurationChanged(newConfig)
 
-        /* Never reuse a cached package after rotation. */
-        reconcileForeground(force = true)
+        /* Reconcile against the next authoritative root sample. */
+        forceForegroundReconcile = true
+        ensureForegroundRootMonitor()
     }
 
     override fun onInterrupt() {
@@ -203,6 +243,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         }
 
         registerScreenReceiver()
+        ensureForegroundRootMonitor()
         foregroundHandler.removeCallbacks(foregroundMonitor)
         foregroundHandler.post(foregroundMonitor)
 
@@ -229,6 +270,8 @@ class TriggerAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         lastForegroundPackage = null
+        forceForegroundReconcile = false
+        stopForegroundRootMonitor()
         foregroundHandler.removeCallbacksAndMessages(null)
         NativeTgkRuntimeState.clear()
         RefreshRateOverlay.hide()
@@ -412,22 +455,106 @@ class TriggerAccessibilityService : AccessibilityService() {
         }.getOrNull()
     }
 
-    private fun reconcileForeground(force: Boolean) {
-        foregroundHandler.postDelayed(
-            {
-                val packageName = latestResumedPackage()
-                    ?: return@postDelayed
-                if (force || packageName != lastForegroundPackage) {
-                    handleForegroundPackage(packageName)
-                }
-            },
-            FOREGROUND_RECONCILE_DELAY_MS
-        )
-    }
-
     private fun isScreenInteractive(): Boolean {
         return getSystemService(PowerManager::class.java)
             ?.isInteractive == true
+    }
+
+    @Synchronized
+    private fun ensureForegroundRootMonitor() {
+        if (foregroundRootProcess?.isAlive == true) {
+            return
+        }
+
+        if (!needsForegroundMonitoring()) {
+            stopForegroundRootMonitor()
+            return
+        }
+
+        val process = runCatching {
+            ProcessBuilder(
+                "su",
+                "-c",
+                ROOT_FOREGROUND_MONITOR_COMMAND
+            ).redirectErrorStream(true).start()
+        }.getOrElse {
+            android.util.Log.e(
+                "RedmagicForeground",
+                "Unable to start authoritative foreground monitor",
+                it
+            )
+            return
+        }
+
+        foregroundRootProcess = process
+
+        val readerThread = Thread(
+            {
+                runCatching {
+                    process.inputStream.bufferedReader().useLines {
+                        lines ->
+                        lines.forEach { rawLine ->
+                            val detected = rawLine.trim()
+                            if (
+                                foregroundPackagePattern.matches(
+                                    detected
+                                )
+                            ) {
+                                foregroundHandler.post {
+                                    if (
+                                        foregroundRootProcess ===
+                                        process &&
+                                        isScreenInteractive()
+                                    ) {
+                                        reconcileDetectedPackage(
+                                            detected
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                synchronized(this) {
+                    if (foregroundRootProcess === process) {
+                        foregroundRootProcess = null
+                        foregroundRootReader = null
+                    }
+                }
+            },
+            "RedMagicForegroundReader"
+        ).apply {
+            priority = Thread.NORM_PRIORITY - 1
+        }
+
+        foregroundRootReader = readerThread
+        readerThread.start()
+    }
+
+    @Synchronized
+    private fun stopForegroundRootMonitor() {
+        val process = foregroundRootProcess
+        val reader = foregroundRootReader
+
+        foregroundRootProcess = null
+        foregroundRootReader = null
+
+        reader?.interrupt()
+        if (process != null) {
+            runCatching { process.destroy() }
+            if (process.isAlive) {
+                runCatching { process.destroyForcibly() }
+            }
+        }
+    }
+
+    private fun needsForegroundMonitoring(): Boolean {
+        return NativeTgkEditorRuntime.isEditing() ||
+            NativeTgkStorage.enabledPackages(this).isNotEmpty() ||
+            RefreshRateStorage.readProfiles(this).any {
+                it.enabled || it.pendingReset
+            }
     }
 
     private fun registerScreenReceiver() {
@@ -465,8 +592,23 @@ class TriggerAccessibilityService : AccessibilityService() {
             15_000L
         private const val FOREGROUND_MONITOR_INTERVAL_MS =
             750L
-        private const val FOREGROUND_RECONCILE_DELAY_MS =
-            200L
+
+        private val ROOT_FOREGROUND_MONITOR_COMMAND = """
+            while true; do
+                line="${'$'}(
+                    dumpsys activity activities 2>/dev/null |
+                    grep -m 1 'topResumedActivity='
+                )"
+                detected="${'$'}(
+                    printf '%s\n' "${'$'}line" |
+                    sed -n 's/.* u[0-9][0-9]* \([^/ ]*\)\/.*/\1/p'
+                )"
+                if [ -n "${'$'}detected" ]; then
+                    printf '%s\n' "${'$'}detected"
+                fi
+                sleep 1
+            done
+        """.trimIndent()
     }
 
     private fun prefs() = getSharedPreferences(
