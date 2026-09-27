@@ -739,12 +739,38 @@ class NativeTgkEditorService : Service() {
         }
 
         /*
-         * Do not apply directly from the overlay service. The
-         * accessibility foreground reconciler will apply this saved
-         * mapping only if the target application is still resumed.
+         * The editor is kept alive only while its target application
+         * is foreground. Apply immediately after Save so there is no
+         * gap where the editor has ended but the foreground monitor
+         * has not yet configured TGK. Marking the mapping active first
+         * also prevents the legacy F7/F8 service from running its
+         * Volume actions during the vendor configuration delay.
          */
-        NativeTgkRuntimeState.clear()
-        stopSelf()
+        NativeTgkRuntimeState.markActive(
+            targetPackage,
+            requestedOrientation
+        )
+
+        Thread(
+            {
+                val result =
+                    NativeTgkCoordinator.applyForegroundMapping(
+                        context = applicationContext,
+                        packageName = targetPackage,
+                        orientation = requestedOrientation
+                    )
+
+                if (!result.success) {
+                    NativeTgkRuntimeState.clearIfMatches(
+                        targetPackage,
+                        requestedOrientation
+                    )
+                }
+
+                stopSelf()
+            },
+            "RedMagicTgkEditorApply"
+        ).start()
     }
 
     private fun finishWithoutMapping() {

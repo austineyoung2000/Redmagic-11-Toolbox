@@ -325,10 +325,10 @@ object NativeTgkBridge {
 
         return listOf(
             {
-                ReflectionBackend(appContext)
+                ServiceCallBackend()
             },
             {
-                ServiceCallBackend()
+                ReflectionBackend(appContext)
             }
         )
     }
