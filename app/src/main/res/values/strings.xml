@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Redmagic Control Center</string>
+    <string name="app_name">Redmagic 11 Toolbox</string>
     <string name="fan_level_value">Fan level: %1$d</string>
     <string name="accessibility_desc">Shoulder trigger handler</string>
     <string name="cooling_widget_name">RedMagic Cooling</string>

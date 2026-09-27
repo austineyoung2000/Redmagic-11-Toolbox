@@ -96,7 +96,7 @@ object MasterProfileStorage {
         require(raw.length <= 5_000_000) { "Backup is larger than 5 MB" }
         val root = JSONObject(raw)
         require(root.optString("format") == BACKUP_FORMAT) {
-            "This is not a RedMagic Control Center backup"
+            "This is not a Redmagic 11 Toolbox backup"
         }
         require(root.optInt("schemaVersion", 0) in 1..CURRENT_SCHEMA_VERSION) {
             "Unsupported backup version"

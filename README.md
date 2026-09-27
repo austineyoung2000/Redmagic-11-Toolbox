@@ -1,74 +1,73 @@
-# RedMagic Control Center
+# Redmagic 11 Toolbox
 
 [![Android CI](https://github.com/austineyoung2000/Redmagic-Control-Center/actions/workflows/android.yml/badge.svg?branch=sixteen)](https://github.com/austineyoung2000/Redmagic-Control-Center/actions/workflows/android.yml)
-![Version](https://img.shields.io/badge/version-2.1.0-red)
+![Version](https://img.shields.io/badge/version-2.5.0-red)
 ![Android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)
 ![Device](https://img.shields.io/badge/device-RedMagic%2011%20Pro-red)
 ![Root](https://img.shields.io/badge/root-required-orange)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Android-7F52FF?logo=kotlin&logoColor=white)
 
-A root-powered hardware control center built specifically for the **RedMagic 11 Pro / NX809J**.
+A hardware, gaming, cooling, lighting, and automation toolbox built specifically for the **RedMagic 11 Pro / NX809J**.
 
-RedMagic Control Center combines cooling, liquid-pump, lighting, shoulder-trigger, Magic Key, Game Mode, charging, call-lighting, and profile controls in one Material-style Android application. It uses hardware paths and behavior validated on real RedMagic 11 Pro hardware instead of depending on the stock Game Space interface.
+Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-trigger touch mapping, per-app performance controls, Magic Key, charging, call-lighting, automation, diagnostics, and portable profiles in one Material-style Android application. The implementation uses interfaces validated on a physical NX809J and does not require the Game Space application to manage native TGK mappings.
 
 > [!WARNING]
-> This application writes directly to kernel and vendor hardware interfaces through root. It is restricted to the RedMagic 11 Pro / NX809J. Do not install it on another device without porting and validating every hardware path.
+> Several hardware controls write directly to kernel and vendor interfaces through root. Stock vendor gaming features use compatibility-gated system APIs where available and fall back only where explicitly implemented. Do not expose NX809J-only hardware controls on another device without porting and validating every interface.
 
 ## Current platform
 
 | Item | Configuration |
 |---|---|
 | Application ID | `com.elitedarkkaiser.redmagic` |
-| Version | `2.1.0` |
+| Version | `2.5.0` (`versionCode 6`) |
 | Development branch | `sixteen` |
 | Minimum Android | Android 9 / API 28 |
 | Target and compile SDK | API 35 |
 | Language | Kotlin |
 | Java compatibility | Java 17 |
 | UI | Material Components |
-| Root | Required |
+| Root | Required for hardware controls; native TGK itself is non-root |
 | Supported device | RedMagic 11 Pro / NX809J |
 
-## What's new in 2.1.0
+## What's new in 2.5.0
 
-Version 2.1.0 expands hardware access, automation, profile portability, and system-level controls while preserving the app's local-only and battery-conscious design.
+Version 2.5.0 rebrands the application as Redmagic 11 Toolbox and adds a standalone, stock-native gaming stack discovered through NX809J framework and Game Space reverse engineering.
 
-### System controls and dashboard
+### Native shoulder-trigger touch mapping
 
-- Six optional Quick Settings tiles for the fan, pump, automatic cooling, shoulder triggers, RGB Studio, and the last applied Master Profile
-- A launcher cooling widget with temperature, fan, pump, refresh, and direct hardware controls
-- A 30-minute in-memory thermal-history graph that reuses shared monitor samples
-- An Active Mode Inspector showing the effective LED owner, cooling controller, last applied Master Profile, and real ownership priority
-- Strict NX809J validation at both application launch and the hardware-controller boundary
-- Capability-aware handling for missing vendor interfaces on supported custom ROMs
+- Independent per-app L and R touch targets using the firmware's native TGK engine
+- Separate portrait and landscape mappings, named layouts, and in-game re-editing
+- Persistent, nearly transparent saved targets that remain non-interactive during play
+- Stock framework press feedback at the mapped targets plus the stock physical-trigger highlights
+- Per-trigger single-touch, long-press, and rapid-fire behavior with supported counts of 2, 5, or 10
+- Simultaneous L/R operation without cancelling held touchscreen contacts or thumbstick movement
+- Foreground-only activation and immediate shutdown when the selected app loses focus
+- Native TGK diagnostics, profile transfer, and Master Profile backup coverage
+- No Game Space database dependency and no accessibility gesture, shell-tap, touchscreen `sendevent`, or virtual-gamepad injection
 
-### Magic Key and slider
+### Per-app stock gaming controls
 
-- A redesigned Material app picker shared with Game Mode, including app icons, labels, package names, and search
-- Stability fixes that isolate Magic Key selection from stock Magic Key functions and prevent picker force closes
-- Optional dual-app slider assignments for the physical up and down positions
-- An optional daily scheduled app pair, including schedules that cross midnight
-- Automatic restoration of the previous stock action, app target, or Android shortcut after dual-app mode is disabled
-- Confirmed ZTE mode `17` support for launching Android app shortcuts directly from the slider
+- Compatibility-gated Eco, Balance, and Rise performance modes
+- Per-app refresh-rate control through the stock REDMAGIC display service
+- Per-app touch sampling, touch sensitivity, touch-follow, and micro-sensitivity profiles
+- A foreground-only performance overlay showing refresh rate, touch sampling, active performance mode, FPS, temperature, and fan telemetry
+- Stock charge-separation control with charger and minimum-battery safety checks
+- Shared foreground lifecycle coordination so TGK, saved targets, refresh rate, touch tuning, performance mode, and telemetry follow the same selected application
 
-### Profiles and automation
+### Existing toolbox features
 
-- Hardware Profiles were replaced by the broader versioned Master Profile system
-- Portable JSON export and import with malformed-profile isolation and a 5 MB input limit
-- Backup coverage for per-game profiles, RGB Studio, temperature units, Magic Key modes, shortcut targets, dual-slider schedules, triggers, and hardware haptics
-- Event-driven Master Profile rules for power connection, power disconnection, low battery, battery recovery, and first unlock after restart
-- Backward-compatible profile migrations through schema version 6
+- Fan and micropump control, temperature curves, telemetry, and screen-off cooling policy
+- Fan, logo, and shoulder lighting plus RGB Studio and explicit LED ownership arbitration
+- Magic Key stock actions, application launching, Android shortcuts, dual-app assignments, and daily schedules
+- Game Mode, Charging Mode, Call Lighting, Quick Settings tiles, and the launcher cooling widget
+- Portable, versioned Master Profiles and event-driven automation rules
+- Shared persistent root execution, duplicate-write suppression, adaptive temperature sampling, and background worker cleanup
 
-### Hardware and reliability
+### Reverse-engineering documentation
 
-- Optional Low, Medium, or High NX809J hardware haptic feedback for trigger actions, successful slider launches, and Master Profile application
-- Serialized whole-profile LED transitions across Charging Mode, Call Lighting, Game Mode, RGB Studio, and normal lighting
-- Modern Android telephony callback handling with legacy fallback for Call Lighting
-- Safer call fan-pause restoration, charging-owner recovery, Game Mode transition debouncing, and RGB frame coordination
-- Accurate Shoulder Trigger Quick Settings state parsing from both NX809J SAR nodes
-- A Settings page for Fahrenheit/Celsius selection and automatic Android light/dark theme following
+The complete native TGK investigation—including firmware classes, Binder transactions, stock database schema, runtime traces, permission testing, activation ordering, visual effects, and the standalone Game Space-independent proof—is documented in [`docs/NATIVE_TGK_REVERSE_ENGINEERING.md`](docs/NATIVE_TGK_REVERSE_ENGINEERING.md).
 
-The sections below document the complete 2.1.0 behavior and current architecture.
+The sections below document the complete 2.5.0 behavior and current architecture.
 
 ## Compatibility
 
@@ -82,12 +81,16 @@ LineageOS-based and other custom ROMs can work when they retain the stock RedMag
 - `/sys/class/leds/sar0/*`
 - `/sys/class/leds/sar1/*`
 - RedMagic/Nubia Magic Key system settings
+- REDMAGIC Android 16 `IInputManager` TGK additions for native touch mapping
+- Stock display, touch-tuning, performance, and charge-separation services for their corresponding per-app features
 
 The app verifies the NX809J identity before requesting root or exposing any controls. The launch gate accepts only exact NX809J model/product identities, including NX809J regional product suffixes, and does not rely on the marketing name alone.
 
 The compatibility layer centralizes the confirmed fan, pump, LED, and trigger paths so capability diagnostics, telemetry, and hardware writes use the same interface definitions. Hardware writes are blocked again at the controller boundary if the device identity is unsupported, protecting against widget, Quick Settings, service, or boot entry points that bypass the activity.
 
 For NX809J custom ROMs, CPU temperature detection resolves the confirmed `cpullc-0-0` sensor by thermal-zone type before falling back to known zone numbers. This tolerates framework-level thermal-zone reordering while remaining restricted to NX809J hardware.
+
+Native TGK and the stock per-app gaming controls are exposed only after their specific compatibility probes pass. A custom ROM may retain the fan, pump, LED, and thermal interfaces while omitting the proprietary framework APIs; in that case the general toolbox remains usable and the unavailable stock-only controls stay gated. Restoring native TGK on a custom ROM requires porting the matching REDMAGIC framework, system-server, native input, vendor, and SELinux pieces rather than copying the application-side Binder calls alone.
 
 ## Application layout
 
@@ -246,6 +249,26 @@ The Trigger Mapping and Trigger Safety dialogs use the same app-themed Material 
 
 Manual **Disable Triggers** stops the service and hardware without erasing the Auto-start preference. Automatic startup remains paused until the user presses **Enable Triggers** or restarts the phone.
 
+### Native game trigger mapping
+
+On compatible stock Android 16 firmware, the Hardware tab also exposes a separate per-app native TGK manager. This is not the media-action trigger service described above. It programs REDMAGIC's system input engine so physical L/R events become native screen contacts at user-selected coordinates.
+
+Each selected application can store named layouts with independent portrait and landscape targets. The editor launches the selected application, places draggable L/R controls over it, and saves the resulting rectangles. During normal play those targets are shown as nearly transparent, touch-through markers: they cannot steal gameplay input or be dragged until the user deliberately enters edit mode again.
+
+The unified foreground runtime performs the following lifecycle:
+
+1. Confirm that the selected package is the top-resumed application.
+2. Load the matching orientation and active named layout.
+3. Program both native TGK points and behavior modes.
+4. Wait for the asynchronous vendor configuration to settle.
+5. Enable key consumption, optional haptics, L/R, and global TGK in the stock order.
+6. Keep the saved markers and optional performance telemetry attached to the same foreground owner.
+7. Disable TGK and remove every related overlay immediately when the app loses the foreground, the screen turns off, or the runtime stops.
+
+Single-touch, long-press, and rapid-fire behaviors can be chosen independently for L and R. Rapid-fire counts are restricted to the confirmed stock values. The framework's own top-edge and mapped-target visual effects provide down/up feedback without the app intercepting F7/F8 events.
+
+Native TGK configuration is performed through ordinary app-accessible InputManager calls and does not require root on the tested stock firmware. The firmware's TGK implementation is still required; this feature cannot be recreated on an arbitrary custom ROM solely from the application layer. See the [native TGK reverse-engineering report](docs/NATIVE_TGK_REVERSE_ENGINEERING.md) for the evidence and exact transaction map.
+
 ### Haptic feedback
 
 The Hardware tab contains optional hardware haptic feedback for shoulder-trigger actions, successful dual-app slider launches, and Master Profile application. It is disabled by default and offers Low, Medium, and High strengths with an immediate test pulse when a strength is selected.
@@ -270,10 +293,13 @@ Master profiles capture the wider application state, including:
 - Hardware haptic enabled state and strength
 - Real-time preview preference
 - Trigger mappings, startup state, and complete Trigger Safety configuration
+- Native TGK applications, named layouts, portrait/landscape targets, per-trigger behavior, rapid-fire counts, haptics, and saved-target visibility
+- Charge-separation state
+- Per-app refresh-rate, touch-tuning, and performance-mode profiles
 
 Profiles can be named, applied, deleted, exported as a portable JSON backup, and imported on another installation.
 
-The versioned profile format uses schema version 6 for Trigger Safety configuration. Schema version 5 added Magic Key shortcut targets, and schema version 4 added haptic configuration. Older profiles remain importable and receive safe defaults for fields their schema did not contain.
+The versioned profile format currently uses schema version 11. Versions 7 through 11 added native TGK profiles, charge separation, refresh-rate profiles, touch-tuning profiles, and performance-mode profiles respectively. Earlier schemas remain importable and receive safe defaults for fields they did not contain. The internal backup-format identifier remains backward compatible across the Redmagic 11 Toolbox rebrand.
 
 ### Automation rules
 
@@ -281,7 +307,7 @@ Saved Master Profiles can be assigned to power connected, power disconnected, ba
 
 ## Settings
 
-The settings page opens from the gear beside the animated RedMagic Control Center header. It contains app-wide display preferences rather than physical hardware controls:
+The settings page opens from the gear beside the animated Redmagic 11 Toolbox header. It contains app-wide display preferences rather than physical hardware controls:
 
 - Fahrenheit or Celsius temperature display
 - Automatic light/dark appearance following the Android system theme
@@ -319,6 +345,21 @@ RGB Studio uses the shared persistent root broker instead of launching `su` for 
 Game Mode applies a saved fan, pump, and LED profile when a selected application becomes active. It uses Usage Access and accessibility foreground-app events instead of continuous idle polling.
 
 While a selected game is active, a slow two-minute verification poll checks state. Polling stops when the game closes or the screen turns off, and the normal hardware profile is restored.
+
+## Per-app gaming controls
+
+The stock-only per-app controls share the same top-resumed-activity detection used by native TGK. Each controller probes its vendor dependency before exposing or applying a profile:
+
+- **Refresh rate** selects the requested stock display mode for the chosen package.
+- **Touch tuning** stores the confirmed REDMAGIC sampling-rate, sensitivity, follow, and micro-sensitivity settings per package.
+- **Performance mode** selects Eco, Balance, or Rise and synchronizes the stock audio/performance state when that vendor API is available.
+- **Performance overlay** is visible only for opted-in foreground packages and can show display refresh rate, configured touch sampling, performance mode, live FPS when the vendor monitor supplies it, CPU temperature, and cached fan telemetry.
+
+These features are deliberately gated separately. Failure or absence of one vendor API does not disable unrelated NX809J hardware controls or native TGK.
+
+## Charge separation
+
+Charge separation uses the stock ZTE provider and `charge_separation_switch` system state when the compatibility probe succeeds. Enabling is blocked unless a charger is connected and the battery meets the controller's minimum threshold. The saved state is covered by Master Profiles.
 
 ## Charging Mode
 
@@ -491,14 +532,14 @@ Never commit signing credentials or keystores.
 
 Android CI runs for pushes and pull requests involving `main` or `sixteen`, manual workflow dispatches, and version tags beginning with `v`.
 
-The workflow builds debug and signed release APKs, uploads both artifacts, and creates a GitHub Release when a version tag is pushed. Release signing material is supplied through encrypted repository secrets.
+The workflow builds and uploads the signed release APK and creates a GitHub Release when a version tag is pushed. Release signing material is supplied through encrypted repository secrets.
 
 ## Troubleshooting
 
 ### Root access is missing
 
 - Confirm Magisk, KernelSU, APatch, or another compatible `su` provider is installed.
-- Verify RedMagic Control is allowed in the root manager.
+- Verify Redmagic 11 Toolbox is allowed in the root manager.
 - Remove an existing denied entry and reopen the app if necessary.
 - Use **Controls → Check Root**.
 

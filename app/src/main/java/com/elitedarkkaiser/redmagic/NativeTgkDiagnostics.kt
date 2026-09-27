@@ -146,7 +146,7 @@ object NativeTgkDiagnostics {
         val liveNativeEnabled = liveResult.state?.mappingEnabled()
 
         return buildString {
-            appendLine("REDMAGIC CONTROL CENTER — TGK DIAGNOSTICS")
+            appendLine("REDMAGIC 11 TOOLBOX — TGK DIAGNOSTICS")
             appendLine("Generated: ${formatTime(System.currentTimeMillis())}")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine("Android: ${Build.VERSION.RELEASE} / SDK ${Build.VERSION.SDK_INT}")

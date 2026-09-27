@@ -105,13 +105,13 @@ abstract class RedMagicTileService : TileService() {
 
     private fun showUnsupportedTile() {
         val tile = qsTile ?: return
-        tile.label = "RedMagic Control"
+        tile.label = "Redmagic 11 Toolbox"
         tile.state = Tile.STATE_UNAVAILABLE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = "NX809J only"
         }
         tile.contentDescription =
-            "RedMagic Control, NX809J only"
+            "Redmagic 11 Toolbox, NX809J only"
         tile.updateTile()
     }
 

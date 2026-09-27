@@ -1,30 +1,48 @@
-# RedMagic Control Center 2.1.0
+# Redmagic 11 Toolbox 2.5.0
 
-Version 2.1.0 is a major feature and reliability update for the RedMagic 11 Pro / NX809J.
+Version 2.5.0 rebrands RedMagic Control Center as **Redmagic 11 Toolbox** and introduces a standalone native gaming stack for the RedMagic 11 Pro / NX809J.
 
-## Highlights
+The application ID and signing identity are unchanged, so this release installs as an update over existing versions and keeps saved app data.
 
-- Added six Android Quick Settings tiles for common hardware controls.
-- Added a battery-conscious home-screen cooling widget.
-- Added a 30-minute thermal-history graph and Active Mode Inspector.
-- Added event-driven Master Profile automation rules.
-- Replaced the old Hardware Profiles system with portable, versioned Master Profile backups.
-- Added a redesigned searchable Material app picker shared by Magic Key and Game Mode.
-- Added optional dual-app slider assignments with daily scheduling and previous-mode restoration.
-- Added confirmed Magic Key Android shortcut launching through ZTE mode 17.
-- Added optional hardware haptic feedback with three strengths.
-- Added Fahrenheit/Celsius settings and automatic system light/dark appearance.
-- Added stricter NX809J device gating and capability-aware hardware handling.
-- Improved Game Mode, Call Lighting, Charging Mode, RGB Studio, and normal LED ownership transitions.
+## Native TGK shoulder-trigger mapping
 
-## Profiles and compatibility
+- Added independent per-app L and R screen targets through REDMAGIC's native TGK engine.
+- Added separate portrait and landscape mappings, named layouts, and in-game editing.
+- Added persistent touch-through saved-target markers with deliberate re-edit mode.
+- Added independent single-touch, hold, and rapid-fire behavior for each trigger.
+- Added supported rapid-fire counts of 2, 5, and 10.
+- Added stock top-edge trigger highlights and native pressed-target visual feedback.
+- Added stock TGK haptics, driver activation, version negotiation, state verification, and runtime diagnostics.
+- Added native TGK profile import/export and complete Master Profile backup coverage.
+- Unified TGK and overlay ownership with the selected application's foreground lifecycle.
 
-Master Profile schema version 5 stores the complete supported configuration, including per-game profiles, RGB Studio, Magic Key shortcut targets, dual-slider schedules, trigger preferences, hardware haptics, and temperature units. Older Master Profile backups remain importable.
+Native TGK does not require the Game Space application or root on the tested stock firmware. Touch contacts are generated inside the firmware input pipeline, preserving simultaneous touchscreen movement and multitouch.
 
-The application remains intentionally restricted to the RedMagic 11 Pro / NX809J. Compatible custom ROMs must retain the required stock vendor and kernel interfaces.
+## Per-app gaming controls
+
+- Added compatibility-gated per-app refresh-rate profiles through the stock REDMAGIC display service.
+- Added per-app touch-sampling, sensitivity, touch-follow, and micro-sensitivity profiles.
+- Added per-app Eco, Balance, and Rise performance-mode management.
+- Added a foreground-only performance overlay showing refresh rate, touch sampling, performance mode, FPS, CPU temperature, and fan telemetry.
+- Added stock charge-separation control with charger and battery safety checks.
+- Added separate capability probes so missing vendor APIs remain unavailable without breaking general toolbox features.
+
+## Existing toolbox
+
+Version 2.5.0 retains fan and micropump control, automatic cooling curves, lighting and RGB Studio, Magic Key actions and shortcuts, dual-app slider schedules, Game Mode, Charging Mode, Call Lighting, Quick Settings tiles, the cooling widget, thermal history, automation rules, diagnostics, and portable Master Profiles.
+
+## Reverse-engineering report
+
+The repository now includes `docs/NATIVE_TGK_REVERSE_ENGINEERING.md`, documenting the firmware classes, Binder transactions, stock database observations, permission testing, kernel trace, runtime sequencing, visual effects, and Game Space-independent validation behind native TGK support.
+
+## Compatibility
+
+- Primary target: RedMagic 11 Pro / NX809J.
+- Native TGK and the new vendor gaming controls require compatible REDMAGIC Android 16 framework services.
+- General hardware features can work on NX809J custom ROMs that preserve the required vendor and kernel interfaces.
+- Stock-only controls are hidden or rejected when their compatibility checks fail.
+- Root remains required for direct fan, pump, LED, trigger-node, and other privileged hardware controls.
 
 ## Installation
 
-Download and install the signed release APK attached to this release. Root access is required. Review the README before installing or granting permanent superuser access.
-
-The debug APK is included for testing and diagnostics. Normal users should install the signed release APK.
+Download and install the signed release APK attached to this release. Existing users can install it directly over the previous signed version. Review the README before granting permanent superuser, accessibility, usage-access, phone-state, notification, or overlay permissions.

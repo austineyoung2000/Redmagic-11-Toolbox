@@ -1295,7 +1295,7 @@ class MainActivity : Activity() {
                             type = "application/json"
                             putExtra(
                                 Intent.EXTRA_TITLE,
-                                "redmagic-control-center-backup.json"
+                                "redmagic-11-toolbox-backup.json"
                             )
                         },
                         MASTER_BACKUP_EXPORT_REQUEST

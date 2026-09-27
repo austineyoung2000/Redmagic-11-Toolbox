@@ -75,7 +75,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: RedMagic Control Center ${{ github.ref_name }}
+          name: Redmagic 11 Toolbox ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
           files: |
             app/build/outputs/apk/release/*.apk

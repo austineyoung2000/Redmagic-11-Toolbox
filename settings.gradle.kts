@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RedMagicRootControl"
+rootProject.name = "Redmagic11Toolbox"
 include(":app")

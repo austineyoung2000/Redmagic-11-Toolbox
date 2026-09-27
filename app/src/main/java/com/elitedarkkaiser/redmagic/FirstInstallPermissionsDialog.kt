@@ -34,7 +34,7 @@ object FirstInstallPermissionsDialog {
 
         val body = TextView(activity).apply {
             text =
-                "RedMagic Control is built for rooted RedMagic 11 Pro hardware control.\n\n" +
+                "Redmagic 11 Toolbox is built for rooted RedMagic 11 Pro hardware control.\n\n" +
                     "Tap Grant with root to allow:\n" +
                     "• Usage Access for Game Mode detection\n" +
                     "• Display over other apps for trigger setup\n" +

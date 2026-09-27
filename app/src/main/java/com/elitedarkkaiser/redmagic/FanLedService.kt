@@ -304,7 +304,7 @@ class FanLedService : Service() {
         }
 
         return builder
-            .setContentTitle("RedMagic Control")
+            .setContentTitle("Redmagic 11 Toolbox")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setOngoing(true)

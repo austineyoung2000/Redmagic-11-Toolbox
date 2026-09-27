@@ -88,7 +88,7 @@ object HomeTabUi {
                 layoutParams = LinearLayout.LayoutParams(deps.dp(60), deps.dp(60))
             }
 
-            val titleView = deps.ledTitleText("Redmagic Control Center")
+            val titleView = deps.ledTitleText("Redmagic 11 Toolbox")
 
             titleView.layoutParams = LinearLayout.LayoutParams(
                 0,
