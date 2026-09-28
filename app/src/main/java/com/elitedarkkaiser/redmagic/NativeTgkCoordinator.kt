@@ -109,7 +109,6 @@ object NativeTgkCoordinator {
         ) ?: return false
 
         return profile.enabled &&
-            profile.showSavedTargets &&
             profile.hasCompleteMapping(orientation) &&
             Settings.canDrawOverlays(context)
     }

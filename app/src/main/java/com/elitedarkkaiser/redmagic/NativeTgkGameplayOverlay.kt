@@ -1,7 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -10,20 +9,16 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 
 /**
- * Displays saved TGK targets during gameplay without accepting input.
- * The window is tied to the same foreground lifecycle as native TGK.
+ * Displays saved TGK targets and owns the Game Space entry point during
+ * gameplay. Both windows are tied to the same foreground lifecycle as TGK.
  */
 object NativeTgkGameplayOverlay {
     private const val TAG = "RedmagicGameplayOverlay"
@@ -40,7 +35,7 @@ object NativeTgkGameplayOverlay {
     private var overlayRoot: View? = null
 
     @Volatile
-    private var editRoot: View? = null
+    private var gameSpaceOverlay: GameplaySpaceOverlay? = null
 
     @Volatile
     private var ownerPackageName: String? = null
@@ -53,12 +48,12 @@ object NativeTgkGameplayOverlay {
         orientation: NativeTgkOrientation
     ): Boolean {
         val targets = overlayRoot
-        val editor = editRoot
+        val gameSpace = gameSpaceOverlay
 
         return ownerPackageName == packageName &&
             ownerOrientation == orientation &&
             targets?.isAttachedToWindow == true &&
-            editor?.isAttachedToWindow == true
+            gameSpace?.isAttached() == true
     }
 
     fun show(
@@ -81,7 +76,6 @@ object NativeTgkGameplayOverlay {
                 hideOnMainThread()
 
                 if (
-                    !profile.showSavedTargets ||
                     !mapping.isComplete() ||
                     !Settings.canDrawOverlays(appContext)
                 ) {
@@ -98,29 +92,31 @@ object NativeTgkGameplayOverlay {
                     isFocusable = false
                 }
 
-                addTarget(
-                    context = appContext,
-                    root = root,
-                    label = "L",
-                    color = Color.rgb(215, 45, 55),
-                    rect = mapping.left!!,
-                    displayWidth = displayWidth,
-                    displayHeight = displayHeight,
-                    opacityPercent =
-                        profile.savedTargetOpacityPercent
-                )
+                if (profile.showSavedTargets) {
+                    addTarget(
+                        context = appContext,
+                        root = root,
+                        label = "L",
+                        color = Color.rgb(215, 45, 55),
+                        rect = mapping.left!!,
+                        displayWidth = displayWidth,
+                        displayHeight = displayHeight,
+                        opacityPercent =
+                            profile.savedTargetOpacityPercent
+                    )
 
-                addTarget(
-                    context = appContext,
-                    root = root,
-                    label = "R",
-                    color = Color.rgb(30, 120, 230),
-                    rect = mapping.right!!,
-                    displayWidth = displayWidth,
-                    displayHeight = displayHeight,
-                    opacityPercent =
-                        profile.savedTargetOpacityPercent
-                )
+                    addTarget(
+                        context = appContext,
+                        root = root,
+                        label = "R",
+                        color = Color.rgb(30, 120, 230),
+                        rect = mapping.right!!,
+                        displayWidth = displayWidth,
+                        displayHeight = displayHeight,
+                        opacityPercent =
+                            profile.savedTargetOpacityPercent
+                    )
+                }
 
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -156,13 +152,14 @@ object NativeTgkGameplayOverlay {
                         windowManager = manager
                         overlayRoot = root
 
-                        val editorAdded = showEditControl(
+                        val gameSpace = GameplaySpaceOverlay(
                             context = appContext,
                             manager = manager,
                             profile = profile,
                             orientation = orientation
                         )
-                        if (editorAdded) {
+                        if (gameSpace.attach()) {
+                            gameSpaceOverlay = gameSpace
                             ownerPackageName = profile.packageName
                             ownerOrientation = orientation
                         } else {
@@ -201,11 +198,11 @@ object NativeTgkGameplayOverlay {
 
     private fun hideOnMainThread() {
         val root = overlayRoot
-        val edit = editRoot
+        val gameSpace = gameSpaceOverlay
         val manager = windowManager
 
         overlayRoot = null
-        editRoot = null
+        gameSpaceOverlay = null
         windowManager = null
         ownerPackageName = null
         ownerOrientation = null
@@ -216,291 +213,7 @@ object NativeTgkGameplayOverlay {
             }
         }
 
-        if (edit != null && manager != null) {
-            runCatching {
-                manager.removeViewImmediate(edit)
-            }
-        }
-    }
-
-    private fun showEditControl(
-        context: Context,
-        manager: WindowManager,
-        profile: NativeTgkProfile,
-        orientation: NativeTgkOrientation
-    ): Boolean {
-        val dragHandle = TextView(context).apply {
-            text = "⠿"
-            contentDescription = "Drag to move the edit control"
-            textSize = 11f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setPadding(
-                dp(context, 9),
-                dp(context, 7),
-                dp(context, 7),
-                dp(context, 7)
-            )
-            background = GradientDrawable().apply {
-                cornerRadius = dp(context, 13).toFloat()
-                setColor(Color.argb(150, 255, 65, 90))
-            }
-        }
-
-        val editAction = TextView(context).apply {
-            text = "EDIT L/R"
-            contentDescription = "Edit L and R trigger targets"
-            textSize = 10f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setPadding(
-                dp(context, 8),
-                dp(context, 7),
-                dp(context, 10),
-                dp(context, 7)
-            )
-            setOnClickListener {
-                openEditor(
-                    context = context,
-                    profile = profile,
-                    orientation = orientation
-                )
-            }
-        }
-
-        val edit = LinearLayout(context).apply {
-            this.orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            alpha = 0.48f
-            background = GradientDrawable().apply {
-                cornerRadius = dp(context, 16).toFloat()
-                setColor(Color.argb(220, 20, 20, 24))
-                setStroke(
-                    dp(context, 1),
-                    Color.argb(210, 255, 255, 255)
-                )
-            }
-            addView(dragHandle)
-            addView(editAction)
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = dp(context, 12)
-        }
-
-        placeEditControl(
-            context = context,
-            manager = manager,
-            edit = edit,
-            dragHandle = dragHandle,
-            params = params,
-            packageName = profile.packageName,
-            orientation = orientation
-        )
-
-        return runCatching {
-            manager.addView(edit, params)
-            editRoot = edit
-            true
-        }.onSuccess {
-            Log.d(
-                TAG,
-                "Attached gameplay controls for " +
-                    profile.packageName
-            )
-        }.onFailure { error ->
-            Log.e(
-                TAG,
-                "Could not attach gameplay editor control for " +
-                    profile.packageName,
-                error
-            )
-        }.getOrDefault(false)
-    }
-
-    private fun openEditor(
-        context: Context,
-        profile: NativeTgkProfile,
-        orientation: NativeTgkOrientation
-    ) {
-        val editorIntent = Intent(
-            context,
-            NativeTgkEditorService::class.java
-        ).apply {
-            putExtra(
-                NativeTgkEditorService.EXTRA_PACKAGE_NAME,
-                profile.packageName
-            )
-            putExtra(
-                NativeTgkEditorService.EXTRA_APP_LABEL,
-                profile.appLabel
-            )
-            putExtra(
-                NativeTgkEditorService.EXTRA_ORIENTATION,
-                orientation.name
-            )
-            putExtra(
-                NativeTgkEditorService.EXTRA_LAUNCH_TARGET,
-                false
-            )
-        }
-
-        runCatching {
-            context.startService(editorIntent)
-        }.onFailure {
-            Toast.makeText(
-                context,
-                "Could not reopen the trigger editor",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    private fun placeEditControl(
-        context: Context,
-        manager: WindowManager,
-        edit: View,
-        dragHandle: View,
-        params: WindowManager.LayoutParams,
-        packageName: String,
-        orientation: NativeTgkOrientation
-    ) {
-        edit.measure(
-            View.MeasureSpec.makeMeasureSpec(
-                0,
-                View.MeasureSpec.UNSPECIFIED
-            ),
-            View.MeasureSpec.makeMeasureSpec(
-                0,
-                View.MeasureSpec.UNSPECIFIED
-            )
-        )
-
-        val screen = overlayBounds(context, manager)
-        val maxX = (screen.first - edit.measuredWidth).coerceAtLeast(0)
-        val maxY = (screen.second - edit.measuredHeight).coerceAtLeast(0)
-        val saved = GameplayEditPositionStorage.read(
-            context,
-            packageName,
-            orientation
-        )
-
-        params.x = saved?.xFor(maxX)
-            ?: (maxX - dp(context, 12)).coerceAtLeast(0)
-        params.y = saved?.yFor(maxY)
-            ?: dp(
-                context,
-                if (
-                    orientation == NativeTgkOrientation.LANDSCAPE
-                ) 52 else 12
-            ).coerceAtMost(maxY)
-
-        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-        var downRawX = 0f
-        var downRawY = 0f
-        var startX = 0
-        var startY = 0
-        var dragging = false
-
-        dragHandle.setOnTouchListener { view, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    downRawX = event.rawX
-                    downRawY = event.rawY
-                    startX = params.x
-                    startY = params.y
-                    dragging = false
-                    true
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-                    val deltaX = event.rawX - downRawX
-                    val deltaY = event.rawY - downRawY
-                    if (
-                        !dragging &&
-                        (
-                            kotlin.math.abs(deltaX) >= touchSlop ||
-                                kotlin.math.abs(deltaY) >= touchSlop
-                            )
-                    ) {
-                        dragging = true
-                    }
-
-                    if (dragging) {
-                        params.x = (startX + deltaX.roundToInt())
-                            .coerceIn(0, maxX)
-                        params.y = (startY + deltaY.roundToInt())
-                            .coerceIn(0, maxY)
-                        runCatching {
-                            manager.updateViewLayout(edit, params)
-                        }
-                    }
-                    true
-                }
-
-                MotionEvent.ACTION_UP -> {
-                    if (dragging) {
-                        GameplayEditPositionStorage.save(
-                            context = context,
-                            packageName = packageName,
-                            orientation = orientation,
-                            x = params.x,
-                            y = params.y,
-                            maxX = maxX,
-                            maxY = maxY
-                        )
-                    } else {
-                        view.performClick()
-                    }
-                    true
-                }
-
-                MotionEvent.ACTION_CANCEL -> {
-                    if (dragging) {
-                        GameplayEditPositionStorage.save(
-                            context = context,
-                            packageName = packageName,
-                            orientation = orientation,
-                            x = params.x,
-                            y = params.y,
-                            maxX = maxX,
-                            maxY = maxY
-                        )
-                    }
-                    true
-                }
-
-                else -> false
-            }
-        }
-    }
-
-    private fun overlayBounds(
-        context: Context,
-        manager: WindowManager
-    ): Pair<Int, Int> {
-        return if (
-            android.os.Build.VERSION.SDK_INT >=
-            android.os.Build.VERSION_CODES.R
-        ) {
-            manager.currentWindowMetrics.bounds.let {
-                it.width() to it.height()
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            context.resources.displayMetrics.let {
-                it.widthPixels to it.heightPixels
-            }
-        }
+        gameSpace?.hide()
     }
 
     private fun addTarget(

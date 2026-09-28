@@ -35,6 +35,7 @@ class MainActivity : Activity() {
 
     private var useFahrenheit = true
     private var uiLaunched = false
+    private var pendingOpenTab: String? = null
     private var deviceCapabilities = DeviceCapabilities.unknown()
 
     private lateinit var activityRuntime: MainActivityRuntime
@@ -161,6 +162,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppTheme.configure(this)
+        pendingOpenTab = requestedTab(intent)
 
         if (!DeviceCompatibility.isSupportedDevice()) {
             deviceGateActions.showUnsupportedDevice()
@@ -186,6 +188,16 @@ class MainActivity : Activity() {
             }
         } else {
             verifyRootAndLaunch()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingOpenTab = requestedTab(intent)
+
+        if (uiLaunched && ::tabHost.isInitialized) {
+            selectPendingTab()
         }
     }
 
@@ -265,7 +277,18 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        internal const val EXTRA_OPEN_TAB =
+            "com.elitedarkkaiser.redmagic.OPEN_TAB"
+
         private const val GAMEPLAY_UI_RELEASE_DELAY_MS = 5_000L
+
+        private val TOOLBOX_TABS = setOf(
+            "home",
+            "cooling",
+            "controls",
+            "hardware",
+            "lighting"
+        )
     }
 
     private fun verifyRootAndLaunch() {
@@ -308,12 +331,26 @@ class MainActivity : Activity() {
         )
         tabHost.launch()
         uiLaunched = true
+        selectPendingTab()
 
         coolingController.startAutoPumpIfEnabled()
         lightingController.startRgbStudioIfEnabled()
         startTriggerAutoStartIfEnabled()
         activityRuntime.onUiReady()
         startCapabilityScan()
+    }
+
+    private fun selectPendingTab() {
+        val tabId = pendingOpenTab ?: return
+        pendingOpenTab = null
+        tabHost.select(tabId)
+        intent?.removeExtra(EXTRA_OPEN_TAB)
+    }
+
+    private fun requestedTab(intent: Intent?): String? {
+        return intent
+            ?.getStringExtra(EXTRA_OPEN_TAB)
+            ?.takeIf { it in TOOLBOX_TABS }
     }
 
     private fun startCapabilityScan() {

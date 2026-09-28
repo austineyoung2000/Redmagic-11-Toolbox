@@ -122,7 +122,7 @@ object RefreshRateOverlay {
         val touchLine = foregroundPackage
             ?.let { TouchTuningStorage.getProfile(context, it) }
             ?.takeIf { it.enabled }
-            ?.let { "TOUCH ${it.sampleRateHz} Hz" }
+            ?.let { "TOUCH SET ${it.sampleRateHz} Hz" }
         val performanceLine = foregroundPackage
             ?.let { PerformanceModeCoordinator.activeLabel(it) }
             ?.let { "MODE ${it.uppercase()}" }
