@@ -29,7 +29,7 @@ import kotlin.math.roundToInt
 
 /**
  * Game Space-style entry point for controls owned by an active native TGK
- * session. The handle and drawer deliberately remain children of the same
+ * session. The button and drawer deliberately remain children of the same
  * lifecycle owner as the saved target overlay; leaving the game, screen-off,
  * editor entry, or runtime recreation therefore removes the complete UI.
  */
@@ -49,10 +49,7 @@ internal class GameplaySpaceOverlay(
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private var leftHandleIndicator: View? = null
-    private var rightHandleIndicator: View? = null
-    private var leftHandleRoot: View? = null
-    private var rightHandleRoot: View? = null
+    private var buttonRoot: View? = null
     private var drawerRoot: View? = null
     private var drawerContent: LinearLayout? = null
     private var currentPage = Page.PERFORMANCE
@@ -61,52 +58,70 @@ internal class GameplaySpaceOverlay(
         DeviceTemperatureMonitor.Subscription? = null
 
     fun isAttached(): Boolean {
-        return leftHandleIndicator?.isAttachedToWindow == true &&
-            rightHandleIndicator?.isAttachedToWindow == true &&
-            leftHandleRoot?.isAttachedToWindow == true &&
-            rightHandleRoot?.isAttachedToWindow == true
+        return buttonRoot?.isAttachedToWindow == true
     }
 
     fun attach(): Boolean {
         if (isAttached()) return true
 
-        val leftIndicator = edgeHandleIndicator(left = true)
-        val rightIndicator = edgeHandleIndicator(left = false)
-        val left = edgeGestureTarget(left = true, indicator = leftIndicator)
-        val right = edgeGestureTarget(left = false, indicator = rightIndicator)
+        val dragControl = textControl(
+            label = "⠿",
+            contentDescription = "Drag the Game Space button",
+            textSizeSp = 11f
+        ).apply {
+            setPadding(dp(9), dp(7), dp(7), dp(7))
+            background = roundedBackground(
+                color = Color.argb(190, 214, 31, 67),
+                radius = dp(14).toFloat(),
+                strokeColor = Color.argb(220, 255, 95, 120)
+            )
+        }
+
+        val openAction = textControl(
+            label = "GS",
+            contentDescription = "Open Game Space controls",
+            textSizeSp = 10f
+        ).apply {
+            setPadding(dp(9), dp(7), dp(11), dp(7))
+            setOnClickListener { toggleDrawer() }
+        }
+
+        val button = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            alpha = BUTTON_RESTING_ALPHA
+            elevation = dp(12).toFloat()
+            background = roundedBackground(
+                color = Color.argb(235, 14, 15, 21),
+                radius = dp(17).toFloat(),
+                strokeColor = Color.argb(220, 255, 65, 90)
+            )
+            addView(dragControl)
+            addView(openAction)
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
+
+        placeButton(button, dragControl, params)
 
         return runCatching {
-            manager.addView(
-                leftIndicator,
-                edgeHandleIndicatorParams(left = true)
-            )
-            leftHandleIndicator = leftIndicator
-            manager.addView(
-                rightIndicator,
-                edgeHandleIndicatorParams(left = false)
-            )
-            rightHandleIndicator = rightIndicator
-            manager.addView(left, edgeGestureTargetParams(left = true))
-            leftHandleRoot = left
-            manager.addView(right, edgeGestureTargetParams(left = false))
-            rightHandleRoot = right
+            manager.addView(button, params)
+            buttonRoot = button
             true
         }.getOrElse { error ->
-            listOfNotNull(
-                leftHandleRoot,
-                rightHandleRoot,
-                leftHandleIndicator,
-                rightHandleIndicator
-            ).forEach { view ->
-                runCatching { manager.removeViewImmediate(view) }
-            }
-            leftHandleIndicator = null
-            rightHandleIndicator = null
-            leftHandleRoot = null
-            rightHandleRoot = null
             android.util.Log.e(
                 TAG,
-                "Could not attach GS edge handles for ${profile.packageName}",
+                "Could not attach GS button for ${profile.packageName}",
                 error
             )
             false
@@ -115,26 +130,32 @@ internal class GameplaySpaceOverlay(
 
     fun hide() {
         hideDrawer()
-        val handles = listOfNotNull(
-            leftHandleRoot,
-            rightHandleRoot,
-            leftHandleIndicator,
-            rightHandleIndicator
-        )
-        leftHandleIndicator = null
-        rightHandleIndicator = null
-        leftHandleRoot = null
-        rightHandleRoot = null
-        handles.forEach { handle ->
-            runCatching { manager.removeViewImmediate(handle) }
+        val button = buttonRoot
+        buttonRoot = null
+        if (button != null) {
+            runCatching { manager.removeViewImmediate(button) }
         }
         mainHandler.removeCallbacksAndMessages(null)
     }
 
-    private fun showDrawer(openedFromLeft: Boolean) {
+    private fun toggleDrawer() {
+        if (drawerRoot != null) {
+            hideDrawer()
+        } else {
+            showDrawer()
+        }
+    }
+
+    private fun showDrawer() {
         if (drawerRoot != null || !isAttached()) return
 
         val screen = overlayBounds()
+        val button = buttonRoot ?: return
+        val buttonLocation = IntArray(2)
+        button.getLocationOnScreen(buttonLocation)
+        val buttonOnRight =
+            buttonLocation[0] + button.width / 2f >= screen.first / 2f
+        val gestureInsets = horizontalSystemGestureInsets()
 
         val backdrop = FrameLayout(context).apply {
             setBackgroundColor(Color.argb(96, 0, 0, 0))
@@ -165,6 +186,7 @@ internal class GameplaySpaceOverlay(
             setTextColor(Color.WHITE)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
+            contentDescription = "Drag the Game Space drawer"
         }
         val close = actionButton("✕") { hideDrawer() }.apply {
             contentDescription = "Close Game Space drawer"
@@ -240,6 +262,7 @@ internal class GameplaySpaceOverlay(
                 )
             }
             renderCurrentPage()
+            panel.post { clampDrawerPanel(backdrop, panel) }
         }
 
         tabViews.forEach { (page, view) ->
@@ -251,27 +274,30 @@ internal class GameplaySpaceOverlay(
             FrameLayout.LayoutParams(
                 min(
                     dp(400),
-                    (screen.first - dp(24)).coerceAtLeast(dp(280))
+                    (
+                        screen.first - gestureInsets.first -
+                            gestureInsets.second - dp(24)
+                    ).coerceAtLeast(dp(280))
                 ),
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                (if (openedFromLeft) Gravity.START else Gravity.END) or
-                    Gravity.CENTER_VERTICAL
-            ).apply {
-                marginStart = dp(12)
-                marginEnd = dp(12)
-            }
+                Gravity.TOP or Gravity.START
+            )
         )
 
         val drawerParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
+            (
+                screen.first - gestureInsets.first - gestureInsets.second
+            ).coerceAtLeast(dp(280)),
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
+            x = gestureInsets.first
         }
 
         val attached = runCatching {
@@ -289,6 +315,12 @@ internal class GameplaySpaceOverlay(
         }
 
         selectPage(currentPage)
+        makeDrawerMovable(
+            backdrop = backdrop,
+            panel = panel,
+            dragSurface = heading,
+            defaultOnRight = buttonOnRight
+        )
         temperatureSubscription = DeviceTemperatureMonitor.subscribe(
             context,
             DeviceTemperatureMonitor.SamplingMode.FOREGROUND
@@ -540,138 +572,282 @@ internal class GameplaySpaceOverlay(
         }
     }
 
-    private fun edgeHandleIndicator(left: Boolean): TextView {
-        return TextView(context).apply {
-            text = if (left) "›" else "‹"
-            textSize = 10f
-            gravity = Gravity.CENTER
-            setTextColor(Color.argb(230, 255, 88, 112))
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            alpha = HANDLE_RESTING_ALPHA
-            elevation = dp(12).toFloat()
-            background = edgeHandleBackground(left)
-        }
-    }
+    private fun placeButton(
+        button: View,
+        dragControl: View,
+        params: WindowManager.LayoutParams
+    ) {
+        button.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val screen = overlayBounds()
+        val gestureInsets = horizontalSystemGestureInsets()
+        val minimumX = gestureInsets.first
+        val maximumX = (
+            screen.first - gestureInsets.second - button.measuredWidth
+        ).coerceAtLeast(minimumX)
+        val minimumY = 0
+        val maximumY = (screen.second - button.measuredHeight)
+            .coerceAtLeast(minimumY)
+        val saved = readOverlayPosition(BUTTON_POSITION_SLOT)
 
-    private fun edgeGestureTarget(
-        left: Boolean,
-        indicator: View
-    ): View {
+        params.x = saved?.first
+            ?.toCoordinate(minimumX, maximumX)
+            ?: (maximumX - dp(12)).coerceAtLeast(minimumX)
+        params.y = saved?.second
+            ?.toCoordinate(minimumY, maximumY)
+            ?: dp(
+                if (orientation == NativeTgkOrientation.LANDSCAPE) 52 else 12
+            ).coerceIn(minimumY, maximumY)
+
         val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         var downRawX = 0f
         var downRawY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
 
-        return View(context).apply {
-            contentDescription = if (left) {
-                "Swipe inward beside the left handle to open Game Space"
-            } else {
-                "Swipe inward beside the right handle to open Game Space"
-            }
-        }.also { target ->
-            target.setOnTouchListener { _, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downRawX = event.rawX
-                        downRawY = event.rawY
-                        indicator.alpha = HANDLE_ACTIVE_ALPHA
-                        true
-                    }
-
-                    MotionEvent.ACTION_MOVE -> {
-                        val deltaX = event.rawX - downRawX
-                        val deltaY = event.rawY - downRawY
-                        val inward = if (left) deltaX else -deltaX
-                        if (
-                            inward > touchSlop &&
-                            inward > abs(deltaY) * DIRECTION_BIAS
-                        ) {
-                            indicator.alpha = HANDLE_ACTIVE_ALPHA
-                        }
-                        true
-                    }
-
-                    MotionEvent.ACTION_UP,
-                    MotionEvent.ACTION_CANCEL -> {
-                        val deltaX = event.rawX - downRawX
-                        val deltaY = event.rawY - downRawY
-                        val inward = if (left) deltaX else -deltaX
-                        val shouldOpen =
-                            event.actionMasked == MotionEvent.ACTION_UP &&
-                                inward >= dp(34) &&
-                                inward > abs(deltaY) * DIRECTION_BIAS
-
-                        indicator.animate()
-                            .alpha(HANDLE_RESTING_ALPHA)
-                            .setDuration(120L)
-                            .start()
-                        if (shouldOpen) {
-                            showDrawer(openedFromLeft = left)
-                        }
-                        true
-                    }
-
-                    else -> false
+        dragControl.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    startX = params.x
+                    startY = params.y
+                    dragging = false
+                    true
                 }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.rawX - downRawX
+                    val deltaY = event.rawY - downRawY
+                    if (
+                        !dragging &&
+                        (abs(deltaX) >= touchSlop || abs(deltaY) >= touchSlop)
+                    ) {
+                        dragging = true
+                        hideDrawer()
+                        button.alpha = 1f
+                    }
+                    if (dragging) {
+                        params.x = (startX + deltaX.roundToInt())
+                            .coerceIn(minimumX, maximumX)
+                        params.y = (startY + deltaY.roundToInt())
+                            .coerceIn(minimumY, maximumY)
+                        runCatching { manager.updateViewLayout(button, params) }
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    button.alpha = BUTTON_RESTING_ALPHA
+                    if (dragging) {
+                        saveOverlayPosition(
+                            slot = BUTTON_POSITION_SLOT,
+                            x = params.x,
+                            y = params.y,
+                            minimumX = minimumX,
+                            maximumX = maximumX,
+                            minimumY = minimumY,
+                            maximumY = maximumY
+                        )
+                    } else if (event.actionMasked == MotionEvent.ACTION_UP) {
+                        view.performClick()
+                    }
+                    dragging = false
+                    true
+                }
+
+                else -> false
             }
         }
     }
 
-    private fun edgeHandleIndicatorParams(
-        left: Boolean
-    ): WindowManager.LayoutParams {
-        return WindowManager.LayoutParams(
-            dp(8),
-            dp(152),
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = (if (left) Gravity.START else Gravity.END) or
-                Gravity.TOP
-            x = 0
-            y = 0
+    private fun makeDrawerMovable(
+        backdrop: View,
+        panel: View,
+        dragSurface: View,
+        defaultOnRight: Boolean
+    ) {
+        panel.post {
+            val bounds = drawerMovementBounds(backdrop, panel)
+            val saved = readOverlayPosition(DRAWER_POSITION_SLOT)
+            panel.x = saved?.first
+                ?.toCoordinate(bounds[0], bounds[1])
+                ?.toFloat()
+                ?: if (defaultOnRight) {
+                    bounds[1].toFloat()
+                } else {
+                    bounds[0].toFloat()
+                }
+            panel.y = saved?.second
+                ?.toCoordinate(bounds[2], bounds[3])
+                ?.toFloat()
+                ?: ((bounds[2] + bounds[3]) / 2f)
+        }
+
+        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = 0f
+        var startY = 0f
+        var dragging = false
+
+        dragSurface.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    startX = panel.x
+                    startY = panel.y
+                    dragging = false
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.rawX - downRawX
+                    val deltaY = event.rawY - downRawY
+                    if (
+                        !dragging &&
+                        (abs(deltaX) >= touchSlop || abs(deltaY) >= touchSlop)
+                    ) {
+                        dragging = true
+                        panel.alpha = 0.94f
+                    }
+                    if (dragging) {
+                        val bounds = drawerMovementBounds(backdrop, panel)
+                        panel.x = (startX + deltaX)
+                            .coerceIn(bounds[0].toFloat(), bounds[1].toFloat())
+                        panel.y = (startY + deltaY)
+                            .coerceIn(bounds[2].toFloat(), bounds[3].toFloat())
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    panel.alpha = 1f
+                    if (dragging) {
+                        val bounds = drawerMovementBounds(backdrop, panel)
+                        saveOverlayPosition(
+                            slot = DRAWER_POSITION_SLOT,
+                            x = panel.x.roundToInt(),
+                            y = panel.y.roundToInt(),
+                            minimumX = bounds[0],
+                            maximumX = bounds[1],
+                            minimumY = bounds[2],
+                            maximumY = bounds[3]
+                        )
+                    } else if (event.actionMasked == MotionEvent.ACTION_UP) {
+                        view.performClick()
+                    }
+                    dragging = false
+                    true
+                }
+
+                else -> false
+            }
         }
     }
 
-    private fun edgeGestureTargetParams(
-        left: Boolean
-    ): WindowManager.LayoutParams {
-        return WindowManager.LayoutParams(
-            dp(18),
-            dp(152),
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = (if (left) Gravity.START else Gravity.END) or
-                Gravity.TOP
-            x = systemBackGestureInset(left)
-            y = 0
-        }
+    private fun clampDrawerPanel(backdrop: View, panel: View) {
+        if (backdrop.width <= 0 || panel.width <= 0) return
+        val bounds = drawerMovementBounds(backdrop, panel)
+        panel.x = panel.x.coerceIn(
+            bounds[0].toFloat(),
+            bounds[1].toFloat()
+        )
+        panel.y = panel.y.coerceIn(
+            bounds[2].toFloat(),
+            bounds[3].toFloat()
+        )
     }
 
-    private fun systemBackGestureInset(left: Boolean): Int {
+    private fun drawerMovementBounds(backdrop: View, panel: View): IntArray {
+        val margin = dp(12)
+        val maximumX = (backdrop.width - panel.width - margin)
+            .coerceAtLeast(margin)
+        val maximumY = (backdrop.height - panel.height - margin)
+            .coerceAtLeast(margin)
+        return intArrayOf(margin, maximumX, margin, maximumY)
+    }
+
+    private fun horizontalSystemGestureInsets(): Pair<Int, Int> {
         val detected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             runCatching {
                 manager.currentWindowMetrics.windowInsets
                     .getInsets(WindowInsets.Type.systemGestures())
-                    .let { insets ->
-                        if (left) insets.left else insets.right
-                    }
             }.getOrNull()
         } else {
             null
         }
 
-        return detected
-            ?.takeIf { it > 0 }
-            ?.coerceIn(dp(16), dp(48))
-            ?: dp(24)
+        fun safeInset(value: Int?): Int {
+            return value
+                ?.takeIf { it > 0 }
+                ?.coerceIn(dp(16), dp(48))
+                ?: dp(24)
+        }
+
+        return safeInset(detected?.left) to safeInset(detected?.right)
+    }
+
+    private fun readOverlayPosition(slot: String): Pair<Float, Float>? {
+        val prefix = overlayPositionKey(slot)
+        val prefs = context.getSharedPreferences(
+            POSITION_PREFS,
+            Context.MODE_PRIVATE
+        )
+        if (!prefs.contains("${prefix}_x") || !prefs.contains("${prefix}_y")) {
+            return null
+        }
+
+        val x = prefs.getFloat("${prefix}_x", -1f)
+        val y = prefs.getFloat("${prefix}_y", -1f)
+        return (x to y).takeIf {
+            it.first in 0f..1f && it.second in 0f..1f
+        }
+    }
+
+    private fun saveOverlayPosition(
+        slot: String,
+        x: Int,
+        y: Int,
+        minimumX: Int,
+        maximumX: Int,
+        minimumY: Int,
+        maximumY: Int
+    ) {
+        val rangeX = (maximumX - minimumX).coerceAtLeast(1)
+        val rangeY = (maximumY - minimumY).coerceAtLeast(1)
+        val prefix = overlayPositionKey(slot)
+
+        context.getSharedPreferences(POSITION_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(
+                "${prefix}_x",
+                (x.coerceIn(minimumX, maximumX) - minimumX).toFloat() /
+                    rangeX.toFloat()
+            )
+            .putFloat(
+                "${prefix}_y",
+                (y.coerceIn(minimumY, maximumY) - minimumY).toFloat() /
+                    rangeY.toFloat()
+            )
+            .apply()
+    }
+
+    private fun overlayPositionKey(slot: String): String {
+        return "${profile.packageName}_${orientation.name.lowercase()}_$slot"
+    }
+
+    private fun Float.toCoordinate(minimum: Int, maximum: Int): Int {
+        val range = (maximum - minimum).coerceAtLeast(0)
+        return (minimum + this.coerceIn(0f, 1f) * range)
+            .roundToInt()
+            .coerceIn(minimum, maximum)
     }
 
     private fun renderDashboard(
@@ -801,30 +977,6 @@ internal class GameplaySpaceOverlay(
         }
     }
 
-    private fun edgeHandleBackground(left: Boolean): GradientDrawable {
-        val radius = dp(9).toFloat()
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(Color.argb(205, 10, 11, 16))
-            setStroke(dp(1), Color.argb(220, 196, 38, 67))
-            cornerRadii = if (left) {
-                floatArrayOf(
-                    0f, 0f,
-                    radius, radius,
-                    radius, radius,
-                    0f, 0f
-                )
-            } else {
-                floatArrayOf(
-                    radius, radius,
-                    0f, 0f,
-                    0f, 0f,
-                    radius, radius
-                )
-            }
-        }
-    }
-
     private fun Page.shortLabel(): String {
         return when (this) {
             Page.PERFORMANCE -> "PERF"
@@ -891,9 +1043,10 @@ internal class GameplaySpaceOverlay(
 
     private companion object {
         private const val TAG = "RedmagicGameSpace"
-        private const val HANDLE_RESTING_ALPHA = 0.58f
-        private const val HANDLE_ACTIVE_ALPHA = 0.95f
-        private const val DIRECTION_BIAS = 1.15f
+        private const val BUTTON_RESTING_ALPHA = 0.72f
+        private const val POSITION_PREFS = "gameplay_space_overlay_positions"
+        private const val BUTTON_POSITION_SLOT = "button"
+        private const val DRAWER_POSITION_SLOT = "drawer"
         private val SECONDARY_TEXT = Color.rgb(181, 187, 201)
     }
 }
