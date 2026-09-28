@@ -92,8 +92,9 @@
 
         <service
             android:name=".GameplayRuntimeWatchdogService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="specialUse"
+            android:permission="android.permission.DUMP"
             android:process=":gameplay_watchdog"
             android:stopWithTask="false">
             <property

@@ -3,7 +3,7 @@
 PATH=/system/bin:/system_ext/bin:/vendor/bin:/product/bin
 export PATH
 
-SUPERVISOR_VERSION=1
+SUPERVISOR_VERSION=2
 PACKAGE_NAME="com.elitedarkkaiser.redmagic"
 ACCESSIBILITY_COMPONENT="com.elitedarkkaiser.redmagic/com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
 WATCHDOG_PROCESS="com.elitedarkkaiser.redmagic:gameplay_watchdog"
@@ -67,7 +67,8 @@ handle_termination() {
 
 accessibility_configured() {
     enabled_services="$(
-        settings --user 0 get secure enabled_accessibility_services \
+        su 2000 -c \
+            'settings --user 0 get secure enabled_accessibility_services' \
             2>/dev/null
     )"
 
@@ -82,11 +83,20 @@ watchdog_running() {
 }
 
 start_watchdog() {
-    am start-foreground-service \
-        --user 0 \
-        -a "$WATCHDOG_ACTION" \
-        -n "$WATCHDOG_COMPONENT" \
-        >/dev/null 2>&1
+    start_output="$(
+        su 2000 -c \
+            "am start-foreground-service --user 0 -a $WATCHDOG_ACTION -n $WATCHDOG_COMPONENT" \
+            2>&1
+    )"
+    start_status="$?"
+
+    if [ "$start_status" -ne 0 ]; then
+        log_message \
+            "framework start failed status=$start_status output=$start_output"
+        return "$start_status"
+    fi
+
+    return 0
 }
 
 acquire_lock || exit 0
