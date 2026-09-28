@@ -1,6 +1,10 @@
 package com.elitedarkkaiser.redmagic
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
@@ -63,6 +67,12 @@ class TriggerAccessibilityService : AccessibilityService() {
     private var screenReceiverRegistered = false
 
     @Volatile
+    private var runtimeStarted = false
+
+    @Volatile
+    private var accessibilityConnected = false
+
+    @Volatile
     private var foregroundRootProcess: Process? = null
 
     @Volatile
@@ -83,25 +93,31 @@ class TriggerAccessibilityService : AccessibilityService() {
 
     private val foregroundMonitor = object : Runnable {
         override fun run() {
-            if (
-                nativeTgkStartupCleanupComplete &&
-                isScreenInteractive()
-            ) {
-                ensureForegroundRootMonitor()
+            runCatching {
+                if (
+                    nativeTgkStartupCleanupComplete &&
+                    isScreenInteractive()
+                ) {
+                    ensureForegroundRootMonitor()
 
-                if (foregroundRootProcess?.isAlive != true) {
-                    latestResumedPackage()?.let { packageName ->
-                        reconcileDetectedPackage(packageName)
+                    if (foregroundRootProcess?.isAlive != true) {
+                        latestResumedPackage()?.let { packageName ->
+                            reconcileDetectedPackage(packageName)
+                        }
                     }
+                } else {
+                    stopForegroundRootMonitor()
                 }
-            } else {
-                stopForegroundRootMonitor()
+            }.onFailure {
+                logRuntimeFailure("foreground monitor", it)
             }
 
-            foregroundHandler.postDelayed(
-                this,
-                FOREGROUND_MONITOR_INTERVAL_MS
-            )
+            if (runtimeStarted) {
+                foregroundHandler.postDelayed(
+                    this,
+                    FOREGROUND_MONITOR_INTERVAL_MS
+                )
+            }
         }
     }
 
@@ -113,19 +129,23 @@ class TriggerAccessibilityService : AccessibilityService() {
             context: Context,
             intent: Intent
         ) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                lastForegroundPackage = null
-                forceForegroundReconcile = false
-                stopForegroundRootMonitor()
-                deactivateNativeTgk("screen off")
-                RefreshRateOverlay.hide()
-                RefreshRateCoordinator.clearRuntimeState()
-                dispatchPerformanceReset("screen off")
-            } else if (intent.action == Intent.ACTION_SCREEN_ON) {
-                forceForegroundReconcile = true
-                if (nativeTgkStartupCleanupComplete) {
-                    ensureForegroundRootMonitor()
+            runCatching {
+                if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                    lastForegroundPackage = null
+                    forceForegroundReconcile = false
+                    stopForegroundRootMonitor()
+                    deactivateNativeTgk("screen off")
+                    RefreshRateOverlay.hide()
+                    RefreshRateCoordinator.clearRuntimeState()
+                    dispatchPerformanceReset("screen off")
+                } else if (intent.action == Intent.ACTION_SCREEN_ON) {
+                    forceForegroundReconcile = true
+                    if (nativeTgkStartupCleanupComplete) {
+                        ensureForegroundRootMonitor()
+                    }
                 }
+            }.onFailure {
+                logRuntimeFailure("screen state change", it)
             }
         }
     }
@@ -137,48 +157,51 @@ class TriggerAccessibilityService : AccessibilityService() {
             return
         }
 
-        val reportedPackage = event?.packageName
-            ?.toString()
-            ?: return
+        runCatching {
+            val reportedPackage = event?.packageName
+                ?.toString()
+                ?: return
 
-        if (reportedPackage.isBlank()) {
-            return
-        }
-
-        if (!nativeTgkStartupCleanupComplete) {
-            return
-        }
-
-        ensureForegroundRootMonitor()
-
-        /*
-         * When available, topResumedActivity is the authoritative
-         * source on REDMAGIC firmware. Do not race it with delayed or
-         * missing Usage Events.
-         */
-        if (foregroundRootProcess?.isAlive == true) {
-            return
-        }
-
-        /*
-         * Our non-touchable gameplay overlay and SystemUI can emit
-         * window events even though the mapped game remains the
-         * resumed activity. Resolve those ambiguous events through
-         * UsageEvents; when the Control Center, Recents, launcher, or
-         * another app is genuinely resumed, the resolved package
-         * immediately drives TGK cleanup.
-         */
-        val pkg = latestResumedPackage()
-            ?: if (
-                reportedPackage == packageName ||
-                reportedPackage == SYSTEM_UI_PACKAGE
-            ) {
+            if (reportedPackage.isBlank()) {
                 return
-            } else {
-                reportedPackage
             }
 
-        reconcileDetectedPackage(pkg)
+            if (!nativeTgkStartupCleanupComplete) {
+                return
+            }
+
+            ensureForegroundRootMonitor()
+
+            /*
+             * When available, topResumedActivity is the authoritative
+             * source on REDMAGIC firmware. Do not race it with delayed or
+             * missing Usage Events.
+             */
+            if (foregroundRootProcess?.isAlive == true) {
+                return
+            }
+
+            /*
+             * Our non-touchable gameplay overlay and SystemUI can emit
+             * window events even though the mapped game remains the
+             * resumed activity. Resolve those ambiguous events through
+             * UsageEvents; when another app is genuinely resumed, the
+             * resolved package immediately drives TGK cleanup.
+             */
+            val pkg = latestResumedPackage()
+                ?: if (
+                    reportedPackage == packageName ||
+                    reportedPackage == SYSTEM_UI_PACKAGE
+                ) {
+                    return
+                } else {
+                    reportedPackage
+                }
+
+            reconcileDetectedPackage(pkg)
+        }.onFailure {
+            logRuntimeFailure("accessibility event", it)
+        }
     }
 
     private fun reconcileDetectedPackage(
@@ -260,14 +283,18 @@ class TriggerAccessibilityService : AccessibilityService() {
          * profile lifecycle requires it.
          */
         if (isTrackedGame || gameModeActive) {
-            startService(
-                Intent(
-                    this,
-                    GameModeService::class.java
-                ).apply {
-                    putExtra("foreground_pkg", pkg)
-                }
-            )
+            runCatching {
+                startService(
+                    Intent(
+                        this,
+                        GameModeService::class.java
+                    ).apply {
+                        putExtra("foreground_pkg", pkg)
+                    }
+                )
+            }.onFailure {
+                logRuntimeFailure("Game Mode dispatch", it)
+            }
         }
     }
 
@@ -276,9 +303,13 @@ class TriggerAccessibilityService : AccessibilityService() {
     ) {
         super.onConfigurationChanged(newConfig)
 
-        /* Reconcile against the next authoritative root sample. */
-        forceForegroundReconcile = true
-        ensureForegroundRootMonitor()
+        runCatching {
+            /* Reconcile against the next authoritative root sample. */
+            forceForegroundReconcile = true
+            ensureForegroundRootMonitor()
+        }.onFailure {
+            logRuntimeFailure("configuration change", it)
+        }
     }
 
     override fun onInterrupt() {
@@ -295,10 +326,61 @@ class TriggerAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
 
+        accessibilityConnected = true
+
         if (!DeviceCompatibility.isSupportedDevice()) {
             disableSelf()
             return
         }
+
+        setRuntimeExpected(true)
+        startRuntimeForeground()
+        runCatching {
+            startService(
+                Intent(
+                    this,
+                    TriggerAccessibilityService::class.java
+                ).setAction(ACTION_KEEP_RUNTIME)
+            )
+        }.onFailure {
+            logRuntimeFailure("sticky runtime start", it)
+        }
+        startRuntimeIfNeeded()
+    }
+
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
+        if (
+            !DeviceCompatibility.isSupportedDevice() ||
+            !isRuntimeExpected()
+        ) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        startRuntimeForeground()
+        startRuntimeIfNeeded()
+        return START_STICKY
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        if (accessibilityConnected) {
+            accessibilityConnected = false
+            setRuntimeExpected(false)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+        return super.onUnbind(intent)
+    }
+
+    private fun startRuntimeIfNeeded() {
+        if (runtimeStarted) {
+            return
+        }
+        runtimeStarted = true
 
         registerScreenReceiver()
         foregroundHandler.removeCallbacks(foregroundMonitor)
@@ -314,39 +396,56 @@ class TriggerAccessibilityService : AccessibilityService() {
         RefreshRateCoordinator.clearRuntimeState()
         runCatching {
             refreshRateExecutor.execute {
-                PerformanceModeCoordinator
-                    .recoverAndResetIfManaged(
-                        applicationContext,
-                        "accessibility service connected"
+                runCatching {
+                    PerformanceModeCoordinator
+                        .recoverAndResetIfManaged(
+                            applicationContext,
+                            "accessibility service connected"
+                        )
+                }.onFailure {
+                    logRuntimeFailure(
+                        "startup performance reset",
+                        it
                     )
+                }
             }
+        }.onFailure {
+            logRuntimeFailure("queue startup reset", it)
         }
         val startupGeneration =
             nativeTgkGeneration.incrementAndGet()
 
-        nativeTgkExecutor.submit {
-            NativeTgkCoordinator.disable(
-                applicationContext,
-                "accessibility service connected"
-            )
-
-            foregroundHandler.post {
-                if (
-                    nativeTgkExecutor.isShutdown ||
-                    nativeTgkGeneration.get() !=
-                    startupGeneration
-                ) {
-                    return@post
+        runCatching {
+            nativeTgkExecutor.submit {
+                runCatching {
+                    NativeTgkCoordinator.disable(
+                        applicationContext,
+                        "gameplay runtime started"
+                    )
+                }.onFailure {
+                    logRuntimeFailure("startup TGK cleanup", it)
                 }
 
-                nativeTgkStartupCleanupComplete = true
-                forceForegroundReconcile = true
-                ensureForegroundRootMonitor()
-                foregroundHandler.removeCallbacks(
-                    foregroundMonitor
-                )
-                foregroundHandler.post(foregroundMonitor)
+                foregroundHandler.post {
+                    if (
+                        nativeTgkExecutor.isShutdown ||
+                        nativeTgkGeneration.get() !=
+                        startupGeneration
+                    ) {
+                        return@post
+                    }
+
+                    nativeTgkStartupCleanupComplete = true
+                    forceForegroundReconcile = true
+                    ensureForegroundRootMonitor()
+                    foregroundHandler.removeCallbacks(
+                        foregroundMonitor
+                    )
+                    foregroundHandler.post(foregroundMonitor)
+                }
             }
+        }.onFailure {
+            logRuntimeFailure("runtime initialization", it)
         }
 
         submitRootAction {
@@ -356,6 +455,7 @@ class TriggerAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        runtimeStarted = false
         lastForegroundPackage = null
         forceForegroundReconcile = false
         nativeTgkStartupCleanupComplete = false
@@ -406,6 +506,7 @@ class TriggerAccessibilityService : AccessibilityService() {
         }
 
         rootExecutor.shutdownNow()
+        stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
@@ -518,12 +619,21 @@ class TriggerAccessibilityService : AccessibilityService() {
                     return@nativeApply
                 }
 
-                val result =
+                val result = runCatching {
                     NativeTgkCoordinator.applyForegroundMapping(
                         context = applicationContext,
                         packageName = packageName,
                         orientation = orientation
                     )
+                }.getOrElse {
+                    logRuntimeFailure("native TGK apply", it)
+                    NativeTgkRuntimeState.clearIfMatches(
+                        packageName,
+                        orientation
+                    )
+                    NativeTgkGameplayOverlay.hide()
+                    return@nativeApply
+                }
 
                 if (
                     !result.success &&
@@ -554,15 +664,21 @@ class TriggerAccessibilityService : AccessibilityService() {
 
         runCatching {
             nativeTgkExecutor.submit {
-                if (
-                    nativeTgkGeneration.get() == generation
-                ) {
-                    NativeTgkCoordinator.disable(
-                        applicationContext,
-                        reason
-                    )
+                runCatching {
+                    if (
+                        nativeTgkGeneration.get() == generation
+                    ) {
+                        NativeTgkCoordinator.disable(
+                            applicationContext,
+                            reason
+                        )
+                    }
+                }.onFailure {
+                    logRuntimeFailure("disable native TGK", it)
                 }
             }
+        }.onFailure {
+            logRuntimeFailure("queue native TGK disable", it)
         }
     }
 
@@ -605,9 +721,14 @@ class TriggerAccessibilityService : AccessibilityService() {
                         return@nativeHealth
                     }
 
-                    val liveState = NativeTgkBridge.readState(
-                        applicationContext
-                    )
+                    val liveState = runCatching {
+                        NativeTgkBridge.readState(
+                            applicationContext
+                        )
+                    }.getOrElse {
+                        logRuntimeFailure("native TGK health check", it)
+                        return@nativeHealth
+                    }
                     val mappingEnabled =
                         liveState.success &&
                             liveState.state?.mappingEnabled() == true
@@ -664,15 +785,19 @@ class TriggerAccessibilityService : AccessibilityService() {
     ) {
         runCatching {
             refreshRateExecutor.execute {
-                RefreshRateCoordinator.onForegroundPackage(
-                    applicationContext,
-                    packageName
-                )
-                PerformanceModeCoordinator.onForegroundPackage(
-                    applicationContext,
-                    packageName
-                )
-                RefreshRateOverlay.refresh()
+                runCatching {
+                    RefreshRateCoordinator.onForegroundPackage(
+                        applicationContext,
+                        packageName
+                    )
+                    PerformanceModeCoordinator.onForegroundPackage(
+                        applicationContext,
+                        packageName
+                    )
+                    RefreshRateOverlay.refresh()
+                }.onFailure {
+                    logRuntimeFailure("performance profile dispatch", it)
+                }
             }
         }
     }
@@ -680,10 +805,14 @@ class TriggerAccessibilityService : AccessibilityService() {
     private fun dispatchPerformanceReset(reason: String) {
         runCatching {
             refreshRateExecutor.execute {
-                PerformanceModeCoordinator.resetIfOwned(
-                    applicationContext,
-                    reason
-                )
+                runCatching {
+                    PerformanceModeCoordinator.resetIfOwned(
+                        applicationContext,
+                        reason
+                    )
+                }.onFailure {
+                    logRuntimeFailure("performance reset", it)
+                }
             }
         }
     }
@@ -790,9 +919,16 @@ class TriggerAccessibilityService : AccessibilityService() {
                                         process &&
                                         isScreenInteractive()
                                     ) {
-                                        reconcileDetectedPackage(
-                                            detected
-                                        )
+                                        runCatching {
+                                            reconcileDetectedPackage(
+                                                detected
+                                            )
+                                        }.onFailure {
+                                            logRuntimeFailure(
+                                                "root foreground sample",
+                                                it
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -889,6 +1025,16 @@ class TriggerAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val TAG = "RedmagicGameplayRuntime"
+        private const val ACTION_KEEP_RUNTIME =
+            "com.elitedarkkaiser.redmagic.KEEP_GAMEPLAY_RUNTIME"
+        private const val RUNTIME_PREFS =
+            "gameplay_runtime_state"
+        private const val KEY_RUNTIME_EXPECTED =
+            "runtime_expected"
+        private const val RUNTIME_NOTIFICATION_CHANNEL =
+            "gameplay_runtime"
+        private const val RUNTIME_NOTIFICATION_ID = 1401
         private const val SYSTEM_UI_PACKAGE =
             "com.android.systemui"
         private const val FOREGROUND_EVENT_LOOKBACK_MS =
@@ -922,8 +1068,86 @@ class TriggerAccessibilityService : AccessibilityService() {
 
     private fun submitRootAction(action: () -> Unit) {
         runCatching {
-            rootExecutor.execute(action)
+            rootExecutor.execute {
+                runCatching { action() }.onFailure {
+                    logRuntimeFailure("root action", it)
+                }
+            }
+        }.onFailure {
+            logRuntimeFailure("queue root action", it)
         }
+    }
+
+    private fun setRuntimeExpected(expected: Boolean) {
+        getSharedPreferences(
+            RUNTIME_PREFS,
+            Context.MODE_PRIVATE
+        ).edit()
+            .putBoolean(KEY_RUNTIME_EXPECTED, expected)
+            .commit()
+    }
+
+    private fun isRuntimeExpected(): Boolean {
+        return getSharedPreferences(
+            RUNTIME_PREFS,
+            Context.MODE_PRIVATE
+        ).getBoolean(KEY_RUNTIME_EXPECTED, false)
+    }
+
+    private fun startRuntimeForeground() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                RUNTIME_NOTIFICATION_CHANNEL,
+                "Gameplay Runtime",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description =
+                    "Keeps configured gaming overlays and controls active"
+                setShowBadge(false)
+            }
+            getSystemService(NotificationManager::class.java)
+                ?.createNotificationChannel(channel)
+        }
+
+        val launchIntent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                PendingIntent.FLAG_IMMUTABLE
+        )
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, RUNTIME_NOTIFICATION_CHANNEL)
+        } else {
+            Notification.Builder(this)
+        }
+
+        startForeground(
+            RUNTIME_NOTIFICATION_ID,
+            builder
+                .setContentTitle("Redmagic gameplay controls")
+                .setContentText(
+                    "Monitoring configured games for overlays and controls"
+                )
+                .setSmallIcon(android.R.drawable.ic_menu_manage)
+                .setContentIntent(pendingIntent)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .build()
+        )
+    }
+
+    private fun logRuntimeFailure(
+        operation: String,
+        error: Throwable
+    ) {
+        android.util.Log.e(
+            TAG,
+            "Contained failure during $operation",
+            error
+        )
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {

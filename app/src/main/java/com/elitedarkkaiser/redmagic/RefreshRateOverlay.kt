@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.text.TextUtils
+import android.util.Log
 import android.view.Display
 import android.view.Gravity
 import android.view.View
@@ -28,7 +29,11 @@ object RefreshRateOverlay {
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            updateText()
+            runCatching {
+                updateText()
+            }.onFailure {
+                Log.e(TAG, "Contained performance overlay update failure", it)
+            }
             if (overlayView != null) {
                 mainHandler.postDelayed(this, UPDATE_INTERVAL_MS)
             }
@@ -41,32 +46,37 @@ object RefreshRateOverlay {
     ) {
         val contextForApp = context.applicationContext
         mainHandler.post {
-            if (!Settings.canDrawOverlays(contextForApp)) {
+            runCatching {
+                if (!Settings.canDrawOverlays(contextForApp)) {
+                    hideOnMainThread()
+                    return@runCatching
+                }
+
+                appContext = contextForApp
+                foregroundPackage = packageName
+                if (overlayView == null) {
+                    val manager = contextForApp.getSystemService(
+                        Context.WINDOW_SERVICE
+                    ) as? WindowManager ?: return@runCatching
+                    val view = buildView(contextForApp)
+                    val added = runCatching {
+                        manager.addView(view, layoutParams(contextForApp))
+                    }.isSuccess
+                    if (!added) return@runCatching
+
+                    windowManager = manager
+                    overlayView = view
+                }
+
+                VendorFpsMonitor.start(packageName)
+                PerformanceOverlayTelemetry.start(contextForApp)
+                overlayView?.visibility = View.VISIBLE
+                mainHandler.removeCallbacks(updateRunnable)
+                updateRunnable.run()
+            }.onFailure {
+                Log.e(TAG, "Contained performance overlay attach failure", it)
                 hideOnMainThread()
-                return@post
             }
-
-            appContext = contextForApp
-            foregroundPackage = packageName
-            if (overlayView == null) {
-                val manager = contextForApp.getSystemService(
-                    Context.WINDOW_SERVICE
-                ) as? WindowManager ?: return@post
-                val view = buildView(contextForApp)
-                val added = runCatching {
-                    manager.addView(view, layoutParams(contextForApp))
-                }.isSuccess
-                if (!added) return@post
-
-                windowManager = manager
-                overlayView = view
-            }
-
-            VendorFpsMonitor.start(packageName)
-            PerformanceOverlayTelemetry.start(contextForApp)
-            overlayView?.visibility = View.VISIBLE
-            mainHandler.removeCallbacks(updateRunnable)
-            updateRunnable.run()
         }
     }
 
@@ -76,8 +86,12 @@ object RefreshRateOverlay {
 
     fun refresh() {
         mainHandler.post {
-            if (overlayView != null) {
-                updateText()
+            runCatching {
+                if (overlayView != null) {
+                    updateText()
+                }
+            }.onFailure {
+                Log.e(TAG, "Contained performance overlay refresh failure", it)
             }
         }
     }
@@ -196,4 +210,5 @@ object RefreshRateOverlay {
     }
 
     private const val UPDATE_INTERVAL_MS = 1_000L
+    private const val TAG = "RedmagicPerformanceOverlay"
 }

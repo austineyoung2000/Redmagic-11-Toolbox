@@ -3,11 +3,36 @@ package com.elitedarkkaiser.redmagic
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import com.elitedarkkaiser.redmagic.ui.components.MainActivityUiKit
 
 class MainActivity : Activity() {
+    private val backgroundReleaseHandler =
+        Handler(Looper.getMainLooper())
+
+    private val releaseUiForGameplay = Runnable {
+        if (
+            !isFinishing &&
+            !isDestroyed &&
+            (
+                NativeTgkRuntimeState.isActive() ||
+                    RefreshRateCoordinator.isActive() ||
+                    PerformanceModeCoordinator.isActive()
+                )
+        ) {
+            /*
+             * The accessibility/gameplay runtime shares this process.
+             * Do not retain the complete five-tab activity hierarchy
+             * behind a memory-intensive game after its profile becomes
+             * active. Reopening the launcher activity reconstructs it.
+             */
+            finishAndRemoveTask()
+        }
+    }
+
     private var useFahrenheit = true
     private var uiLaunched = false
     private var deviceCapabilities = DeviceCapabilities.unknown()
@@ -195,6 +220,9 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        backgroundReleaseHandler.removeCallbacks(
+            releaseUiForGameplay
+        )
         if (::activityRuntime.isInitialized) {
             activityRuntime.onStart()
         }
@@ -214,14 +242,28 @@ class MainActivity : Activity() {
         if (::activityRuntime.isInitialized) {
             activityRuntime.onStop()
         }
+        if (!isChangingConfigurations) {
+            backgroundReleaseHandler.removeCallbacks(
+                releaseUiForGameplay
+            )
+            backgroundReleaseHandler.postDelayed(
+                releaseUiForGameplay,
+                GAMEPLAY_UI_RELEASE_DELAY_MS
+            )
+        }
         super.onStop()
     }
 
     override fun onDestroy() {
+        backgroundReleaseHandler.removeCallbacksAndMessages(null)
         if (::activityRuntime.isInitialized) {
             activityRuntime.destroy()
         }
         super.onDestroy()
+    }
+
+    companion object {
+        private const val GAMEPLAY_UI_RELEASE_DELAY_MS = 5_000L
     }
 
     private fun verifyRootAndLaunch() {

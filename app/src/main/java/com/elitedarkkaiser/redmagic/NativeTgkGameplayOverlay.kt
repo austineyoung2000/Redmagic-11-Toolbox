@@ -73,105 +73,115 @@ object NativeTgkGameplayOverlay {
         val generation = requestGeneration.incrementAndGet()
 
         mainHandler.post {
-            if (requestGeneration.get() != generation) {
-                return@post
-            }
-
-            hideOnMainThread()
-
-            if (
-                !profile.showSavedTargets ||
-                !mapping.isComplete() ||
-                !Settings.canDrawOverlays(appContext)
-            ) {
-                return@post
-            }
-
-            val manager = appContext.getSystemService(
-                WindowManager::class.java
-            ) ?: return@post
-
-            val root = FrameLayout(appContext).apply {
-                setBackgroundColor(Color.TRANSPARENT)
-                isClickable = false
-                isFocusable = false
-            }
-
-            addTarget(
-                context = appContext,
-                root = root,
-                label = "L",
-                color = Color.rgb(215, 45, 55),
-                rect = mapping.left!!,
-                displayWidth = displayWidth,
-                displayHeight = displayHeight,
-                opacityPercent =
-                    profile.savedTargetOpacityPercent
-            )
-
-            addTarget(
-                context = appContext,
-                root = root,
-                label = "R",
-                color = Color.rgb(30, 120, 230),
-                rect = mapping.right!!,
-                displayWidth = displayWidth,
-                displayHeight = displayHeight,
-                opacityPercent =
-                    profile.savedTargetOpacityPercent
-            )
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-
-                if (
-                    android.os.Build.VERSION.SDK_INT >=
-                    android.os.Build.VERSION_CODES.P
-                ) {
-                    layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams
-                            .LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                }
-            }
-
             runCatching {
                 if (requestGeneration.get() != generation) {
-                    false
-                } else {
-                    manager.addView(root, params)
-                    true
+                    return@runCatching
                 }
-            }.onSuccess { targetAdded ->
-                if (targetAdded) {
-                    windowManager = manager
-                    overlayRoot = root
 
-                    val editorAdded = showEditControl(
-                        context = appContext,
-                        manager = manager,
-                        profile = profile,
-                        orientation = orientation
-                    )
-                    if (editorAdded) {
-                        ownerPackageName = profile.packageName
-                        ownerOrientation = orientation
-                    } else {
-                        hideOnMainThread()
+                hideOnMainThread()
+
+                if (
+                    !profile.showSavedTargets ||
+                    !mapping.isComplete() ||
+                    !Settings.canDrawOverlays(appContext)
+                ) {
+                    return@runCatching
+                }
+
+                val manager = appContext.getSystemService(
+                    WindowManager::class.java
+                ) ?: return@runCatching
+
+                val root = FrameLayout(appContext).apply {
+                    setBackgroundColor(Color.TRANSPARENT)
+                    isClickable = false
+                    isFocusable = false
+                }
+
+                addTarget(
+                    context = appContext,
+                    root = root,
+                    label = "L",
+                    color = Color.rgb(215, 45, 55),
+                    rect = mapping.left!!,
+                    displayWidth = displayWidth,
+                    displayHeight = displayHeight,
+                    opacityPercent =
+                        profile.savedTargetOpacityPercent
+                )
+
+                addTarget(
+                    context = appContext,
+                    root = root,
+                    label = "R",
+                    color = Color.rgb(30, 120, 230),
+                    rect = mapping.right!!,
+                    displayWidth = displayWidth,
+                    displayHeight = displayHeight,
+                    opacityPercent =
+                        profile.savedTargetOpacityPercent
+                )
+
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    gravity = Gravity.TOP or Gravity.START
+
+                    if (
+                        android.os.Build.VERSION.SDK_INT >=
+                        android.os.Build.VERSION_CODES.P
+                    ) {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams
+                                .LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                     }
                 }
+
+                runCatching {
+                    if (requestGeneration.get() != generation) {
+                        false
+                    } else {
+                        manager.addView(root, params)
+                        true
+                    }
+                }.onSuccess { targetAdded ->
+                    if (targetAdded) {
+                        windowManager = manager
+                        overlayRoot = root
+
+                        val editorAdded = showEditControl(
+                            context = appContext,
+                            manager = manager,
+                            profile = profile,
+                            orientation = orientation
+                        )
+                        if (editorAdded) {
+                            ownerPackageName = profile.packageName
+                            ownerOrientation = orientation
+                        } else {
+                            hideOnMainThread()
+                        }
+                    }
+                }.onFailure { error ->
+                    Log.e(
+                        TAG,
+                        "Could not attach saved targets for " +
+                            profile.packageName,
+                        error
+                    )
+                }
             }.onFailure { error ->
+                hideOnMainThread()
                 Log.e(
                     TAG,
-                    "Could not attach saved targets for " +
+                    "Contained gameplay overlay failure for " +
                         profile.packageName,
                     error
                 )
