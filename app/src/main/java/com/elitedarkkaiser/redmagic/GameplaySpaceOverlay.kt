@@ -8,6 +8,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
@@ -16,6 +17,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -47,6 +49,8 @@ internal class GameplaySpaceOverlay(
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private var leftHandleIndicator: View? = null
+    private var rightHandleIndicator: View? = null
     private var leftHandleRoot: View? = null
     private var rightHandleRoot: View? = null
     private var drawerRoot: View? = null
@@ -57,25 +61,47 @@ internal class GameplaySpaceOverlay(
         DeviceTemperatureMonitor.Subscription? = null
 
     fun isAttached(): Boolean {
-        return leftHandleRoot?.isAttachedToWindow == true &&
+        return leftHandleIndicator?.isAttachedToWindow == true &&
+            rightHandleIndicator?.isAttachedToWindow == true &&
+            leftHandleRoot?.isAttachedToWindow == true &&
             rightHandleRoot?.isAttachedToWindow == true
     }
 
     fun attach(): Boolean {
         if (isAttached()) return true
 
-        val left = edgeHandle(left = true)
-        val right = edgeHandle(left = false)
+        val leftIndicator = edgeHandleIndicator(left = true)
+        val rightIndicator = edgeHandleIndicator(left = false)
+        val left = edgeGestureTarget(left = true, indicator = leftIndicator)
+        val right = edgeGestureTarget(left = false, indicator = rightIndicator)
 
         return runCatching {
-            manager.addView(left, edgeHandleParams(left = true))
+            manager.addView(
+                leftIndicator,
+                edgeHandleIndicatorParams(left = true)
+            )
+            leftHandleIndicator = leftIndicator
+            manager.addView(
+                rightIndicator,
+                edgeHandleIndicatorParams(left = false)
+            )
+            rightHandleIndicator = rightIndicator
+            manager.addView(left, edgeGestureTargetParams(left = true))
             leftHandleRoot = left
-            manager.addView(right, edgeHandleParams(left = false))
+            manager.addView(right, edgeGestureTargetParams(left = false))
             rightHandleRoot = right
             true
         }.getOrElse { error ->
-            leftHandleRoot?.let { runCatching { manager.removeViewImmediate(it) } }
-            rightHandleRoot?.let { runCatching { manager.removeViewImmediate(it) } }
+            listOfNotNull(
+                leftHandleRoot,
+                rightHandleRoot,
+                leftHandleIndicator,
+                rightHandleIndicator
+            ).forEach { view ->
+                runCatching { manager.removeViewImmediate(view) }
+            }
+            leftHandleIndicator = null
+            rightHandleIndicator = null
             leftHandleRoot = null
             rightHandleRoot = null
             android.util.Log.e(
@@ -89,7 +115,14 @@ internal class GameplaySpaceOverlay(
 
     fun hide() {
         hideDrawer()
-        val handles = listOfNotNull(leftHandleRoot, rightHandleRoot)
+        val handles = listOfNotNull(
+            leftHandleRoot,
+            rightHandleRoot,
+            leftHandleIndicator,
+            rightHandleIndicator
+        )
+        leftHandleIndicator = null
+        rightHandleIndicator = null
         leftHandleRoot = null
         rightHandleRoot = null
         handles.forEach { handle ->
@@ -507,31 +540,40 @@ internal class GameplaySpaceOverlay(
         }
     }
 
-    private fun edgeHandle(left: Boolean): TextView {
+    private fun edgeHandleIndicator(left: Boolean): TextView {
+        return TextView(context).apply {
+            text = if (left) "›" else "‹"
+            textSize = 10f
+            gravity = Gravity.CENTER
+            setTextColor(Color.argb(230, 255, 88, 112))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            alpha = HANDLE_RESTING_ALPHA
+            elevation = dp(12).toFloat()
+            background = edgeHandleBackground(left)
+        }
+    }
+
+    private fun edgeGestureTarget(
+        left: Boolean,
+        indicator: View
+    ): View {
         val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         var downRawX = 0f
         var downRawY = 0f
 
-        return TextView(context).apply {
-            text = if (left) "›" else "‹"
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setTextColor(Color.argb(230, 255, 88, 112))
+        return View(context).apply {
             contentDescription = if (left) {
-                "Swipe right to open Game Space"
+                "Swipe inward beside the left handle to open Game Space"
             } else {
-                "Swipe left to open Game Space"
+                "Swipe inward beside the right handle to open Game Space"
             }
-            alpha = 0.58f
-            elevation = dp(12).toFloat()
-            background = edgeHandleBackground(left)
-        }.also { handle ->
-            handle.setOnTouchListener { _, event ->
+        }.also { target ->
+            target.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         downRawX = event.rawX
                         downRawY = event.rawY
-                        handle.alpha = 0.95f
+                        indicator.alpha = HANDLE_ACTIVE_ALPHA
                         true
                     }
 
@@ -539,13 +581,11 @@ internal class GameplaySpaceOverlay(
                         val deltaX = event.rawX - downRawX
                         val deltaY = event.rawY - downRawY
                         val inward = if (left) deltaX else -deltaX
-                        if (inward > touchSlop && inward > abs(deltaY)) {
-                            val travel = inward.coerceIn(
-                                0f,
-                                dp(24).toFloat()
-                            )
-                            handle.translationX =
-                                if (left) travel else -travel
+                        if (
+                            inward > touchSlop &&
+                            inward > abs(deltaY) * DIRECTION_BIAS
+                        ) {
+                            indicator.alpha = HANDLE_ACTIVE_ALPHA
                         }
                         true
                     }
@@ -558,11 +598,10 @@ internal class GameplaySpaceOverlay(
                         val shouldOpen =
                             event.actionMasked == MotionEvent.ACTION_UP &&
                                 inward >= dp(34) &&
-                                inward > abs(deltaY) * 1.15f
+                                inward > abs(deltaY) * DIRECTION_BIAS
 
-                        handle.animate()
-                            .translationX(0f)
-                            .alpha(0.58f)
+                        indicator.animate()
+                            .alpha(HANDLE_RESTING_ALPHA)
                             .setDuration(120L)
                             .start()
                         if (shouldOpen) {
@@ -577,19 +616,62 @@ internal class GameplaySpaceOverlay(
         }
     }
 
-    private fun edgeHandleParams(left: Boolean): WindowManager.LayoutParams {
+    private fun edgeHandleIndicatorParams(
+        left: Boolean
+    ): WindowManager.LayoutParams {
         return WindowManager.LayoutParams(
-            dp(18),
-            dp(76),
+            dp(8),
+            dp(152),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = (if (left) Gravity.START else Gravity.END) or
                 Gravity.TOP
-            y = dp(64)
+            x = 0
+            y = 0
         }
+    }
+
+    private fun edgeGestureTargetParams(
+        left: Boolean
+    ): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            dp(18),
+            dp(152),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = (if (left) Gravity.START else Gravity.END) or
+                Gravity.TOP
+            x = systemBackGestureInset(left)
+            y = 0
+        }
+    }
+
+    private fun systemBackGestureInset(left: Boolean): Int {
+        val detected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                manager.currentWindowMetrics.windowInsets
+                    .getInsets(WindowInsets.Type.systemGestures())
+                    .let { insets ->
+                        if (left) insets.left else insets.right
+                    }
+            }.getOrNull()
+        } else {
+            null
+        }
+
+        return detected
+            ?.takeIf { it > 0 }
+            ?.coerceIn(dp(16), dp(48))
+            ?: dp(24)
     }
 
     private fun renderDashboard(
@@ -809,6 +891,9 @@ internal class GameplaySpaceOverlay(
 
     private companion object {
         private const val TAG = "RedmagicGameSpace"
+        private const val HANDLE_RESTING_ALPHA = 0.58f
+        private const val HANDLE_ACTIVE_ALPHA = 0.95f
+        private const val DIRECTION_BIAS = 1.15f
         private val SECONDARY_TEXT = Color.rgb(181, 187, 201)
     }
 }
