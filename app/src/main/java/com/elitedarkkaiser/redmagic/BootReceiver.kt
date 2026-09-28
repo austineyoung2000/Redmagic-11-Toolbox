@@ -6,6 +6,13 @@ import android.content.Intent
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            if (DeviceCompatibility.isSupportedDevice()) {
+                GameplayRuntimeService.ensureRunning(context)
+            }
+            return
+        }
+
         val event = when (intent?.action) {
             Intent.ACTION_BOOT_COMPLETED ->
                 BootEvent.BOOT_COMPLETED
@@ -17,6 +24,7 @@ class BootReceiver : BroadcastReceiver() {
         if (!DeviceCompatibility.isSupportedDevice()) return
 
         val appContext = context.applicationContext
+        GameplayRuntimeService.ensureRunning(appContext)
         val triggersAutoStart =
             readTriggerPrefsSnapshot(appContext).triggersAutoStart
         val hasUnlockAutomation =
