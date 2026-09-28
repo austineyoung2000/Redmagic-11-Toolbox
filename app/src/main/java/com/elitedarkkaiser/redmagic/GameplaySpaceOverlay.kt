@@ -104,7 +104,7 @@ internal class GameplaySpaceOverlay(
         val screen = overlayBounds()
 
         val backdrop = FrameLayout(context).apply {
-            setBackgroundColor(Color.argb(150, 0, 0, 0))
+            setBackgroundColor(Color.argb(96, 0, 0, 0))
             isClickable = true
             contentDescription = "Game Space drawer background"
             setOnClickListener { hideDrawer() }
@@ -114,11 +114,11 @@ internal class GameplaySpaceOverlay(
             orientation = LinearLayout.VERTICAL
             isClickable = true
             elevation = dp(20).toFloat()
-            setPadding(dp(16), dp(11), dp(16), dp(14))
+            setPadding(dp(10), dp(9), dp(10), dp(10))
             background = roundedBackground(
-                color = Color.argb(222, 8, 9, 13),
-                radius = dp(8).toFloat(),
-                strokeColor = Color.argb(235, 196, 38, 67)
+                color = Color.argb(246, 12, 13, 19),
+                radius = dp(18).toFloat(),
+                strokeColor = Color.argb(230, 164, 27, 58)
             )
         }
 
@@ -127,8 +127,8 @@ internal class GameplaySpaceOverlay(
             gravity = Gravity.CENTER_VERTICAL
         }
         val heading = TextView(context).apply {
-            text = "REDMAGIC 11  •  GAME SPACE"
-            textSize = 14f
+            text = "REDMAGIC 11 TOOLBOX"
+            textSize = 13f
             setTextColor(Color.WHITE)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
@@ -147,11 +147,11 @@ internal class GameplaySpaceOverlay(
         panel.addView(header)
 
         panel.addView(TextView(context).apply {
-            text = "${profile.appLabel}  •  ${orientationLabel()}  •  SWIPE EDGE TO OPEN"
+            text = "${profile.appLabel}  •  ${orientationLabel()}"
             textSize = 10f
             setTextColor(SECONDARY_TEXT)
             maxLines = 1
-            setPadding(dp(2), 0, dp(2), dp(9))
+            setPadding(dp(2), 0, dp(2), dp(7))
         })
 
         val tabs = LinearLayout(context).apply {
@@ -161,16 +161,16 @@ internal class GameplaySpaceOverlay(
         val tabViews = linkedMapOf<Page, TextView>()
         Page.entries.forEach { page ->
             val tab = textControl(
-                label = page.hudLabel(),
+                label = page.shortLabel(),
                 contentDescription = "Open ${page.title.lowercase()} controls",
                 textSizeSp = 9f
             )
             tabViews[page] = tab
             tabs.addView(
                 tab,
-                LinearLayout.LayoutParams(dp(58), dp(48)).apply {
-                    marginStart = dp(8)
-                    marginEnd = dp(8)
+                LinearLayout.LayoutParams(0, dp(32), 1f).apply {
+                    marginStart = dp(2)
+                    marginEnd = dp(2)
                 }
             )
         }
@@ -178,8 +178,7 @@ internal class GameplaySpaceOverlay(
 
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            minimumHeight = dp(210)
-            setPadding(dp(3), dp(10), dp(3), 0)
+            setPadding(dp(2), dp(9), dp(2), 0)
         }
         drawerContent = content
         panel.addView(
@@ -195,11 +194,11 @@ internal class GameplaySpaceOverlay(
             tabViews.forEach { (candidate, view) ->
                 view.background = roundedBackground(
                     color = if (candidate == page) {
-                        Color.argb(238, 166, 29, 58)
+                        Color.argb(235, 150, 25, 54)
                     } else {
-                        Color.argb(205, 27, 29, 38)
+                        Color.argb(220, 29, 31, 42)
                     },
-                    radius = dp(24).toFloat(),
+                    radius = dp(9).toFloat(),
                     strokeColor = if (candidate == page) {
                         Color.rgb(255, 65, 90)
                     } else {
@@ -217,15 +216,16 @@ internal class GameplaySpaceOverlay(
         backdrop.addView(
             panel,
             FrameLayout.LayoutParams(
-                (screen.first - dp(28)).coerceAtLeast(dp(300)),
                 min(
-                    dp(430),
-                    (screen.second - dp(28)).coerceAtLeast(dp(250))
+                    dp(400),
+                    (screen.first - dp(24)).coerceAtLeast(dp(280))
                 ),
-                Gravity.CENTER
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                (if (openedFromLeft) Gravity.START else Gravity.END) or
+                    Gravity.CENTER_VERTICAL
             ).apply {
-                marginStart = if (openedFromLeft) dp(10) else dp(18)
-                marginEnd = if (openedFromLeft) dp(18) else dp(10)
+                marginStart = dp(12)
+                marginEnd = dp(12)
             }
         )
 
@@ -587,7 +587,8 @@ internal class GameplaySpaceOverlay(
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = (if (left) Gravity.START else Gravity.END) or
-                Gravity.CENTER_VERTICAL
+                Gravity.TOP
+            y = dp(64)
         }
     }
 
@@ -596,59 +597,14 @@ internal class GameplaySpaceOverlay(
         status: View,
         actions: List<View>
     ) {
-        val wide = overlayBounds().first >= dp(520)
-        val body = LinearLayout(context).apply {
-            orientation = if (wide) {
-                LinearLayout.HORIZONTAL
-            } else {
-                LinearLayout.VERTICAL
-            }
-            gravity = Gravity.TOP
-        }
-        val actionColumn = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        if (wide) {
-            body.addView(
-                status,
-                LinearLayout.LayoutParams(0, dp(174), 0.9f).apply {
-                    marginEnd = dp(10)
-                }
-            )
-            body.addView(
-                actionColumn,
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1.1f
-                )
-            )
-        } else {
-            body.addView(
-                status,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-            body.addView(
-                actionColumn,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-
-        actions.forEach(actionColumn::addView)
         content.addView(
-            body,
+            status,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
+        actions.forEach(content::addView)
     }
 
     private fun statusCard(lines: List<String>): TextView {
@@ -787,13 +743,13 @@ internal class GameplaySpaceOverlay(
         }
     }
 
-    private fun Page.hudLabel(): String {
+    private fun Page.shortLabel(): String {
         return when (this) {
-            Page.PERFORMANCE -> "◉\nPERF"
-            Page.TRIGGERS -> "L/R\nTRIG"
-            Page.COOLING -> "❄\nCOOL"
-            Page.LIGHTING -> "✦\nLIGHT"
-            Page.TOOLS -> "•••\nTOOLS"
+            Page.PERFORMANCE -> "PERF"
+            Page.TRIGGERS -> "TRIG"
+            Page.COOLING -> "COOL"
+            Page.LIGHTING -> "LIGHT"
+            Page.TOOLS -> "TOOLS"
         }
     }
 
