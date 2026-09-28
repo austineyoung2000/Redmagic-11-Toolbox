@@ -95,6 +95,13 @@ class NativeTgkEditorService : Service() {
     private var requestedOrientation =
         NativeTgkOrientation.LANDSCAPE
 
+    private var editedLeftBehavior =
+        NativeTgkTriggerBehavior.SINGLE_TOUCH
+    private var editedRightBehavior =
+        NativeTgkTriggerBehavior.SINGLE_TOUCH
+    private var editedLeftRapidFireCount = 0
+    private var editedRightRapidFireCount = 0
+
     private var finishing = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -297,106 +304,293 @@ class NativeTgkEditorService : Service() {
             return
         }
 
+        val storedProfile = NativeTgkStorage.getProfile(
+            this,
+            targetPackage
+        )
+        editedLeftBehavior = storedProfile
+            ?.effectiveLeftBehavior()
+            ?: NativeTgkTriggerBehavior.SINGLE_TOUCH
+        editedRightBehavior = storedProfile
+            ?.effectiveRightBehavior()
+            ?: NativeTgkTriggerBehavior.SINGLE_TOUCH
+        editedLeftRapidFireCount = storedProfile
+            ?.effectiveLeftRapidFireCount()
+            ?: 0
+        editedRightRapidFireCount = storedProfile
+            ?.effectiveRightRapidFireCount()
+            ?: 0
+
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.TRANSPARENT)
             isClickable = true
         }
 
-        val instruction = TextView(this).apply {
+        val panelBody = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        val leftSelector = behaviorSelector(
+            left = true,
+            accentColor = Color.rgb(225, 26, 66)
+        )
+        val rightSelector = behaviorSelector(
+            left = false,
+            accentColor = Color.rgb(20, 105, 235)
+        )
+
+        lateinit var leftMenu: LinearLayout
+        lateinit var rightMenu: LinearLayout
+
+        fun closeMenus() {
+            leftMenu.visibility = View.GONE
+            rightMenu.visibility = View.GONE
+            refreshBehaviorSelector(leftSelector, true, false)
+            refreshBehaviorSelector(rightSelector, false, false)
+        }
+
+        leftMenu = behaviorMenu(
+            left = true,
+            accentColor = Color.rgb(225, 26, 66),
+            onSelected = { closeMenus() }
+        )
+        rightMenu = behaviorMenu(
+            left = false,
+            accentColor = Color.rgb(20, 105, 235),
+            onSelected = { closeMenus() }
+        )
+
+        leftSelector.setOnClickListener {
+            val show = leftMenu.visibility != View.VISIBLE
+            rightMenu.visibility = View.GONE
+            leftMenu.visibility = if (show) View.VISIBLE else View.GONE
+            refreshBehaviorSelector(leftSelector, true, show)
+            refreshBehaviorSelector(rightSelector, false, false)
+        }
+        rightSelector.setOnClickListener {
+            val show = rightMenu.visibility != View.VISIBLE
+            leftMenu.visibility = View.GONE
+            rightMenu.visibility = if (show) View.VISIBLE else View.GONE
+            refreshBehaviorSelector(leftSelector, true, false)
+            refreshBehaviorSelector(rightSelector, false, show)
+        }
+
+        val selectors = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+            setPadding(dp(12), dp(4), dp(12), dp(2))
+
+            addView(
+                LinearLayout(this@NativeTgkEditorService).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(
+                        leftSelector,
+                        LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            dp(48)
+                        )
+                    )
+                    addView(
+                        leftMenu,
+                        LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            topMargin = dp(3)
+                        }
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply {
+                    marginEnd = dp(6)
+                }
+            )
+            addView(
+                LinearLayout(this@NativeTgkEditorService).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(
+                        rightSelector,
+                        LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            dp(48)
+                        )
+                    )
+                    addView(
+                        rightMenu,
+                        LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            topMargin = dp(3)
+                        }
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply {
+                    marginStart = dp(6)
+                }
+            )
+        }
+
+        val subtitle = TextView(this).apply {
             text = buildString {
-                append("L/R • ")
                 append(targetLabel)
                 append(" • ")
                 append(
-                    when (requestedOrientation) {
-                        NativeTgkOrientation.PORTRAIT ->
-                            "Portrait"
-                        NativeTgkOrientation.LANDSCAPE ->
-                            "Landscape"
-                    }
+                    if (
+                        requestedOrientation ==
+                        NativeTgkOrientation.PORTRAIT
+                    ) "Portrait" else "Landscape"
                 )
+                append(" • Drag L/R onto the controls")
             }
-            textSize = 12f
-            setTextColor(
-                getColor(R.color.redmagic_text_primary)
-            )
+            textSize = 10f
+            setTextColor(Color.rgb(178, 184, 198))
             gravity = Gravity.CENTER
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(
-                dp(10),
-                0,
-                dp(10),
-                0
+            setPadding(dp(12), dp(3), dp(12), dp(7))
+        }
+
+        panelBody.addView(
+            selectors,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
+        )
+        panelBody.addView(
+            subtitle,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        val title = TextView(this).apply {
+            text = "Shoulder Triggers"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, dp(4), 0)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
 
-        val cancel = editorActionButton(
-            label = "✕",
-            emphasized = false
-        ).apply {
+        val help = editorActionButton("?", false).apply {
+            contentDescription = "Trigger editor help"
+            setOnClickListener {
+                Toast.makeText(
+                    this@NativeTgkEditorService,
+                    "Drag L and R to the game controls, choose each behavior, then tap Save.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        val collapse = editorActionButton("▴", false).apply {
+            contentDescription = "Collapse trigger controls"
+        }
+        val save = editorActionButton("✓ SAVE", true).apply {
+            contentDescription = "Save trigger targets and behavior"
+            setOnClickListener { saveTargets() }
+        }
+        val cancel = editorActionButton("✕", false).apply {
             contentDescription = "Cancel target editing"
-            setOnClickListener {
-                cancelEditing()
+            setOnClickListener { cancelEditing() }
+        }
+
+        var expanded = true
+        collapse.setOnClickListener {
+            expanded = !expanded
+            panelBody.visibility = if (expanded) View.VISIBLE else View.GONE
+            collapse.text = if (expanded) "▴" else "▾"
+            collapse.contentDescription = if (expanded) {
+                "Collapse trigger controls"
+            } else {
+                "Expand trigger controls"
+            }
+            if (!expanded) {
+                closeMenus()
             }
         }
 
-        val save = editorActionButton(
-            label = "✓  SAVE",
-            emphasized = true
-        ).apply {
-            contentDescription = "Save trigger targets"
-            setOnClickListener {
-                saveTargets()
-            }
-        }
-
-        val controls = LinearLayout(this).apply {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(
-                dp(4),
-                dp(3),
-                dp(4),
-                dp(3)
-            )
-            background = roundedBackground(
-                getColor(R.color.redmagic_panel),
-                dp(14).toFloat(),
-                getColor(R.color.redmagic_border)
-            )
-            elevation = dp(8).toFloat()
-
+            setPadding(dp(9), dp(7), dp(9), dp(7))
+            addView(title, LinearLayout.LayoutParams(0, dp(34), 1f))
+            addView(help, LinearLayout.LayoutParams(dp(34), dp(32)))
             addView(
-                cancel,
-                LinearLayout.LayoutParams(
-                    dp(40),
-                    dp(32)
-                )
-            )
-            addView(
-                instruction,
-                LinearLayout.LayoutParams(
-                    if (
-                        requestedOrientation ==
-                        NativeTgkOrientation.LANDSCAPE
-                    ) dp(190) else dp(110),
-                    dp(32)
-                )
+                collapse,
+                LinearLayout.LayoutParams(dp(34), dp(32)).apply {
+                    marginStart = dp(4)
+                }
             )
             addView(
                 save,
+                LinearLayout.LayoutParams(dp(72), dp(32)).apply {
+                    marginStart = dp(6)
+                }
+            )
+            addView(
+                cancel,
+                LinearLayout.LayoutParams(dp(34), dp(32)).apply {
+                    marginStart = dp(4)
+                }
+            )
+        }
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedBackground(
+                Color.argb(238, 12, 13, 19),
+                dp(14).toFloat(),
+                Color.rgb(125, 24, 48)
+            )
+            elevation = dp(12).toFloat()
+            addView(
+                header,
                 LinearLayout.LayoutParams(
-                    dp(68),
-                    dp(32)
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                View(this@NativeTgkEditorService).apply {
+                    setBackgroundColor(Color.argb(120, 125, 24, 48))
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(1)
+                )
+            )
+            addView(
+                panelBody,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
                 )
             )
         }
+
+        val availableWidth = (
+            resources.displayMetrics.widthPixels - dp(16)
+            ).coerceAtLeast(dp(280))
+        val preferredWidth = if (
+            requestedOrientation == NativeTgkOrientation.LANDSCAPE
+        ) dp(680) else dp(380)
 
         root.addView(
             controls,
             FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
+                min(availableWidth, preferredWidth),
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
@@ -666,6 +860,16 @@ class NativeTgkEditorService : Service() {
                 requestedOrientation,
                 mapping
             )
+            .withTriggerBehavior(
+                left = true,
+                behavior = editedLeftBehavior,
+                count = editedLeftRapidFireCount
+            )
+            .withTriggerBehavior(
+                left = false,
+                behavior = editedRightBehavior,
+                count = editedRightRapidFireCount
+            )
 
         if (!NativeTgkStorage.saveProfile(this, updated)) {
             Toast.makeText(
@@ -678,7 +882,7 @@ class NativeTgkEditorService : Service() {
 
         Toast.makeText(
             this,
-            "Saved ${requestedOrientation.name.lowercase()} L/R targets",
+            "Saved ${requestedOrientation.name.lowercase()} L/R controls",
             Toast.LENGTH_SHORT
         ).show()
 
@@ -865,6 +1069,160 @@ class NativeTgkEditorService : Service() {
             )
             isClickable = true
             isFocusable = true
+        }
+    }
+
+    private data class BehaviorOption(
+        val label: String,
+        val behavior: NativeTgkTriggerBehavior,
+        val rapidFireCount: Int
+    )
+
+    private fun behaviorOptions(): List<BehaviorOption> {
+        return listOf(
+            BehaviorOption(
+                "Single Tap",
+                NativeTgkTriggerBehavior.SINGLE_TOUCH,
+                0
+            ),
+            BehaviorOption(
+                "Long Press",
+                NativeTgkTriggerBehavior.LONG_PRESS,
+                0
+            ),
+            BehaviorOption(
+                "Rapid Fire ×2",
+                NativeTgkTriggerBehavior.RAPID_FIRE,
+                2
+            ),
+            BehaviorOption(
+                "Rapid Fire ×5",
+                NativeTgkTriggerBehavior.RAPID_FIRE,
+                5
+            ),
+            BehaviorOption(
+                "Rapid Fire ×10",
+                NativeTgkTriggerBehavior.RAPID_FIRE,
+                10
+            )
+        )
+    }
+
+    private fun behaviorSelector(
+        left: Boolean,
+        accentColor: Int
+    ): TextView {
+        return TextView(this).apply {
+            textSize = 13f
+            gravity = Gravity.CENTER_VERTICAL
+            setTextColor(Color.WHITE)
+            setPadding(dp(14), 0, dp(12), 0)
+            background = RippleDrawable(
+                ColorStateList.valueOf(Color.argb(90, 255, 255, 255)),
+                roundedBackground(
+                    color = Color.argb(225, 22, 24, 34),
+                    radius = dp(9).toFloat(),
+                    strokeColor = accentColor
+                ),
+                null
+            )
+            isClickable = true
+            isFocusable = true
+            refreshBehaviorSelector(this, left, false)
+        }
+    }
+
+    private fun refreshBehaviorSelector(
+        selector: TextView,
+        left: Boolean,
+        expanded: Boolean
+    ) {
+        val behavior = if (left) {
+            editedLeftBehavior
+        } else {
+            editedRightBehavior
+        }
+        val count = if (left) {
+            editedLeftRapidFireCount
+        } else {
+            editedRightRapidFireCount
+        }
+        val mode = behaviorOptions().firstOrNull {
+            it.behavior == behavior && it.rapidFireCount == count
+        }?.label ?: "Single Tap"
+        selector.text = buildString {
+            append(if (left) "L   " else "R   ")
+            append(mode)
+            append(if (expanded) "   ▴" else "   ▾")
+        }
+        selector.contentDescription = buildString {
+            append(if (left) "Left" else "Right")
+            append(" trigger behavior: ")
+            append(mode)
+        }
+    }
+
+    private fun behaviorMenu(
+        left: Boolean,
+        accentColor: Int,
+        onSelected: () -> Unit
+    ): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = roundedBackground(
+                Color.argb(248, 25, 27, 38),
+                dp(8).toFloat(),
+                Color.argb(
+                    190,
+                    Color.red(accentColor),
+                    Color.green(accentColor),
+                    Color.blue(accentColor)
+                )
+            )
+
+            behaviorOptions().forEach { option ->
+                val item = TextView(this@NativeTgkEditorService).apply {
+                    text = option.label
+                    textSize = 12f
+                    gravity = Gravity.CENTER_VERTICAL
+                    setTextColor(Color.WHITE)
+                    setPadding(dp(12), 0, dp(8), 0)
+                    background = RippleDrawable(
+                        ColorStateList.valueOf(
+                            Color.argb(90, 255, 255, 255)
+                        ),
+                        roundedBackground(
+                            Color.TRANSPARENT,
+                            dp(6).toFloat(),
+                            Color.TRANSPARENT
+                        ),
+                        null
+                    )
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        if (left) {
+                            editedLeftBehavior = option.behavior
+                            editedLeftRapidFireCount =
+                                option.rapidFireCount
+                        } else {
+                            editedRightBehavior = option.behavior
+                            editedRightRapidFireCount =
+                                option.rapidFireCount
+                        }
+                        onSelected()
+                    }
+                }
+                addView(
+                    item,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(36)
+                    )
+                )
+            }
         }
     }
 
