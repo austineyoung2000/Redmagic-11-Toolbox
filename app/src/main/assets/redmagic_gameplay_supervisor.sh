@@ -3,7 +3,7 @@
 PATH=/system/bin:/system_ext/bin:/vendor/bin:/product/bin
 export PATH
 
-SUPERVISOR_VERSION=2
+SUPERVISOR_VERSION=3
 PACKAGE_NAME="com.elitedarkkaiser.redmagic"
 ACCESSIBILITY_COMPONENT="com.elitedarkkaiser.redmagic/com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
 WATCHDOG_PROCESS="com.elitedarkkaiser.redmagic:gameplay_watchdog"
@@ -82,7 +82,22 @@ watchdog_running() {
     pidof "$WATCHDOG_PROCESS" >/dev/null 2>&1
 }
 
+arm_vendor_autolaunch_whitelist() {
+    # REDMAGIC's AutoLaunch policy blocks a shell-originated service start
+    # after the application UID has been killed. Transaction 6 is the
+    # framework's one-shot pending-launch whitelist. Keep this best-effort so
+    # retained service.d support still works on ROMs without that service.
+    su 2000 -c \
+        "service call AutoLaunch 6 s16 $PACKAGE_NAME" \
+        >/dev/null 2>&1
+}
+
 start_watchdog() {
+    if ! arm_vendor_autolaunch_whitelist; then
+        log_message \
+            "vendor AutoLaunch whitelist unavailable; trying framework start"
+    fi
+
     start_output="$(
         su 2000 -c \
             "am start-foreground-service --user 0 -a $WATCHDOG_ACTION -n $WATCHDOG_COMPONENT" \

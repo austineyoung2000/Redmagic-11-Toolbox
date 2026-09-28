@@ -24,7 +24,7 @@ internal object GameplayRuntimeSupervisor {
         "/data/adb/redmagic_toolbox"
     private const val PID_FILE =
         "$STATE_DIRECTORY/gameplay_supervisor.lock/pid"
-    private const val REQUIRED_VERSION = "2"
+    private const val REQUIRED_VERSION = "3"
 
     private val installQueued = AtomicBoolean(false)
     private val installer = Executors.newSingleThreadExecutor { runnable ->
@@ -103,12 +103,35 @@ internal object GameplayRuntimeSupervisor {
                 printf '%s' '$encodedScript' |
                     base64 -d > "${'$'}temporary_path" || return 1
                 chmod 0755 "${'$'}temporary_path" || return 1
+                mv -f "${'$'}temporary_path" "${'$'}service_path" ||
+                    return 1
+
                 old_pid="${'$'}(cat '$PID_FILE' 2>/dev/null)"
-                if [ -n "${'$'}old_pid" ]; then
+                case "${'$'}old_pid" in
+                    ''|*[!0-9]*) old_pid='' ;;
+                esac
+
+                if [ -n "${'$'}old_pid" ] &&
+                    kill -0 "${'$'}old_pid" 2>/dev/null; then
                     kill "${'$'}old_pid" 2>/dev/null || true
-                    sleep 1
+                    remaining_waits=10
+                    while kill -0 "${'$'}old_pid" 2>/dev/null &&
+                        [ "${'$'}remaining_waits" -gt 0 ]; do
+                        sleep 1
+                        remaining_waits="${'$'}((remaining_waits - 1))"
+                    done
+
+                    if kill -0 "${'$'}old_pid" 2>/dev/null; then
+                        kill -9 "${'$'}old_pid" 2>/dev/null || return 1
+                        sleep 1
+                    fi
                 fi
-                mv -f "${'$'}temporary_path" "${'$'}service_path"
+
+                current_pid="${'$'}(cat '$PID_FILE' 2>/dev/null)"
+                if [ -z "${'$'}current_pid" ] ||
+                    ! kill -0 "${'$'}current_pid" 2>/dev/null; then
+                    rm -rf '$STATE_DIRECTORY/gameplay_supervisor.lock'
+                fi
             }
             redmagic_install_supervisor
             redmagic_status="${'$'}?"
