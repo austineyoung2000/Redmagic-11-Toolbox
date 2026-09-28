@@ -1,39 +1,45 @@
-# Redmagic 11 Toolbox 2.5.0
+# Redmagic 11 Toolbox 2.5.1
 
-Version 2.5.0 rebrands RedMagic Control Center as **Redmagic 11 Toolbox** and introduces a standalone native gaming stack for the RedMagic 11 Pro / NX809J.
+Version 2.5.1 is a stability and in-game usability release for the standalone gaming stack introduced in 2.5.0. It preserves the existing application ID and signing identity, so it installs over earlier versions without clearing saved profiles.
 
-The application ID and signing identity are unchanged, so this release installs as an update over existing versions and keeps saved app data.
+## Reliable gameplay runtime
 
-## Native TGK shoulder-trigger mapping
+- Moved gameplay overlay and native TGK ownership out of the accessibility-service binding and into a dedicated foreground runtime.
+- Added an independent watchdog process that binds the runtime and requests state reconstruction after unexpected process termination.
+- Added a minimal root-owned `service.d` supervisor because REDMAGIC firmware can kill every process belonging to the application UID simultaneously.
+- Routed external recovery through the Android shell identity required by framework Binder services.
+- Integrated REDMAGIC AutoLaunch transaction 6 as a one-shot launch whitelist before restarting the watchdog foreground service.
+- Added safe supervisor replacement, stale-lock recovery, bounded retry backoff, process checks, and rotating diagnostics.
+- Restored overlays, saved trigger targets, and native TGK state without requiring an accessibility toggle or device reboot.
 
-- Added independent per-app L and R screen targets through REDMAGIC's native TGK engine.
-- Added separate portrait and landscape mappings, named layouts, and in-game editing.
-- Added persistent touch-through saved-target markers with deliberate re-edit mode.
-- Added independent single-touch, hold, and rapid-fire behavior for each trigger.
-- Added supported rapid-fire counts of 2, 5, and 10.
-- Added stock top-edge trigger highlights and native pressed-target visual feedback.
-- Added stock TGK haptics, driver activation, version negotiation, state verification, and runtime diagnostics.
-- Added native TGK profile import/export and complete Master Profile backup coverage.
-- Unified TGK and overlay ownership with the selected application's foreground lifecycle.
+## In-game Game Space controls
 
-Native TGK does not require the Game Space application or root on the tested stock firmware. Touch contacts are generated inside the firmware input pipeline, preserving simultaneous touchscreen movement and multitouch.
+- Added a compact Game Space-style drawer for performance, triggers, cooling, lighting, and tools.
+- Restored a single movable `GS` button with a dedicated drag grip.
+- Made the compact drawer independently movable from its header.
+- Persisted button and drawer positions separately for every selected application and orientation.
+- Kept the button and drawer inside Android system-gesture insets and excluded the physical edge strips from the drawer backdrop.
+- Removed experimental edge handles and their touch-capture windows so the Android Back gesture remains unobstructed.
 
-## Per-app gaming controls
+## Trigger editor polish
 
-- Added compatibility-gated per-app refresh-rate profiles through the stock REDMAGIC display service.
-- Added per-app touch-sampling, sensitivity, touch-follow, and micro-sensitivity profiles.
-- Added per-app Eco, Balance, and Rise performance-mode management.
-- Added a foreground-only performance overlay showing refresh rate, touch sampling, performance mode, FPS, CPU temperature, and fan telemetry.
-- Added stock charge-separation control with charger and battery safety checks.
-- Added separate capability probes so missing vendor APIs remain unavailable without breaking general toolbox features.
+- Reduced the editor footprint and L/R target size.
+- Made the complete shoulder-trigger editor movable.
+- Replaced expanding behavior lists with independent floating dropdown menus.
+- Kept trigger behavior, rapid-fire counts, native mapping, and runtime lifecycle semantics unchanged.
 
-## Existing toolbox
+## Lighting and efficiency
 
-Version 2.5.0 retains fan and micropump control, automatic cooling curves, lighting and RGB Studio, Magic Key actions and shortcuts, dual-app slider schedules, Game Mode, Charging Mode, Call Lighting, Quick Settings tiles, the cooling widget, thermal history, automation rules, diagnostics, and portable Master Profiles.
+- Combined fan multicolor palettes with supported lighting effects.
+- Reduced persistent monitoring and hardware-control overhead.
+- Prevented target-editor theme failures from taking down the accessibility binding.
+- Tightened foreground lifecycle recovery around application transitions and runtime races.
 
-## Reverse-engineering report
+## Reverse-engineering reports
 
-The repository now includes `docs/NATIVE_TGK_REVERSE_ENGINEERING.md`, documenting the firmware classes, Binder transactions, stock database observations, permission testing, kernel trace, runtime sequencing, visual effects, and Game Space-independent validation behind native TGK support.
+- Retained `docs/NATIVE_TGK_REVERSE_ENGINEERING.md` as the authoritative native Touch Game Key report.
+- Added `docs/GAME_SPACE_REVERSE_ENGINEERING.md` for stock package roles, window and input evidence, privileged handle invocation, AutoLaunch policy, process-kill recovery, rejected prototypes, and the Toolbox implementation.
+- Future verified Game Space findings should be recorded in the Game Space report so the repository remains the project record rather than relying on chat history.
 
 ## Compatibility
 
