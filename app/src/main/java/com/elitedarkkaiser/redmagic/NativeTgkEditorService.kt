@@ -16,6 +16,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -23,6 +24,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -496,7 +498,7 @@ class NativeTgkEditorService : Service() {
         )
 
         val title = TextView(this).apply {
-            text = "Shoulder Triggers"
+            text = "⠿  Shoulder Triggers"
             textSize = 12f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER_VERTICAL
@@ -504,6 +506,9 @@ class NativeTgkEditorService : Service() {
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
+            contentDescription =
+                "Drag to move the shoulder trigger editor"
+            isClickable = true
         }
 
         val help = editorActionButton("?", false).apply {
@@ -511,7 +516,7 @@ class NativeTgkEditorService : Service() {
             setOnClickListener {
                 Toast.makeText(
                     this@NativeTgkEditorService,
-                    "Drag L and R to the game controls, choose each behavior, then tap Save.",
+                    "Drag this panel by its title. Drag L and R to the game controls, choose each behavior, then tap Save.",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -618,6 +623,13 @@ class NativeTgkEditorService : Service() {
             ).apply {
                 topMargin = dp(6)
             }
+        )
+
+        attachPanelDragHandle(
+            handle = title,
+            panel = controls,
+            bounds = root,
+            onDragStarted = { closeMenu() }
         )
 
         val targetSize = dp(38)
@@ -763,6 +775,100 @@ class NativeTgkEditorService : Service() {
         }
 
         return target
+    }
+
+    private fun attachPanelDragHandle(
+        handle: View,
+        panel: View,
+        bounds: View,
+        onDragStarted: () -> Unit
+    ) {
+        val touchSlop = ViewConfiguration
+            .get(this)
+            .scaledTouchSlop
+
+        var panelOffsetX = 0f
+        var panelOffsetY = 0f
+        var downRawX = 0f
+        var downRawY = 0f
+        var boundsScreenX = 0
+        var boundsScreenY = 0
+        var dragging = false
+
+        handle.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    val boundsLocation = IntArray(2)
+                    bounds.getLocationOnScreen(boundsLocation)
+                    boundsScreenX = boundsLocation[0]
+                    boundsScreenY = boundsLocation[1]
+
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    panelOffsetX =
+                        panel.x - (event.rawX - boundsScreenX)
+                    panelOffsetY =
+                        panel.y - (event.rawY - boundsScreenY)
+                    dragging = false
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    if (
+                        !dragging &&
+                        (
+                            abs(event.rawX - downRawX) > touchSlop ||
+                                abs(event.rawY - downRawY) > touchSlop
+                            )
+                    ) {
+                        dragging = true
+                        onDragStarted()
+                        panel.elevation = dp(18).toFloat()
+                    }
+
+                    if (dragging) {
+                        val edgeMargin = dp(4)
+                        val maximumX = (
+                            bounds.width - panel.width - edgeMargin
+                            ).coerceAtLeast(edgeMargin)
+                        val maximumY = (
+                            bounds.height - panel.height - edgeMargin
+                            ).coerceAtLeast(edgeMargin)
+
+                        panel.x = (
+                            event.rawX - boundsScreenX + panelOffsetX
+                            ).coerceIn(
+                                edgeMargin.toFloat(),
+                                maximumX.toFloat()
+                            )
+                        panel.y = (
+                            event.rawY - boundsScreenY + panelOffsetY
+                            ).coerceIn(
+                                edgeMargin.toFloat(),
+                                maximumY.toFloat()
+                            )
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    panel.elevation = dp(12).toFloat()
+                    if (!dragging) {
+                        view.performClick()
+                    }
+                    dragging = false
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    panel.elevation = dp(12).toFloat()
+                    dragging = false
+                    true
+                }
+
+                else -> false
+            }
+        }
     }
 
     private fun restoreOrPlaceDefaults(
