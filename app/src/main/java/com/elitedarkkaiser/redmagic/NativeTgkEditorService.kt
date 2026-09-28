@@ -339,101 +339,123 @@ class NativeTgkEditorService : Service() {
             accentColor = Color.rgb(20, 105, 235)
         )
 
-        lateinit var leftMenu: LinearLayout
-        lateinit var rightMenu: LinearLayout
+        var activeMenu: LinearLayout? = null
+        var activeMenuIsLeft: Boolean? = null
 
-        fun closeMenus() {
-            leftMenu.visibility = View.GONE
-            rightMenu.visibility = View.GONE
+        fun closeMenu() {
+            activeMenu?.let { menu ->
+                runCatching { root.removeView(menu) }
+            }
+            activeMenu = null
+            activeMenuIsLeft = null
             refreshBehaviorSelector(leftSelector, true, false)
             refreshBehaviorSelector(rightSelector, false, false)
         }
 
-        leftMenu = behaviorMenu(
-            left = true,
-            accentColor = Color.rgb(225, 26, 66),
-            onSelected = { closeMenus() }
-        )
-        rightMenu = behaviorMenu(
-            left = false,
-            accentColor = Color.rgb(20, 105, 235),
-            onSelected = { closeMenus() }
-        )
+        fun toggleMenu(
+            left: Boolean,
+            selector: TextView,
+            accentColor: Int
+        ) {
+            val closeOnly = activeMenuIsLeft == left
+            closeMenu()
+            if (closeOnly) {
+                return
+            }
+
+            val menu = behaviorMenu(
+                left = left,
+                accentColor = accentColor,
+                onSelected = { closeMenu() }
+            )
+            activeMenu = menu
+            activeMenuIsLeft = left
+            refreshBehaviorSelector(selector, left, true)
+
+            root.addView(
+                menu,
+                FrameLayout.LayoutParams(
+                    selector.width.coerceAtLeast(dp(150)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            menu.post {
+                if (activeMenu !== menu || menu.parent !== root) {
+                    return@post
+                }
+
+                val selectorLocation = IntArray(2)
+                val rootLocation = IntArray(2)
+                selector.getLocationOnScreen(selectorLocation)
+                root.getLocationOnScreen(rootLocation)
+
+                val horizontalMargin = dp(6)
+                val verticalGap = dp(3)
+                val selectorX =
+                    selectorLocation[0] - rootLocation[0]
+                val selectorY =
+                    selectorLocation[1] - rootLocation[1]
+                val maximumX = (
+                    root.width - menu.width - horizontalMargin
+                    ).coerceAtLeast(horizontalMargin)
+                val belowY =
+                    selectorY + selector.height + verticalGap
+                val aboveY =
+                    selectorY - menu.height - verticalGap
+                val maximumY = (
+                    root.height - menu.height - horizontalMargin
+                    ).coerceAtLeast(horizontalMargin)
+
+                menu.x = selectorX
+                    .coerceIn(horizontalMargin, maximumX)
+                    .toFloat()
+                menu.y = (
+                    if (belowY <= maximumY) belowY else aboveY
+                    ).coerceIn(horizontalMargin, maximumY)
+                    .toFloat()
+            }
+        }
 
         leftSelector.setOnClickListener {
-            val show = leftMenu.visibility != View.VISIBLE
-            rightMenu.visibility = View.GONE
-            leftMenu.visibility = if (show) View.VISIBLE else View.GONE
-            refreshBehaviorSelector(leftSelector, true, show)
-            refreshBehaviorSelector(rightSelector, false, false)
+            toggleMenu(
+                left = true,
+                selector = leftSelector,
+                accentColor = Color.rgb(225, 26, 66)
+            )
         }
         rightSelector.setOnClickListener {
-            val show = rightMenu.visibility != View.VISIBLE
-            leftMenu.visibility = View.GONE
-            rightMenu.visibility = if (show) View.VISIBLE else View.GONE
-            refreshBehaviorSelector(leftSelector, true, false)
-            refreshBehaviorSelector(rightSelector, false, show)
+            toggleMenu(
+                left = false,
+                selector = rightSelector,
+                accentColor = Color.rgb(20, 105, 235)
+            )
         }
+        root.setOnClickListener { closeMenu() }
 
         val selectors = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
-            setPadding(dp(12), dp(4), dp(12), dp(2))
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(4), dp(8), dp(2))
 
             addView(
-                LinearLayout(this@NativeTgkEditorService).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(
-                        leftSelector,
-                        LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            dp(48)
-                        )
-                    )
-                    addView(
-                        leftMenu,
-                        LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            topMargin = dp(3)
-                        }
-                    )
-                },
+                leftSelector,
                 LinearLayout.LayoutParams(
                     0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(36),
                     1f
                 ).apply {
-                    marginEnd = dp(6)
+                    marginEnd = dp(4)
                 }
             )
             addView(
-                LinearLayout(this@NativeTgkEditorService).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(
-                        rightSelector,
-                        LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            dp(48)
-                        )
-                    )
-                    addView(
-                        rightMenu,
-                        LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            topMargin = dp(3)
-                        }
-                    )
-                },
+                rightSelector,
                 LinearLayout.LayoutParams(
                     0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(36),
                     1f
                 ).apply {
-                    marginStart = dp(6)
+                    marginStart = dp(4)
                 }
             )
         }
@@ -448,14 +470,14 @@ class NativeTgkEditorService : Service() {
                         NativeTgkOrientation.PORTRAIT
                     ) "Portrait" else "Landscape"
                 )
-                append(" • Drag L/R onto the controls")
+                append(" • Drag L/R onto controls")
             }
-            textSize = 10f
+            textSize = 9f
             setTextColor(Color.rgb(178, 184, 198))
             gravity = Gravity.CENTER
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(dp(12), dp(3), dp(12), dp(7))
+            setPadding(dp(8), dp(1), dp(8), dp(4))
         }
 
         panelBody.addView(
@@ -475,10 +497,10 @@ class NativeTgkEditorService : Service() {
 
         val title = TextView(this).apply {
             text = "Shoulder Triggers"
-            textSize = 14f
+            textSize = 12f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), 0, dp(4), 0)
+            setPadding(dp(3), 0, dp(3), 0)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -517,32 +539,32 @@ class NativeTgkEditorService : Service() {
                 "Expand trigger controls"
             }
             if (!expanded) {
-                closeMenus()
+                closeMenu()
             }
         }
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(9), dp(7), dp(9), dp(7))
-            addView(title, LinearLayout.LayoutParams(0, dp(34), 1f))
-            addView(help, LinearLayout.LayoutParams(dp(34), dp(32)))
+            setPadding(dp(7), dp(4), dp(7), dp(4))
+            addView(title, LinearLayout.LayoutParams(0, dp(28), 1f))
+            addView(help, LinearLayout.LayoutParams(dp(28), dp(28)))
             addView(
                 collapse,
-                LinearLayout.LayoutParams(dp(34), dp(32)).apply {
-                    marginStart = dp(4)
+                LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                    marginStart = dp(3)
                 }
             )
             addView(
                 save,
-                LinearLayout.LayoutParams(dp(72), dp(32)).apply {
-                    marginStart = dp(6)
+                LinearLayout.LayoutParams(dp(62), dp(28)).apply {
+                    marginStart = dp(4)
                 }
             )
             addView(
                 cancel,
-                LinearLayout.LayoutParams(dp(34), dp(32)).apply {
-                    marginStart = dp(4)
+                LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                    marginStart = dp(3)
                 }
             )
         }
@@ -551,7 +573,7 @@ class NativeTgkEditorService : Service() {
             orientation = LinearLayout.VERTICAL
             background = roundedBackground(
                 Color.argb(238, 12, 13, 19),
-                dp(14).toFloat(),
+                dp(11).toFloat(),
                 Color.rgb(125, 24, 48)
             )
             elevation = dp(12).toFloat()
@@ -585,7 +607,7 @@ class NativeTgkEditorService : Service() {
             ).coerceAtLeast(dp(280))
         val preferredWidth = if (
             requestedOrientation == NativeTgkOrientation.LANDSCAPE
-        ) dp(680) else dp(380)
+        ) dp(400) else dp(340)
 
         root.addView(
             controls,
@@ -594,11 +616,11 @@ class NativeTgkEditorService : Service() {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
-                topMargin = dp(8)
+                topMargin = dp(6)
             }
         )
 
-        val targetSize = dp(58)
+        val targetSize = dp(38)
 
         val left = createTarget(
             label = "L",
@@ -684,14 +706,14 @@ class NativeTgkEditorService : Service() {
     ): TextView {
         val target = TextView(this).apply {
             text = label
-            textSize = 22f
+            textSize = 15f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             background = roundedBackground(
                 color,
                 targetSize / 2f
             )
-            elevation = dp(10).toFloat()
+            elevation = dp(7).toFloat()
         }
 
         var offsetX = 0f
@@ -702,7 +724,7 @@ class NativeTgkEditorService : Service() {
                 MotionEvent.ACTION_DOWN -> {
                     offsetX = view.x - event.rawX
                     offsetY = view.y - event.rawY
-                    view.elevation = dp(18).toFloat()
+                    view.elevation = dp(12).toFloat()
                     true
                 }
 
@@ -732,7 +754,7 @@ class NativeTgkEditorService : Service() {
 
                 MotionEvent.ACTION_UP,
                 MotionEvent.ACTION_CANCEL -> {
-                    view.elevation = dp(10).toFloat()
+                    view.elevation = dp(7).toFloat()
                     true
                 }
 
@@ -1044,11 +1066,11 @@ class NativeTgkEditorService : Service() {
 
         return TextView(this).apply {
             text = label
-            textSize = 10f
+            textSize = 9f
             gravity = Gravity.CENTER
             minWidth = 0
             minHeight = 0
-            setPadding(dp(7), 0, dp(7), 0)
+            setPadding(dp(5), 0, dp(5), 0)
             setTextColor(
                 if (emphasized) {
                     Color.WHITE
@@ -1062,7 +1084,7 @@ class NativeTgkEditorService : Service() {
                 ),
                 roundedBackground(
                     color = fill,
-                    radius = dp(10).toFloat(),
+                    radius = dp(8).toFloat(),
                     strokeColor = stroke
                 ),
                 null
@@ -1113,10 +1135,10 @@ class NativeTgkEditorService : Service() {
         accentColor: Int
     ): TextView {
         return TextView(this).apply {
-            textSize = 13f
+            textSize = 11f
             gravity = Gravity.CENTER_VERTICAL
             setTextColor(Color.WHITE)
-            setPadding(dp(14), 0, dp(12), 0)
+            setPadding(dp(10), 0, dp(8), 0)
             background = RippleDrawable(
                 ColorStateList.valueOf(Color.argb(90, 255, 255, 255)),
                 roundedBackground(
@@ -1169,8 +1191,8 @@ class NativeTgkEditorService : Service() {
     ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            elevation = dp(16).toFloat()
+            setPadding(dp(3), dp(3), dp(3), dp(3))
             background = roundedBackground(
                 Color.argb(248, 25, 27, 38),
                 dp(8).toFloat(),
@@ -1185,10 +1207,10 @@ class NativeTgkEditorService : Service() {
             behaviorOptions().forEach { option ->
                 val item = TextView(this@NativeTgkEditorService).apply {
                     text = option.label
-                    textSize = 12f
+                    textSize = 11f
                     gravity = Gravity.CENTER_VERTICAL
                     setTextColor(Color.WHITE)
-                    setPadding(dp(12), 0, dp(8), 0)
+                    setPadding(dp(10), 0, dp(7), 0)
                     background = RippleDrawable(
                         ColorStateList.valueOf(
                             Color.argb(90, 255, 255, 255)
@@ -1219,7 +1241,7 @@ class NativeTgkEditorService : Service() {
                     item,
                     LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        dp(36)
+                        dp(30)
                     )
                 )
             }
