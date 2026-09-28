@@ -1,10 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -15,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Binder
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -27,6 +24,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 class GameplayRuntimeService : Service() {
+    private val runtimeBinder = Binder()
 
     private val foregroundHandler = Handler(Looper.getMainLooper())
 
@@ -71,9 +69,6 @@ class GameplayRuntimeService : Service() {
 
     @Volatile
     private var runtimeStarted = false
-
-    @Volatile
-    private var runtimeForegroundStarted = false
 
     @Volatile
     private var lastAccessibilityCheckAt = 0L
@@ -137,11 +132,21 @@ class GameplayRuntimeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+
+        if (
+            !DeviceCompatibility.isSupportedDevice() ||
+            !isAccessibilityEnabled()
+        ) {
+            stopSelf()
+            return
+        }
+
         serviceRunning = true
         android.util.Log.i(
             TAG,
             "Gameplay runtime created pid=${android.os.Process.myPid()}"
         )
+        startRuntimeIfNeeded()
     }
 
     @Volatile
@@ -326,7 +331,7 @@ class GameplayRuntimeService : Service() {
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder = runtimeBinder
 
     override fun onStartCommand(
         intent: Intent?,
@@ -347,20 +352,6 @@ class GameplayRuntimeService : Service() {
             return START_NOT_STICKY
         }
 
-        if (!runtimeForegroundStarted) {
-            val foregroundResult = runCatching {
-                startRuntimeForeground()
-                runtimeForegroundStarted = true
-            }
-            if (foregroundResult.isFailure) {
-                logRuntimeFailure(
-                    "start gameplay foreground service",
-                    foregroundResult.exceptionOrNull()!!
-                )
-                stopSelf(startId)
-                return START_NOT_STICKY
-            }
-        }
         startRuntimeIfNeeded()
 
         when (intent?.action) {
@@ -465,7 +456,6 @@ class GameplayRuntimeService : Service() {
         android.util.Log.i(TAG, "Gameplay runtime stopping")
         serviceRunning = false
         runtimeStarted = false
-        runtimeForegroundStarted = false
         lastForegroundPackage = null
         forceForegroundReconcile = false
         nativeTgkStartupCleanupComplete = false
@@ -516,7 +506,6 @@ class GameplayRuntimeService : Service() {
         }
 
         rootExecutor.shutdownNow()
-        stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
@@ -1056,17 +1045,12 @@ class GameplayRuntimeService : Service() {
         private var serviceRunning = false
 
         private const val TAG = "RedmagicGameplayRuntime"
-        private const val ACTION_KEEP_RUNTIME =
-            "com.elitedarkkaiser.redmagic.KEEP_GAMEPLAY_RUNTIME"
         private const val ACTION_FOREGROUND_HINT =
             "com.elitedarkkaiser.redmagic.GAMEPLAY_FOREGROUND_HINT"
         private const val ACTION_CHECK_ACCESSIBILITY =
             "com.elitedarkkaiser.redmagic.CHECK_GAMEPLAY_ACCESSIBILITY"
         private const val EXTRA_FOREGROUND_PACKAGE =
             "foreground_package"
-        private const val RUNTIME_NOTIFICATION_CHANNEL =
-            "gameplay_runtime"
-        private const val RUNTIME_NOTIFICATION_ID = 1401
         private const val SYSTEM_UI_PACKAGE =
             "com.android.systemui"
         private const val FOREGROUND_EVENT_LOOKBACK_MS =
@@ -1106,14 +1090,7 @@ class GameplayRuntimeService : Service() {
                 return
             }
 
-            startRuntimeIntent(
-                context,
-                Intent(
-                    context,
-                    GameplayRuntimeService::class.java
-                ).setAction(ACTION_KEEP_RUNTIME),
-                requireForegroundStart = !serviceRunning
-            )
+            GameplayRuntimeWatchdogService.ensureRunning(context)
         }
 
         internal fun forwardForegroundHint(
@@ -1126,39 +1103,33 @@ class GameplayRuntimeService : Service() {
             ).setAction(ACTION_FOREGROUND_HINT).apply {
                 putExtra(EXTRA_FOREGROUND_PACKAGE, packageName)
             }
-            startRuntimeIntent(
-                context,
-                intent,
-                requireForegroundStart = !serviceRunning
-            )
+            if (serviceRunning) {
+                startRuntimeIntent(context, intent)
+            } else {
+                GameplayRuntimeWatchdogService.ensureRunning(context)
+            }
         }
 
         internal fun checkAccessibilityState(context: Context) {
-            startRuntimeIntent(
-                context,
-                Intent(
+            if (serviceRunning) {
+                startRuntimeIntent(
                     context,
-                    GameplayRuntimeService::class.java
-                ).setAction(ACTION_CHECK_ACCESSIBILITY),
-                requireForegroundStart = !serviceRunning
-            )
+                    Intent(
+                        context,
+                        GameplayRuntimeService::class.java
+                    ).setAction(ACTION_CHECK_ACCESSIBILITY)
+                )
+            }
+            GameplayRuntimeWatchdogService
+                .checkAccessibilityState(context)
         }
 
         private fun startRuntimeIntent(
             context: Context,
-            intent: Intent,
-            requireForegroundStart: Boolean
+            intent: Intent
         ) {
             runCatching {
-                val appContext = context.applicationContext
-                if (
-                    requireForegroundStart &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ) {
-                    appContext.startForegroundService(intent)
-                } else {
-                    appContext.startService(intent)
-                }
+                context.applicationContext.startService(intent)
             }.onFailure {
                 android.util.Log.e(
                     TAG,
@@ -1168,7 +1139,7 @@ class GameplayRuntimeService : Service() {
             }
         }
 
-        private fun isAccessibilityConfigured(
+        internal fun isAccessibilityConfigured(
             context: Context
         ): Boolean {
             val appContext = context.applicationContext
@@ -1220,51 +1191,6 @@ class GameplayRuntimeService : Service() {
         }.onFailure {
             logRuntimeFailure("queue root action", it)
         }
-    }
-
-    private fun startRuntimeForeground() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                RUNTIME_NOTIFICATION_CHANNEL,
-                "Gameplay Runtime",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description =
-                    "Keeps configured gaming overlays and controls active"
-                setShowBadge(false)
-            }
-            getSystemService(NotificationManager::class.java)
-                ?.createNotificationChannel(channel)
-        }
-
-        val launchIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                PendingIntent.FLAG_IMMUTABLE
-        )
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, RUNTIME_NOTIFICATION_CHANNEL)
-        } else {
-            Notification.Builder(this)
-        }
-
-        startForeground(
-            RUNTIME_NOTIFICATION_ID,
-            builder
-                .setContentTitle("Redmagic gameplay controls")
-                .setContentText(
-                    "Monitoring configured games for overlays and controls"
-                )
-                .setSmallIcon(android.R.drawable.ic_menu_manage)
-                .setContentIntent(pendingIntent)
-                .setCategory(Notification.CATEGORY_SERVICE)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .build()
-        )
     }
 
     private fun logRuntimeFailure(

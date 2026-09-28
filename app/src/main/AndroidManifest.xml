@@ -88,11 +88,17 @@
         <service
             android:name=".GameplayRuntimeService"
             android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
+            android:name=".GameplayRuntimeWatchdogService"
+            android:exported="false"
             android:foregroundServiceType="specialUse"
+            android:process=":gameplay_watchdog"
             android:stopWithTask="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps configured per-app gaming overlays and controls synchronized with the foreground application" />
+                android:value="Maintains an independent foreground binding that restores configured gameplay overlays and controls after unexpected process termination" />
         </service>
 
                 <service
