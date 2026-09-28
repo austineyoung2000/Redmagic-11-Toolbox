@@ -37,20 +37,18 @@ internal class GameplaySpaceOverlay(
     private val profile: NativeTgkProfile,
     private val orientation: NativeTgkOrientation
 ) {
-    private enum class Page(
-        val shortLabel: String,
-        val title: String
-    ) {
-        PERFORMANCE("PERF", "PERFORMANCE"),
-        TRIGGERS("TRIG", "TRIGGERS"),
-        COOLING("COOL", "COOLING"),
-        LIGHTING("LIGHT", "LIGHTING"),
-        TOOLS("TOOLS", "TOOLS")
+    private enum class Page(val title: String) {
+        PERFORMANCE("PERFORMANCE"),
+        TRIGGERS("TRIGGERS"),
+        COOLING("COOLING"),
+        LIGHTING("LIGHTING"),
+        TOOLS("TOOLS")
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private var handleRoot: View? = null
+    private var leftHandleRoot: View? = null
+    private var rightHandleRoot: View? = null
     private var drawerRoot: View? = null
     private var drawerContent: LinearLayout? = null
     private var currentPage = Page.PERFORMANCE
@@ -59,69 +57,30 @@ internal class GameplaySpaceOverlay(
         DeviceTemperatureMonitor.Subscription? = null
 
     fun isAttached(): Boolean {
-        return handleRoot?.isAttachedToWindow == true
+        return leftHandleRoot?.isAttachedToWindow == true &&
+            rightHandleRoot?.isAttachedToWindow == true
     }
 
     fun attach(): Boolean {
         if (isAttached()) return true
 
-        val dragHandle = textControl(
-            label = "⠿",
-            contentDescription = "Drag the Game Space handle",
-            textSizeSp = 11f
-        ).apply {
-            setPadding(dp(9), dp(7), dp(7), dp(7))
-            background = roundedBackground(
-                color = Color.argb(190, 214, 31, 67),
-                radius = dp(14).toFloat(),
-                strokeColor = Color.argb(220, 255, 95, 120)
-            )
-        }
-
-        val openAction = textControl(
-            label = "GS",
-            contentDescription = "Open Game Space controls",
-            textSizeSp = 10f
-        ).apply {
-            setPadding(dp(9), dp(7), dp(11), dp(7))
-            setOnClickListener { toggleDrawer() }
-        }
-
-        val handle = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            alpha = 0.72f
-            elevation = dp(12).toFloat()
-            background = roundedBackground(
-                color = Color.argb(235, 14, 15, 21),
-                radius = dp(17).toFloat(),
-                strokeColor = Color.argb(220, 255, 65, 90)
-            )
-            addView(dragHandle)
-            addView(openAction)
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-        }
-
-        placeHandle(handle, dragHandle, params)
+        val left = edgeHandle(left = true)
+        val right = edgeHandle(left = false)
 
         return runCatching {
-            manager.addView(handle, params)
-            handleRoot = handle
+            manager.addView(left, edgeHandleParams(left = true))
+            leftHandleRoot = left
+            manager.addView(right, edgeHandleParams(left = false))
+            rightHandleRoot = right
             true
         }.getOrElse { error ->
+            leftHandleRoot?.let { runCatching { manager.removeViewImmediate(it) } }
+            rightHandleRoot?.let { runCatching { manager.removeViewImmediate(it) } }
+            leftHandleRoot = null
+            rightHandleRoot = null
             android.util.Log.e(
                 TAG,
-                "Could not attach GS handle for ${profile.packageName}",
+                "Could not attach GS edge handles for ${profile.packageName}",
                 error
             )
             false
@@ -130,34 +89,22 @@ internal class GameplaySpaceOverlay(
 
     fun hide() {
         hideDrawer()
-        val handle = handleRoot
-        handleRoot = null
-        if (handle != null) {
+        val handles = listOfNotNull(leftHandleRoot, rightHandleRoot)
+        leftHandleRoot = null
+        rightHandleRoot = null
+        handles.forEach { handle ->
             runCatching { manager.removeViewImmediate(handle) }
         }
         mainHandler.removeCallbacksAndMessages(null)
     }
 
-    private fun toggleDrawer() {
-        if (drawerRoot != null) {
-            hideDrawer()
-        } else {
-            showDrawer()
-        }
-    }
-
-    private fun showDrawer() {
+    private fun showDrawer(openedFromLeft: Boolean) {
         if (drawerRoot != null || !isAttached()) return
 
         val screen = overlayBounds()
-        val handle = handleRoot ?: return
-        val handleLocation = IntArray(2)
-        handle.getLocationOnScreen(handleLocation)
-        val handleOnRight =
-            handleLocation[0] + handle.width / 2f >= screen.first / 2f
 
         val backdrop = FrameLayout(context).apply {
-            setBackgroundColor(Color.argb(92, 0, 0, 0))
+            setBackgroundColor(Color.argb(150, 0, 0, 0))
             isClickable = true
             contentDescription = "Game Space drawer background"
             setOnClickListener { hideDrawer() }
@@ -167,11 +114,11 @@ internal class GameplaySpaceOverlay(
             orientation = LinearLayout.VERTICAL
             isClickable = true
             elevation = dp(20).toFloat()
-            setPadding(dp(10), dp(9), dp(10), dp(10))
+            setPadding(dp(16), dp(11), dp(16), dp(14))
             background = roundedBackground(
-                color = Color.argb(250, 12, 13, 19),
-                radius = dp(18).toFloat(),
-                strokeColor = Color.argb(230, 164, 27, 58)
+                color = Color.argb(222, 8, 9, 13),
+                radius = dp(8).toFloat(),
+                strokeColor = Color.argb(235, 196, 38, 67)
             )
         }
 
@@ -180,8 +127,8 @@ internal class GameplaySpaceOverlay(
             gravity = Gravity.CENTER_VERTICAL
         }
         val heading = TextView(context).apply {
-            text = "REDMAGIC 11 TOOLBOX"
-            textSize = 13f
+            text = "REDMAGIC 11  •  GAME SPACE"
+            textSize = 14f
             setTextColor(Color.WHITE)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
@@ -200,11 +147,11 @@ internal class GameplaySpaceOverlay(
         panel.addView(header)
 
         panel.addView(TextView(context).apply {
-            text = "${profile.appLabel} • ${orientationLabel()}"
+            text = "${profile.appLabel}  •  ${orientationLabel()}  •  SWIPE EDGE TO OPEN"
             textSize = 10f
             setTextColor(SECONDARY_TEXT)
             maxLines = 1
-            setPadding(dp(2), 0, dp(2), dp(7))
+            setPadding(dp(2), 0, dp(2), dp(9))
         })
 
         val tabs = LinearLayout(context).apply {
@@ -214,16 +161,16 @@ internal class GameplaySpaceOverlay(
         val tabViews = linkedMapOf<Page, TextView>()
         Page.entries.forEach { page ->
             val tab = textControl(
-                label = page.shortLabel,
+                label = page.hudLabel(),
                 contentDescription = "Open ${page.title.lowercase()} controls",
                 textSizeSp = 9f
             )
             tabViews[page] = tab
             tabs.addView(
                 tab,
-                LinearLayout.LayoutParams(0, dp(32), 1f).apply {
-                    marginStart = dp(2)
-                    marginEnd = dp(2)
+                LinearLayout.LayoutParams(dp(58), dp(48)).apply {
+                    marginStart = dp(8)
+                    marginEnd = dp(8)
                 }
             )
         }
@@ -231,8 +178,8 @@ internal class GameplaySpaceOverlay(
 
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            minimumHeight = dp(190)
-            setPadding(dp(2), dp(9), dp(2), 0)
+            minimumHeight = dp(210)
+            setPadding(dp(3), dp(10), dp(3), 0)
         }
         drawerContent = content
         panel.addView(
@@ -248,11 +195,11 @@ internal class GameplaySpaceOverlay(
             tabViews.forEach { (candidate, view) ->
                 view.background = roundedBackground(
                     color = if (candidate == page) {
-                        Color.argb(235, 150, 25, 54)
+                        Color.argb(238, 166, 29, 58)
                     } else {
-                        Color.argb(220, 29, 31, 42)
+                        Color.argb(205, 27, 29, 38)
                     },
-                    radius = dp(9).toFloat(),
+                    radius = dp(24).toFloat(),
                     strokeColor = if (candidate == page) {
                         Color.rgb(255, 65, 90)
                     } else {
@@ -270,13 +217,15 @@ internal class GameplaySpaceOverlay(
         backdrop.addView(
             panel,
             FrameLayout.LayoutParams(
-                min(dp(350), (screen.first - dp(24)).coerceAtLeast(dp(280))),
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                (if (handleOnRight) Gravity.END else Gravity.START) or
-                    Gravity.CENTER_VERTICAL
+                (screen.first - dp(28)).coerceAtLeast(dp(300)),
+                min(
+                    dp(430),
+                    (screen.second - dp(28)).coerceAtLeast(dp(250))
+                ),
+                Gravity.CENTER
             ).apply {
-                marginStart = dp(12)
-                marginEnd = dp(12)
+                marginStart = if (openedFromLeft) dp(10) else dp(18)
+                marginEnd = if (openedFromLeft) dp(18) else dp(10)
             }
         )
 
@@ -372,48 +321,52 @@ internal class GameplaySpaceOverlay(
             ?.mode
             ?.label
 
-        content.addView(statusCard(listOfNotNull(
+        val status = statusCard(listOfNotNull(
             fps?.let { "FPS  $it" },
             temperatureText(),
             displayRate?.let { "DISPLAY  $it Hz" },
             refresh?.let { "REFRESH SET  $it Hz" },
             touch?.let { "TOUCH SET  $it Hz" },
             mode?.let { "MODE  ${it.uppercase()}" }
-        ).ifEmpty { listOf("No active performance readings") }))
-        content.addView(actionRow(
-            "OPEN PERFORMANCE CONTROLS",
-            "Configure refresh rate, touch response, and performance mode"
-        ) { openToolbox("controls") })
+        ).ifEmpty { listOf("No active performance readings") })
+        renderDashboard(content, status, listOf(
+            actionRow(
+                "OPEN PERFORMANCE CONTROLS",
+                "Configure refresh rate, touch response, and performance mode"
+            ) { openToolbox("controls") }
+        ))
     }
 
     private fun renderTriggers(content: LinearLayout) {
-        content.addView(statusCard(listOf(
+        val status = statusCard(listOf(
             "L  ${behaviorLabel(profile.effectiveLeftBehavior(), profile.effectiveLeftRapidFireCount())}",
             "R  ${behaviorLabel(profile.effectiveRightBehavior(), profile.effectiveRightRapidFireCount())}",
             "LAYOUT  ${orientationLabel().uppercase()}",
             "Native TGK mapping active"
-        )))
-        content.addView(actionRow(
-            "EDIT L/R TARGETS",
-            "Move targets and change trigger behavior"
-        ) { openEditor() })
-        content.addView(actionRow(
-            "OPEN TRIGGER PROFILES",
-            "Manage layouts, haptics, visibility, and profiles"
-        ) { openToolbox("controls") })
+        ))
+        renderDashboard(content, status, listOf(
+            actionRow(
+                "EDIT L/R TARGETS",
+                "Move targets and change trigger behavior"
+            ) { openEditor() },
+            actionRow(
+                "OPEN TRIGGER PROFILES",
+                "Manage layouts, haptics, visibility, and profiles"
+            ) { openToolbox("controls") }
+        ))
     }
 
     private fun renderCooling(content: LinearLayout) {
         val autoFan = isAutoFanEnabledStorage(context)
         val pump = savedPumpStateStorage(context)
-        content.addView(statusCard(listOfNotNull(
+        val status = statusCard(listOfNotNull(
             temperatureText(),
             "AUTO FAN  ${onOff(autoFan)}",
             "FAN CURVE  ${selectedCurveStorage(context).uppercase()}",
             "AUTO PUMP  ${onOff(pump.autoEnabled)}",
             "PUMP PROFILE  ${pump.profile.uppercase()}"
-        )))
-        content.addView(actionRow(
+        ))
+        val fanAction = actionRow(
             "AUTO FAN: ${onOff(autoFan)}",
             "Toggle automatic temperature-based fan control"
         ) {
@@ -425,8 +378,8 @@ internal class GameplaySpaceOverlay(
                 HardwareServiceActions.stopAutoFan(context)
             }
             renderCurrentPage()
-        })
-        content.addView(actionRow(
+        }
+        val pumpAction = actionRow(
             "AUTO PUMP: ${onOff(pump.autoEnabled)}",
             "Toggle automatic liquid-pump control"
         ) {
@@ -438,22 +391,26 @@ internal class GameplaySpaceOverlay(
                 HardwareServiceActions.stopAutoPump(context)
             }
             renderCurrentPage()
-        })
-        content.addView(actionRow(
-            "OPEN COOLING CONTROLS",
-            "Configure curves, manual fan levels, and pump profiles"
-        ) { openToolbox("cooling") })
+        }
+        renderDashboard(content, status, listOf(
+            fanAction,
+            pumpAction,
+            actionRow(
+                "OPEN COOLING CONTROLS",
+                "Configure curves, manual fan levels, and pump profiles"
+            ) { openToolbox("cooling") }
+        ))
     }
 
     private fun renderLighting(content: LinearLayout) {
         val rgbEnabled = RgbStudioStorage.isEnabled(context)
         val owner = LedOwnership.current(context)
-        content.addView(statusCard(listOf(
+        val status = statusCard(listOf(
             "ACTIVE OWNER  ${owner.name.replace('_', ' ')}",
             "RGB STUDIO  ${RgbStudioStorage.summary(context)}",
             "Game Mode lighting retains priority while active"
-        )))
-        content.addView(actionRow(
+        ))
+        val rgbAction = actionRow(
             "RGB STUDIO: ${onOff(rgbEnabled)}",
             "Toggle saved RGB Studio animation settings"
         ) {
@@ -465,11 +422,14 @@ internal class GameplaySpaceOverlay(
                 HardwareServiceActions.stopRgbCycle(context)
             }
             renderCurrentPage()
-        })
-        content.addView(actionRow(
-            "OPEN LIGHTING CONTROLS",
-            "Configure fan, logo, shoulder, and RGB lighting"
-        ) { openToolbox("lighting") })
+        }
+        renderDashboard(content, status, listOf(
+            rgbAction,
+            actionRow(
+                "OPEN LIGHTING CONTROLS",
+                "Configure fan, logo, shoulder, and RGB lighting"
+            ) { openToolbox("lighting") }
+        ))
     }
 
     private fun renderTools(content: LinearLayout) {
@@ -479,19 +439,21 @@ internal class GameplaySpaceOverlay(
             charge.enabled == false -> "CHARGE SEPARATION  OFF"
             else -> "CHARGE SEPARATION  UNAVAILABLE"
         }
-        content.addView(statusCard(listOf(
+        val status = statusCard(listOf(
             chargeText,
             "PROFILE  ${profile.appLabel}",
             "GS follows the active gameplay lifecycle"
-        )))
-        content.addView(actionRow(
-            "OPEN HARDWARE TOOLS",
-            "Charge separation, fan hardware, triggers, and slider"
-        ) { openToolbox("hardware") })
-        content.addView(actionRow(
-            "OPEN TOOLBOX HOME",
-            "View device status and active ownership"
-        ) { openToolbox("home") })
+        ))
+        renderDashboard(content, status, listOf(
+            actionRow(
+                "OPEN HARDWARE TOOLS",
+                "Charge separation, fan hardware, triggers, and slider"
+            ) { openToolbox("hardware") },
+            actionRow(
+                "OPEN TOOLBOX HOME",
+                "View device status and active ownership"
+            ) { openToolbox("home") }
+        ))
     }
 
     private fun openEditor() {
@@ -545,94 +507,148 @@ internal class GameplaySpaceOverlay(
         }
     }
 
-    private fun placeHandle(
-        handle: View,
-        dragHandle: View,
-        params: WindowManager.LayoutParams
-    ) {
-        handle.measure(
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        )
-        val screen = overlayBounds()
-        val maximumX = (screen.first - handle.measuredWidth).coerceAtLeast(0)
-        val maximumY = (screen.second - handle.measuredHeight).coerceAtLeast(0)
-        val saved = GameplayEditPositionStorage.read(
-            context,
-            profile.packageName,
-            orientation
-        )
-
-        params.x = saved?.xFor(maximumX)
-            ?: (maximumX - dp(12)).coerceAtLeast(0)
-        params.y = saved?.yFor(maximumY)
-            ?: dp(if (orientation == NativeTgkOrientation.LANDSCAPE) 52 else 12)
-                .coerceAtMost(maximumY)
-
+    private fun edgeHandle(left: Boolean): TextView {
         val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         var downRawX = 0f
         var downRawY = 0f
-        var startX = 0
-        var startY = 0
-        var dragging = false
 
-        dragHandle.setOnTouchListener { view, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    downRawX = event.rawX
-                    downRawY = event.rawY
-                    startX = params.x
-                    startY = params.y
-                    dragging = false
-                    true
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-                    val deltaX = event.rawX - downRawX
-                    val deltaY = event.rawY - downRawY
-                    if (
-                        !dragging &&
-                        (abs(deltaX) >= touchSlop || abs(deltaY) >= touchSlop)
-                    ) {
-                        dragging = true
-                        hideDrawer()
-                        handle.alpha = 1f
+        return TextView(context).apply {
+            text = if (left) "›" else "‹"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(Color.argb(230, 255, 88, 112))
+            contentDescription = if (left) {
+                "Swipe right to open Game Space"
+            } else {
+                "Swipe left to open Game Space"
+            }
+            alpha = 0.58f
+            elevation = dp(12).toFloat()
+            background = edgeHandleBackground(left)
+        }.also { handle ->
+            handle.setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downRawX = event.rawX
+                        downRawY = event.rawY
+                        handle.alpha = 0.95f
+                        true
                     }
-                    if (dragging) {
-                        params.x = (startX + deltaX.roundToInt())
-                            .coerceIn(0, maximumX)
-                        params.y = (startY + deltaY.roundToInt())
-                            .coerceIn(0, maximumY)
-                        runCatching {
-                            manager.updateViewLayout(handle, params)
+
+                    MotionEvent.ACTION_MOVE -> {
+                        val deltaX = event.rawX - downRawX
+                        val deltaY = event.rawY - downRawY
+                        val inward = if (left) deltaX else -deltaX
+                        if (inward > touchSlop && inward > abs(deltaY)) {
+                            val travel = inward.coerceIn(
+                                0f,
+                                dp(24).toFloat()
+                            )
+                            handle.translationX =
+                                if (left) travel else -travel
                         }
+                        true
                     }
-                    true
-                }
 
-                MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_CANCEL -> {
-                    handle.alpha = 0.72f
-                    if (dragging) {
-                        GameplayEditPositionStorage.save(
-                            context = context,
-                            packageName = profile.packageName,
-                            orientation = orientation,
-                            x = params.x,
-                            y = params.y,
-                            maxX = maximumX,
-                            maxY = maximumY
-                        )
-                    } else if (event.actionMasked == MotionEvent.ACTION_UP) {
-                        view.performClick()
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL -> {
+                        val deltaX = event.rawX - downRawX
+                        val deltaY = event.rawY - downRawY
+                        val inward = if (left) deltaX else -deltaX
+                        val shouldOpen =
+                            event.actionMasked == MotionEvent.ACTION_UP &&
+                                inward >= dp(34) &&
+                                inward > abs(deltaY) * 1.15f
+
+                        handle.animate()
+                            .translationX(0f)
+                            .alpha(0.58f)
+                            .setDuration(120L)
+                            .start()
+                        if (shouldOpen) {
+                            showDrawer(openedFromLeft = left)
+                        }
+                        true
                     }
-                    dragging = false
-                    true
-                }
 
-                else -> false
+                    else -> false
+                }
             }
         }
+    }
+
+    private fun edgeHandleParams(left: Boolean): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            dp(18),
+            dp(76),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = (if (left) Gravity.START else Gravity.END) or
+                Gravity.CENTER_VERTICAL
+        }
+    }
+
+    private fun renderDashboard(
+        content: LinearLayout,
+        status: View,
+        actions: List<View>
+    ) {
+        val wide = overlayBounds().first >= dp(520)
+        val body = LinearLayout(context).apply {
+            orientation = if (wide) {
+                LinearLayout.HORIZONTAL
+            } else {
+                LinearLayout.VERTICAL
+            }
+            gravity = Gravity.TOP
+        }
+        val actionColumn = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        if (wide) {
+            body.addView(
+                status,
+                LinearLayout.LayoutParams(0, dp(174), 0.9f).apply {
+                    marginEnd = dp(10)
+                }
+            )
+            body.addView(
+                actionColumn,
+                LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1.1f
+                )
+            )
+        } else {
+            body.addView(
+                status,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            body.addView(
+                actionColumn,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        actions.forEach(actionColumn::addView)
+        content.addView(
+            body,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
     }
 
     private fun statusCard(lines: List<String>): TextView {
@@ -744,6 +760,40 @@ internal class GameplaySpaceOverlay(
             setColor(color)
             cornerRadius = radius
             setStroke(dp(1), strokeColor)
+        }
+    }
+
+    private fun edgeHandleBackground(left: Boolean): GradientDrawable {
+        val radius = dp(9).toFloat()
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.argb(205, 10, 11, 16))
+            setStroke(dp(1), Color.argb(220, 196, 38, 67))
+            cornerRadii = if (left) {
+                floatArrayOf(
+                    0f, 0f,
+                    radius, radius,
+                    radius, radius,
+                    0f, 0f
+                )
+            } else {
+                floatArrayOf(
+                    radius, radius,
+                    0f, 0f,
+                    0f, 0f,
+                    radius, radius
+                )
+            }
+        }
+    }
+
+    private fun Page.hudLabel(): String {
+        return when (this) {
+            Page.PERFORMANCE -> "◉\nPERF"
+            Page.TRIGGERS -> "L/R\nTRIG"
+            Page.COOLING -> "❄\nCOOL"
+            Page.LIGHTING -> "✦\nLIGHT"
+            Page.TOOLS -> "•••\nTOOLS"
         }
     }
 
