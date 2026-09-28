@@ -221,6 +221,7 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         GameplayRuntimeService.ensureRunning(this)
+        GameplayRuntimeSupervisor.ensureInstalled(this)
         backgroundReleaseHandler.removeCallbacks(
             releaseUiForGameplay
         )
