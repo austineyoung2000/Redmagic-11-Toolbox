@@ -83,6 +83,9 @@ class GameplayRuntimeService : Service() {
     private var foregroundRootPollSeconds: Int? = null
 
     @Volatile
+    private var lastForegroundRootSampleAt = 0L
+
+    @Volatile
     private var forceForegroundReconcile = false
 
     @Volatile
@@ -109,7 +112,7 @@ class GameplayRuntimeService : Service() {
                 ) {
                     ensureForegroundRootMonitor()
 
-                    if (foregroundRootProcess?.isAlive != true) {
+                    if (!hasFreshRootForegroundSample()) {
                         latestResumedPackage()?.let { packageName ->
                             reconcileDetectedPackage(packageName)
                         }
@@ -196,7 +199,7 @@ class GameplayRuntimeService : Service() {
              * source on REDMAGIC firmware. Do not race it with delayed or
              * missing Usage Events.
              */
-            if (foregroundRootProcess?.isAlive == true) {
+            if (hasFreshRootForegroundSample()) {
                 return@runCatching
             }
 
@@ -925,6 +928,7 @@ class GameplayRuntimeService : Service() {
 
         foregroundRootProcess = process
         foregroundRootPollSeconds = desiredPollSeconds
+        lastForegroundRootSampleAt = 0L
 
         val readerThread = Thread(
             {
@@ -944,6 +948,8 @@ class GameplayRuntimeService : Service() {
                                         process &&
                                         isScreenInteractive()
                                     ) {
+                                        lastForegroundRootSampleAt =
+                                            SystemClock.elapsedRealtime()
                                         runCatching {
                                             reconcileDetectedPackage(
                                                 detected
@@ -966,6 +972,7 @@ class GameplayRuntimeService : Service() {
                         foregroundRootProcess = null
                         foregroundRootReader = null
                         foregroundRootPollSeconds = null
+                        lastForegroundRootSampleAt = 0L
                     }
                 }
             },
@@ -986,6 +993,7 @@ class GameplayRuntimeService : Service() {
         foregroundRootProcess = null
         foregroundRootReader = null
         foregroundRootPollSeconds = null
+        lastForegroundRootSampleAt = 0L
 
         reader?.interrupt()
         if (process != null) {
@@ -1005,6 +1013,21 @@ class GameplayRuntimeService : Service() {
             PerformanceModeStorage.readProfiles(this).any {
                 it.enabled
             }
+    }
+
+    private fun hasFreshRootForegroundSample(): Boolean {
+        val pollSeconds = foregroundRootPollSeconds
+            ?: desiredForegroundPollSeconds()
+        val maximumAgeMs =
+            pollSeconds.coerceAtLeast(1) * 1_000L +
+                ROOT_FOREGROUND_SAMPLE_GRACE_MS
+
+        return ForegroundAuthorityPolicy.hasFreshRootSample(
+            processAlive = foregroundRootProcess?.isAlive == true,
+            lastSampleAtMs = lastForegroundRootSampleAt,
+            nowMs = SystemClock.elapsedRealtime(),
+            maximumAgeMs = maximumAgeMs
+        )
     }
 
     private fun desiredForegroundPollSeconds(): Int {
@@ -1074,6 +1097,7 @@ class GameplayRuntimeService : Service() {
             10_000L
         private const val ACTIVE_FOREGROUND_POLL_SECONDS = 1
         private const val IDLE_FOREGROUND_POLL_SECONDS = 3
+        private const val ROOT_FOREGROUND_SAMPLE_GRACE_MS = 1_500L
 
         private fun rootForegroundMonitorCommand(
             pollSeconds: Int
