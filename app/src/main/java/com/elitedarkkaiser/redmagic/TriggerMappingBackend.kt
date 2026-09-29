@@ -12,6 +12,27 @@ import android.util.Base64
 object TriggerMappingBackend {
     const val MODULE_BACKEND = "Trigger Bridge module"
 
+    /*
+     * Root-only validation escape hatch. This exists solely to exercise the
+     * custom-ROM Trigger Bridge lifecycle on stock hardware without disabling
+     * or damaging the firmware TGK implementation.
+     *
+     * Normal users never create this exact sentinel, so production selection
+     * remains native-TGK-first.
+     */
+    private const val FORCE_MODULE_TEST_MARKER =
+        "/data/local/tmp/redmagic-force-trigger-bridge"
+    private const val FORCE_MODULE_TEST_TOKEN =
+        "force-module-v1"
+
+    private fun forceModuleForTesting(): Boolean {
+        return RootShell.exec(
+            "[ -f '$FORCE_MODULE_TEST_MARKER' ] && " +
+                "grep -qx '$FORCE_MODULE_TEST_TOKEN' " +
+                "'$FORCE_MODULE_TEST_MARKER'"
+        )
+    }
+
     fun moduleInstalled(): Boolean {
         return RootShell.exec(
             "[ -x '${TriggerBridgeModule.CONTROL_PATH}' ] && " +
@@ -29,8 +50,9 @@ object TriggerMappingBackend {
         displayHeight: Int
     ): NativeTgkApplyResult {
         val nativeProbe = NativeTgkBridge.readState(context)
+        val forceModule = forceModuleForTesting()
 
-        if (nativeProbe.success) {
+        if (!forceModule && nativeProbe.success) {
             TriggerBridgeModule.disableIfInstalled()
 
             val nativeResult = NativeTgkBridge.applyMapping(
