@@ -151,7 +151,7 @@ internal object HardwareTriggerSections {
             deps.showNativeTgkProfileDialog
         )
         val diagnosticsButton = deps.actionButton(
-            "TGK DIAGNOSTICS",
+            "TRIGGER BACKEND DIAGNOSTICS",
             false,
             deps.showNativeTgkDiagnosticsDialog
         )
@@ -159,9 +159,11 @@ internal object HardwareTriggerSections {
             addView(deps.sectionHeader("🎯", "GAME TRIGGER MAPPING"))
             addView(
                 deps.bodyText(
-                    "Place native L and R touch targets for individual " +
+                    "Place L and R touch targets for individual " +
                         "apps. Portrait and landscape mappings are " +
-                        "stored separately and Game Space is not required."
+                        "stored separately. Stock firmware uses Native " +
+                        "TGK; compatible custom ROMs can use the optional " +
+                        "Trigger Bridge module."
                 )
             )
             addView(deps.space(deps.dp(8)))
@@ -172,13 +174,14 @@ internal object HardwareTriggerSections {
 
         if (
             deps.capabilities.scanComplete &&
-            !deps.capabilities.nativeTgkAvailable
+            !deps.capabilities.nativeTgkAvailable &&
+            !deps.capabilities.triggerBridgeAvailable
         ) {
             card.addView(
                 deps.bodyText(
-                    "Native TGK is unavailable on this firmware. The " +
-                        "REDMAGIC InputManager interface must be present " +
-                        "and readable."
+                    "No trigger-mapping backend is available. Stock " +
+                        "firmware requires Native TGK; compatible custom " +
+                        "ROMs require the Trigger Bridge module."
                 )
             )
             CapabilityUi.disableInteractions(card)
