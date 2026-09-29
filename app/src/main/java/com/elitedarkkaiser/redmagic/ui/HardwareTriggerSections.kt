@@ -7,6 +7,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.elitedarkkaiser.redmagic.TriggerMappingBackend
 import com.google.android.material.materialswitch.MaterialSwitch
 
 internal object HardwareTriggerSections {
@@ -181,7 +182,9 @@ internal object HardwareTriggerSections {
                 deps.bodyText(
                     "No trigger-mapping backend is available. Stock " +
                         "firmware requires Native TGK; compatible custom " +
-                        "ROMs require the Trigger Bridge module."
+                        "ROMs require Trigger Bridge " +
+                        "v${TriggerMappingBackend.MINIMUM_MODULE_VERSION} " +
+                        "or newer."
                 )
             )
             CapabilityUi.disableInteractions(card)

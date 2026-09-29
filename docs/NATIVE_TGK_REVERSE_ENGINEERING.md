@@ -400,11 +400,30 @@ input-listener event ABI, InputDispatcher propagation, and system-server JNI.
 
 An app can detect and call these APIs when they exist, but it cannot recreate the downstream native contact injection on a ROM that removed the firmware implementation. A LineageOS port would need to forward-port or independently reimplement the complete framework/native/vendor path with appropriate legal permission and device-specific validation.
 
-The separate [Redmagic Trigger Bridge](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge) module does not recreate native TGK. It is a root-level fallback that reads the retained NX809J SAR trigger devices (`KEY_F7` and `KEY_F8`) and creates two independent touchscreen contacts through `/dev/uinput`. It therefore requires the stock-compatible kernel and vendor trigger interfaces, but not the proprietary framework TGK implementation.
+The separate [Redmagic Trigger Bridge](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge) module does not recreate native TGK. It is a root-level fallback that reads the retained NX809J SAR trigger devices (`KEY_F7` and `KEY_F8`). Version 0.3.0 temporarily acquires the physical `synaptics_tcm_touch` stream while active and combines its physical slots with two reserved trigger slots in one protocol-B `/dev/uinput` touchscreen. Games therefore receive physical fingers and shoulder contacts from one coherent device instead of two competing touchscreen devices. The bridge requires the stock-compatible kernel and vendor trigger/touchscreen interfaces, but not the proprietary framework TGK implementation.
 
 The Toolbox selects these backends automatically. A verified Native TGK apply is preferred. If the native probe or actual apply fails and the companion module is installed, the runtime disables any partial native state, writes normalized per-rotation targets to the module, and activates it for the configured foreground game. Game exit, screen-off, editor transitions, and runtime teardown disable both paths. This mutual-exclusion boundary prevents duplicate contacts if a ROM contains a partial TGK port.
 
-The module fallback currently provides the independently verified contact path: left, right, held, and simultaneous multitouch with forced release on deactivation. Native TGK remains the full-fidelity backend for firmware haptics, rapid-fire behavior, and system-server visual effects.
+Toolbox requires Trigger Bridge v0.3.0 (`versionCode 10`) or newer before the
+fallback can activate. Older releases used a separate trigger-only touchscreen
+and can interrupt physical gameplay contacts, so they are deliberately rejected.
+An outdated installed module is still disabled during native-backend cleanup to
+ensure that it cannot retain input ownership.
+
+The v0.3.0 module fallback has been verified on stock NX809J hardware through a
+root-only exact test marker that bypasses native selection without modifying the
+firmware TGK implementation. Validation covered physical-only input, continuous
+thumbstick movement with left/right taps and holds, both triggers with two
+physical fingers, repeated contact replacement, correct COD Mobile landscape
+targets, and a two-minute combined-input test without lost touch or camera
+snapping. Protocol-B slot reselection was required after every injected trigger
+event because the physical stream can continue a contact without repeating
+`ABS_MT_SLOT`.
+
+Native TGK remains the full-fidelity backend for firmware haptics, rapid-fire
+behavior, and system-server visual effects. End-to-end automatic selection on
+an actual custom ROM without native TGK remains unverified because the tested
+device remains on stock firmware.
 
 ### APK replacement and reboot boundary
 

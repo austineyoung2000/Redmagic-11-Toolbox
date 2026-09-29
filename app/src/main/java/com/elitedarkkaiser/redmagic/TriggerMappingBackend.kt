@@ -11,6 +11,8 @@ import android.util.Base64
  */
 object TriggerMappingBackend {
     const val MODULE_BACKEND = "Trigger Bridge module"
+    const val MINIMUM_MODULE_VERSION = "0.3.0"
+    private const val MINIMUM_MODULE_VERSION_CODE = 10
 
     /*
      * Root-only validation escape hatch. This exists solely to exercise the
@@ -35,10 +37,17 @@ object TriggerMappingBackend {
 
     fun moduleInstalled(): Boolean {
         return RootShell.exec(
-            "[ -x '${TriggerBridgeModule.CONTROL_PATH}' ] && " +
+            "prop='${TriggerBridgeModule.MODULE_PROP_PATH}'; " +
+                "[ -x '${TriggerBridgeModule.CONTROL_PATH}' ] && " +
                 "[ -x '${TriggerBridgeModule.DAEMON_PATH}' ] && " +
                 "grep -qx 'id=redmagic_trigger_bridge' " +
-                "'${TriggerBridgeModule.MODULE_PROP_PATH}'"
+                "\"\$prop\" && " +
+                "version_code=\$(sed -n " +
+                "'s/^versionCode=//p' \"\$prop\" | head -n 1); " +
+                "case \"\$version_code\" in " +
+                "''|*[!0-9]*) exit 1 ;; esac; " +
+                "[ \"\$version_code\" -ge " +
+                "$MINIMUM_MODULE_VERSION_CODE ]"
         )
     }
 
@@ -87,7 +96,8 @@ object TriggerMappingBackend {
                 backend = null,
                 state = null,
                 message = nativeProbe.message +
-                    " | Trigger Bridge module is not installed"
+                    " | Trigger Bridge $MINIMUM_MODULE_VERSION or newer " +
+                    "is not installed"
             )
         }
 
@@ -156,6 +166,14 @@ private object TriggerBridgeModule {
     private const val CONFIG_PATH = "$STATE_DIR/config.conf"
     private const val PID_PATH = "$STATE_DIR/bridge.pid"
 
+    private fun present(): Boolean {
+        return RootShell.exec(
+            "[ -x '$CONTROL_PATH' ] && " +
+                "grep -qx 'id=redmagic_trigger_bridge' " +
+                "'$MODULE_PROP_PATH'"
+        )
+    }
+
     fun apply(profile: NativeTgkProfile): NativeTgkApplyResult {
         val encoded = Base64.encodeToString(
             buildConfig(profile).toByteArray(Charsets.UTF_8),
@@ -206,7 +224,9 @@ private object TriggerBridgeModule {
                 success = false,
                 backend = TriggerMappingBackend.MODULE_BACKEND,
                 state = null,
-                message = "Trigger Bridge module is not installed"
+                message = "Trigger Bridge " +
+                    TriggerMappingBackend.MINIMUM_MODULE_VERSION +
+                    " or newer is not installed"
             )
         }
 
@@ -247,7 +267,11 @@ private object TriggerBridgeModule {
     }
 
     fun disableIfInstalled(): NativeTgkApplyResult? {
-        if (!TriggerMappingBackend.moduleInstalled()) {
+        /*
+         * Disable even an outdated installation. It must never retain input
+         * ownership merely because it is too old to qualify for activation.
+         */
+        if (!present()) {
             return null
         }
 

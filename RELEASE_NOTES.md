@@ -1,55 +1,75 @@
-# Redmagic 11 Toolbox 2.5.1
+# Redmagic 11 Toolbox 2.5.2
 
-Version 2.5.1 is a stability and in-game usability release for the standalone gaming stack introduced in 2.5.0. It preserves the existing application ID and signing identity, so it installs over earlier versions without clearing saved profiles.
+Version 2.5.2 adds the production Trigger Bridge fallback and completes the
+gameplay-runtime lifecycle fixes introduced after 2.5.1. It preserves the
+existing application ID and signing identity, so it installs over earlier
+versions without clearing saved profiles.
 
-## Reliable gameplay runtime
+## Automatic trigger backend selection
 
-- Moved gameplay overlay and native TGK ownership out of the accessibility-service binding and into a dedicated foreground runtime.
-- Added an independent watchdog process that binds the runtime and requests state reconstruction after unexpected process termination.
-- Added a minimal root-owned `service.d` supervisor because REDMAGIC firmware can kill every process belonging to the application UID simultaneously.
-- Routed external recovery through the Android shell identity required by framework Binder services.
-- Integrated REDMAGIC AutoLaunch transaction 6 as a one-shot launch whitelist before restarting the watchdog foreground service.
-- Added safe supervisor replacement, stale-lock recovery, bounded retry backoff, process checks, and rotating diagnostics.
-- Restored overlays, saved trigger targets, and native TGK state after firmware process kills without requiring an accessibility toggle or reboot during normal gameplay recovery.
-- APK updates that replace the accessibility, watchdog, overlay, or trigger runtime require one device reboot before validation; the app now detects an update installed during the current boot and explains this requirement.
+- Continues to prefer REDMAGIC Native TGK on compatible stock firmware.
+- Falls back to the optional root companion module when Native TGK is missing
+  or rejects the active mapping.
+- Requires Redmagic Trigger Bridge v0.3.0 (`versionCode 10`) or newer; older
+  separate-touchscreen builds are rejected.
+- Writes normalized portrait and landscape targets to the module and activates
+  it only while a configured game owns the foreground.
+- Disables partial native state before module activation and disables both
+  paths during game exit, screen-off, editing, and runtime teardown.
+- Keeps a root-only exact validation marker for maintainers without changing
+  normal native-first production selection.
 
-## In-game Game Space controls
+## Verified merged-touch gameplay
 
-- Added a compact Game Space-style drawer for performance, triggers, cooling, lighting, and tools.
-- Restored a single movable `GS` button with a dedicated drag grip.
-- Made the compact drawer independently movable from its header.
-- Persisted button and drawer positions separately for every selected application and orientation.
-- Kept the button and drawer inside Android system-gesture insets and excluded the physical edge strips from the drawer backdrop.
-- Removed experimental edge handles and their touch-capture windows so the Android Back gesture remains unobstructed.
+Trigger Bridge v0.3.0 combines the physical Synaptics touchscreen and two
+reserved shoulder-trigger slots into one protocol-B input device. On-device COD
+Mobile validation covered:
 
-## Trigger editor polish
+- Continuous thumbstick movement while tapping and holding L/R
+- Both shoulder triggers with one and two physical screen contacts
+- Repeated lifting and replacement of physical fingers during trigger input
+- Accurate saved targets in the measured landscape orientation
+- Stable slot ownership without stuck contacts, dropped touch, or aim snapping
+- A final two-minute combined-input stress test
 
-- Reduced the editor footprint and L/R target size.
-- Made the complete shoulder-trigger editor movable.
-- Replaced expanding behavior lists with independent floating dropdown menus.
-- Kept trigger behavior, rapid-fire counts, native mapping, and runtime lifecycle semantics unchanged.
+Native TGK remains the preferred full-fidelity backend for stock haptics,
+rapid-fire modes, and vendor visual effects. The module backend is intended for
+compatible NX809J ROMs retaining the required SAR, touchscreen, arming-node,
+uinput, root, and SELinux interfaces.
 
-## Lighting and efficiency
+## Gameplay runtime and overlay recovery
 
-- Combined fan multicolor palettes with supported lighting effects.
-- Reduced persistent monitoring and hardware-control overhead.
-- Prevented target-editor theme failures from taking down the accessibility binding.
-- Tightened foreground lifecycle recovery around application transitions and runtime races.
+- Restart a missing gameplay runtime when a valid foreground hint arrives.
+- Retire stale foreground-monitor authority so overlays do not remain visible
+  outside the configured application.
+- Preserve the movable GS button, movable drawer, saved per-app positions, and
+  Android Back-gesture access from 2.5.1.
+- Show a one-time reboot notice after an APK replacement changes the gameplay,
+  overlay, accessibility, watchdog, or trigger stack. Android may otherwise
+  retain stale service or input state until the next boot.
 
-## Reverse-engineering reports
+## Diagnostics and documentation
 
-- Retained `docs/NATIVE_TGK_REVERSE_ENGINEERING.md` as the authoritative native Touch Game Key report.
-- Added `docs/GAME_SPACE_REVERSE_ENGINEERING.md` for stock package roles, window and input evidence, privileged handle invocation, AutoLaunch policy, process-kill recovery, rejected prototypes, and the Toolbox implementation.
-- Future verified Game Space findings should be recorded in the Game Space report so the repository remains the project record rather than relying on chat history.
+- Device scanning reports Native TGK and compatible Trigger Bridge availability
+  independently.
+- Trigger diagnostics identify the selected backend and its live state.
+- README and native TGK reverse-engineering documentation now cover the merged
+  input architecture, minimum module version, validation evidence, and custom
+  ROM boundary.
 
-## Compatibility
+## Compatibility boundary
 
-- Primary target: RedMagic 11 Pro / NX809J.
-- Native TGK and the new vendor gaming controls require compatible REDMAGIC Android 16 framework services.
-- General hardware features can work on NX809J custom ROMs that preserve the required vendor and kernel interfaces.
-- Stock-only controls are hidden or rejected when their compatibility checks fail.
-- Root remains required for direct fan, pump, LED, trigger-node, and other privileged hardware controls.
+- Primary target: REDMAGIC 11 Pro / NX809J.
+- The module fallback was forced and verified end to end on stock Android 16.
+- Automatic selection on an actual custom ROM without Native TGK remains
+  unverified because the test device remains on stock firmware.
+- Stock-only performance, display, touch-tuning, charge-separation, haptic,
+  rapid-fire, and visual-effect features still require their corresponding
+  REDMAGIC framework implementations.
 
 ## Installation
 
-Download and install the signed release APK attached to this release. Existing users can install it directly over the previous signed version. Review the README before granting permanent superuser, accessibility, usage-access, phone-state, notification, or overlay permissions.
+Install the signed APK over the existing Toolbox installation, then reboot the
+phone once before testing gameplay overlays or trigger mapping. Keep Trigger
+Bridge v0.3.0 enabled in KernelSU, Magisk, or APatch; Toolbox leaves it inactive
+unless the module backend is actually selected.

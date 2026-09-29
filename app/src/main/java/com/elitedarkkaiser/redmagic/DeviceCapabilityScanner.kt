@@ -252,7 +252,11 @@ object DeviceCapabilityScanner {
                 if (nativeTgkAvailable) "available" else "unavailable"
             )
             append("\nTrigger Bridge module: ").append(
-                if (triggerBridgeAvailable) "available" else "not installed"
+                if (triggerBridgeAvailable) {
+                    "available"
+                } else {
+                    "requires v${TriggerMappingBackend.MINIMUM_MODULE_VERSION}+"
+                }
             )
             append("\nCharge separation: ").append(
                 if (chargeSeparationAvailable) "available" else "unavailable"
