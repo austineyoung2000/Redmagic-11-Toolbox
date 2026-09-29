@@ -406,6 +406,12 @@ The Toolbox selects these backends automatically. A verified Native TGK apply is
 
 The module fallback currently provides the independently verified contact path: left, right, held, and simultaneous multitouch with forced release on deactivation. Native TGK remains the full-fidelity backend for firmware haptics, rapid-fire behavior, and system-server visual effects.
 
+### APK replacement and reboot boundary
+
+On-device integration testing exposed a separate lifecycle boundary after replacing the Toolbox APK. Before reboot, the accessibility service could be disabled or Android could retain stale process and input state: overlays might not launch, or native TGK could report enabled while mapped contacts did not reach the game. Disabling the companion module and rebooting restored native TGK. Re-enabling the same module and rebooting again also left overlays and mapped contacts working, ruling out module ownership as the cause.
+
+The verified operational rule is therefore to reboot once after installing an APK update that changes the accessibility, gameplay-runtime, watchdog, overlay, or trigger-backend code. This is an update boundary, not a normal runtime-recovery requirement. The Toolbox records the package replacement timestamp and shows a one-time warning when it detects that an existing installation was updated during the current boot.
+
 For that reason, Redmagic 11 Toolbox gates TGK, the Trigger Bridge, and every other stock-only gaming API independently. General NX809J features remain available on compatible custom ROMs when their kernel/vendor interfaces survive, while unavailable services are not presented as working.
 
 ## Implementation principles

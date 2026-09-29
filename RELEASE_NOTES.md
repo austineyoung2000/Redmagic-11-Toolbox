@@ -10,7 +10,8 @@ Version 2.5.1 is a stability and in-game usability release for the standalone ga
 - Routed external recovery through the Android shell identity required by framework Binder services.
 - Integrated REDMAGIC AutoLaunch transaction 6 as a one-shot launch whitelist before restarting the watchdog foreground service.
 - Added safe supervisor replacement, stale-lock recovery, bounded retry backoff, process checks, and rotating diagnostics.
-- Restored overlays, saved trigger targets, and native TGK state without requiring an accessibility toggle or device reboot.
+- Restored overlays, saved trigger targets, and native TGK state after firmware process kills without requiring an accessibility toggle or reboot during normal gameplay recovery.
+- APK updates that replace the accessibility, watchdog, overlay, or trigger runtime require one device reboot before validation; the app now detects an update installed during the current boot and explains this requirement.
 
 ## In-game Game Space controls
 

@@ -338,6 +338,9 @@ class MainActivity : Activity() {
         startTriggerAutoStartIfEnabled()
         activityRuntime.onUiReady()
         startCapabilityScan()
+        window.decorView.post {
+            PostUpdateRebootNotice.showIfNeeded(this)
+        }
     }
 
     private fun selectPendingTab() {

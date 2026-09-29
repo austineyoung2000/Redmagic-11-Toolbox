@@ -520,7 +520,8 @@ The root-assisted setup can grant Usage Access, notification permission, phone-s
 2. Download the signed release APK.
 3. Allow installation from the browser or file manager if Android requests it.
 4. Install the APK.
-5. Open the application and grant root.
+5. When updating an existing installation, reboot the phone once so Android and REDMAGIC discard the replaced accessibility, overlay, watchdog, and trigger runtime.
+6. Open the application, grant root if requested, and confirm the Toolbox accessibility service remains enabled.
 
 Development artifacts are available from successful [Android CI](https://github.com/austineyoung2000/Redmagic-Control-Center/actions/workflows/android.yml) runs.
 
@@ -583,6 +584,7 @@ Confirm the ROM retains the stock RedMagic vendor and kernel interfaces. Use Hom
 - Enable Auto-start triggers.
 - Confirm the trigger nodes are detected.
 - Confirm the accessibility service is enabled.
+- If the APK was just updated, reboot once before testing either native TGK or the companion module.
 - If manually disabled, press Enable Triggers or restart.
 
 ### Lighting is replaced unexpectedly
