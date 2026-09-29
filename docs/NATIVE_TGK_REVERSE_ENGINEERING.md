@@ -400,7 +400,13 @@ input-listener event ABI, InputDispatcher propagation, and system-server JNI.
 
 An app can detect and call these APIs when they exist, but it cannot recreate the downstream native contact injection on a ROM that removed the firmware implementation. A LineageOS port would need to forward-port or independently reimplement the complete framework/native/vendor path with appropriate legal permission and device-specific validation.
 
-For that reason, Redmagic 11 Toolbox gates TGK and every other stock-only gaming API independently. General NX809J features remain available on compatible custom ROMs when their kernel/vendor interfaces survive, while unavailable stock services are not presented as working.
+The separate [Redmagic Trigger Bridge](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge) module does not recreate native TGK. It is a root-level fallback that reads the retained NX809J SAR trigger devices (`KEY_F7` and `KEY_F8`) and creates two independent touchscreen contacts through `/dev/uinput`. It therefore requires the stock-compatible kernel and vendor trigger interfaces, but not the proprietary framework TGK implementation.
+
+The Toolbox selects these backends automatically. A verified Native TGK apply is preferred. If the native probe or actual apply fails and the companion module is installed, the runtime disables any partial native state, writes normalized per-rotation targets to the module, and activates it for the configured foreground game. Game exit, screen-off, editor transitions, and runtime teardown disable both paths. This mutual-exclusion boundary prevents duplicate contacts if a ROM contains a partial TGK port.
+
+The module fallback currently provides the independently verified contact path: left, right, held, and simultaneous multitouch with forced release on deactivation. Native TGK remains the full-fidelity backend for firmware haptics, rapid-fire behavior, and system-server visual effects.
+
+For that reason, Redmagic 11 Toolbox gates TGK, the Trigger Bridge, and every other stock-only gaming API independently. General NX809J features remain available on compatible custom ROMs when their kernel/vendor interfaces survive, while unavailable services are not presented as working.
 
 ## Implementation principles
 
@@ -409,6 +415,7 @@ The production implementation follows these rules:
 - Preserve the stock driver/version/point/mode/settle/enable sequence.
 - Never inject a shell command for each trigger press.
 - Never replace native TGK with accessibility gestures, `input tap`, touchscreen `sendevent`, or uinput gamepads.
+- Keep the optional uinput touchscreen bridge inactive whenever native TGK owns the triggers.
 - Keep optional visual effects best-effort.
 - Verify enabled state after application and disabled state after cleanup.
 - Store profiles locally by package, orientation, and named layout.
