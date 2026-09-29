@@ -18,13 +18,15 @@ private const val DEVICE_SCAN_LAST_RUN = "device_scan_last_run"
 private const val DEVICE_SCAN_FINGERPRINT =
     "device_scan_fingerprint"
 private const val DEVICE_SCAN_SCHEMA = "device_scan_schema"
-private const val CURRENT_DEVICE_SCAN_SCHEMA = 2
+private const val CURRENT_DEVICE_SCAN_SCHEMA = 3
 private const val DEVICE_SCAN_STOCK_FIRMWARE =
     "device_scan_stock_firmware"
 private const val DEVICE_SCAN_STOCK_GAME_SUITE =
     "device_scan_stock_game_suite"
 private const val DEVICE_SCAN_NATIVE_TGK =
     "device_scan_native_tgk"
+private const val DEVICE_SCAN_TRIGGER_BRIDGE =
+    "device_scan_trigger_bridge"
 private const val DEVICE_SCAN_CHARGE_SEPARATION =
     "device_scan_charge_separation"
 private const val DEVICE_SCAN_REFRESH_RATE =
@@ -84,6 +86,10 @@ fun saveDeviceCapabilityReportStorage(context: Context, report: DeviceCapability
             report.nativeTgkAvailable
         )
         .putBoolean(
+            DEVICE_SCAN_TRIGGER_BRIDGE,
+            report.triggerBridgeAvailable
+        )
+        .putBoolean(
             DEVICE_SCAN_CHARGE_SEPARATION,
             report.chargeSeparationAvailable
         )
@@ -133,6 +139,7 @@ data class DeviceCapabilities(
     val stockFirmware: Boolean,
     val stockGameSuiteAvailable: Boolean,
     val nativeTgkAvailable: Boolean,
+    val triggerBridgeAvailable: Boolean,
     val chargeSeparationAvailable: Boolean,
     val refreshRateAvailable: Boolean,
     val touchTuningAvailable: Boolean,
@@ -156,6 +163,7 @@ data class DeviceCapabilities(
                 stockFirmware = false,
                 stockGameSuiteAvailable = false,
                 nativeTgkAvailable = false,
+                triggerBridgeAvailable = false,
                 chargeSeparationAvailable = false,
                 refreshRateAvailable = false,
                 touchTuningAvailable = false,
@@ -183,6 +191,7 @@ fun DeviceCapabilityReport.toDeviceCapabilities():
         stockFirmware = stockFirmware,
         stockGameSuiteAvailable = stockGameSuiteAvailable,
         nativeTgkAvailable = nativeTgkAvailable,
+        triggerBridgeAvailable = triggerBridgeAvailable,
         chargeSeparationAvailable = chargeSeparationAvailable,
         refreshRateAvailable = refreshRateAvailable,
         touchTuningAvailable = touchTuningAvailable,
@@ -244,6 +253,10 @@ fun deviceCapabilitiesStorage(
         ),
         nativeTgkAvailable = prefs.getBoolean(
             DEVICE_SCAN_NATIVE_TGK,
+            false
+        ),
+        triggerBridgeAvailable = prefs.getBoolean(
+            DEVICE_SCAN_TRIGGER_BRIDGE,
             false
         ),
         chargeSeparationAvailable = prefs.getBoolean(

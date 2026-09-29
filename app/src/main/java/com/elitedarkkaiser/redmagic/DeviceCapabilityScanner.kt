@@ -19,6 +19,7 @@ data class DeviceCapabilityReport(
     val stockFirmware: Boolean,
     val stockGameSuiteAvailable: Boolean,
     val nativeTgkAvailable: Boolean,
+    val triggerBridgeAvailable: Boolean,
     val chargeSeparationAvailable: Boolean,
     val refreshRateAvailable: Boolean,
     val touchTuningAvailable: Boolean,
@@ -195,6 +196,9 @@ object DeviceCapabilityScanner {
         val nativeTgkAvailable =
             identity.supported &&
                 NativeTgkBridge.readState(context).success
+        val triggerBridgeAvailable =
+            identity.supported &&
+                TriggerMappingBackend.moduleInstalled()
         val chargeSeparationAvailable =
             ChargeSeparationController
                 .probe(context)
@@ -247,6 +251,9 @@ object DeviceCapabilityScanner {
             append("\nNative TGK: ").append(
                 if (nativeTgkAvailable) "available" else "unavailable"
             )
+            append("\nTrigger Bridge module: ").append(
+                if (triggerBridgeAvailable) "available" else "not installed"
+            )
             append("\nCharge separation: ").append(
                 if (chargeSeparationAvailable) "available" else "unavailable"
             )
@@ -291,6 +298,7 @@ object DeviceCapabilityScanner {
             stockGameSuiteAvailable =
                 stockGameSuiteAvailable,
             nativeTgkAvailable = nativeTgkAvailable,
+            triggerBridgeAvailable = triggerBridgeAvailable,
             chargeSeparationAvailable =
                 chargeSeparationAvailable,
             refreshRateAvailable = refreshRateAvailable,

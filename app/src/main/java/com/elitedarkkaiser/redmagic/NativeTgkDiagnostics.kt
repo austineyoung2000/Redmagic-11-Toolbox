@@ -146,7 +146,7 @@ object NativeTgkDiagnostics {
         val liveNativeEnabled = liveResult.state?.mappingEnabled()
 
         return buildString {
-            appendLine("REDMAGIC 11 TOOLBOX — TGK DIAGNOSTICS")
+            appendLine("REDMAGIC 11 TOOLBOX — TRIGGER BACKEND DIAGNOSTICS")
             appendLine("Generated: ${formatTime(System.currentTimeMillis())}")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine("Android: ${Build.VERSION.RELEASE} / SDK ${Build.VERSION.SDK_INT}")
@@ -195,7 +195,7 @@ object NativeTgkDiagnostics {
             )
             appendLine()
 
-            appendLine("LIVE NATIVE STATE")
+            appendLine("LIVE BACKEND STATE")
             appendLine("Read succeeded: ${liveResult.success}")
             appendLine("Backend: ${liveResult.backend ?: "Unavailable"}")
             appendLine(
@@ -218,7 +218,7 @@ object NativeTgkDiagnostics {
             appendLine("Result: ${liveResult.message}")
             appendLine()
 
-            appendLine("LAST TGK TRANSITION")
+            appendLine("LAST TRIGGER BACKEND TRANSITION")
             appendLine("Action: ${snapshot.action ?: "None recorded"}")
             appendLine("Time: ${formatTime(snapshot.transitionAt)}")
             appendLine("Package: ${snapshot.packageName ?: "None"}")

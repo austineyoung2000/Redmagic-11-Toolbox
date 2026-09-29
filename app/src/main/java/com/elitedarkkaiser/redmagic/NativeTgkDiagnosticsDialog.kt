@@ -17,7 +17,7 @@ object NativeTgkDiagnosticsDialog {
         AppTheme.configure(activity)
 
         val reportView = TextView(activity).apply {
-            text = "Reading native TGK state…"
+            text = "Reading trigger backend state…"
             textSize = 12f
             setTextColor(AppTheme.textPrimary)
             typeface = Typeface.MONOSPACE
@@ -39,7 +39,7 @@ object NativeTgkDiagnosticsDialog {
             )
         }
         val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle("TGK Diagnostics")
+            .setTitle("Trigger Backend Diagnostics")
             .setView(scroll)
             .setNegativeButton("Close", null)
             .setNeutralButton("Refresh", null)
@@ -49,20 +49,21 @@ object NativeTgkDiagnosticsDialog {
         var currentReport = ""
 
         fun refresh() {
-            reportView.text = "Reading native TGK state…"
+            reportView.text = "Reading trigger backend state…"
             dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL)
                 ?.isEnabled = false
 
             Thread(
                 {
-                    val liveResult = NativeTgkBridge.readState(activity)
+                    val liveResult =
+                        NativeTgkCoordinator.readActiveState(activity)
                     val report = runCatching {
                         NativeTgkDiagnostics.buildReport(
                             activity,
                             liveResult
                         )
                     }.getOrElse {
-                        "Unable to create TGK diagnostic report: " +
+                        "Unable to create trigger diagnostic report: " +
                             (it.message ?: it.javaClass.simpleName)
                     }
 
@@ -103,13 +104,13 @@ object NativeTgkDiagnosticsDialog {
                 ) as ClipboardManager
                 clipboard.setPrimaryClip(
                     ClipData.newPlainText(
-                        "REDMAGIC TGK diagnostics",
+                        "REDMAGIC trigger backend diagnostics",
                         currentReport
                     )
                 )
                 Toast.makeText(
                     activity,
-                    "TGK diagnostic report copied",
+                    "Trigger diagnostic report copied",
                     Toast.LENGTH_SHORT
                 ).show()
             }

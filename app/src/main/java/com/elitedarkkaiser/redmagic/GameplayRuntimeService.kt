@@ -642,6 +642,15 @@ class GameplayRuntimeService : Service() {
                         packageName,
                         orientation
                     )
+                } else if (
+                    result.success &&
+                    nativeTgkGeneration.get() == generation
+                ) {
+                    NativeTgkRuntimeState.markBackendIfMatches(
+                        packageName,
+                        orientation,
+                        result.backend
+                    )
                 }
             }
         }.onFailure {
@@ -721,11 +730,11 @@ class GameplayRuntimeService : Service() {
                     }
 
                     val liveState = runCatching {
-                        NativeTgkBridge.readState(
+                        NativeTgkCoordinator.readActiveState(
                             applicationContext
                         )
                     }.getOrElse {
-                        logRuntimeFailure("native TGK health check", it)
+                        logRuntimeFailure("trigger backend health check", it)
                         return@nativeHealth
                     }
                     val mappingEnabled =

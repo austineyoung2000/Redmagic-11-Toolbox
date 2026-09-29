@@ -16,6 +16,9 @@ object NativeTgkRuntimeState {
     private var activeOrientation:
         NativeTgkOrientation? = null
 
+    @Volatile
+    private var activeBackendName: String? = null
+
     fun isActive(): Boolean {
         return activePackageName != null
     }
@@ -26,6 +29,10 @@ object NativeTgkRuntimeState {
 
     fun activeOrientation(): NativeTgkOrientation? {
         return activeOrientation
+    }
+
+    fun activeBackend(): String? {
+        return activeBackendName
     }
 
     fun matches(
@@ -43,6 +50,22 @@ object NativeTgkRuntimeState {
         synchronized(lock) {
             activePackageName = packageName
             activeOrientation = orientation
+            activeBackendName = null
+        }
+    }
+
+    fun markBackendIfMatches(
+        packageName: String,
+        orientation: NativeTgkOrientation,
+        backend: String?
+    ) {
+        synchronized(lock) {
+            if (
+                activePackageName == packageName &&
+                activeOrientation == orientation
+            ) {
+                activeBackendName = backend
+            }
         }
     }
 
@@ -50,6 +73,7 @@ object NativeTgkRuntimeState {
         synchronized(lock) {
             activePackageName = null
             activeOrientation = null
+            activeBackendName = null
         }
     }
 
@@ -64,6 +88,7 @@ object NativeTgkRuntimeState {
             ) {
                 activePackageName = null
                 activeOrientation = null
+                activeBackendName = null
             }
         }
     }
@@ -176,18 +201,12 @@ object NativeTgkCoordinator {
             displayHeight = displaySize.height
         )
 
-        val result = NativeTgkBridge.applyMapping(
+        val result = TriggerMappingBackend.apply(
             context = context,
+            profile = profile,
             mapping = mapping,
             displayWidth = displaySize.width,
-            displayHeight = displaySize.height,
-            hapticsEnabled = profile.hapticsEnabled,
-            leftBehavior = profile.effectiveLeftBehavior(),
-            rightBehavior = profile.effectiveRightBehavior(),
-            leftRapidFireCount =
-                profile.effectiveLeftRapidFireCount(),
-            rightRapidFireCount =
-                profile.effectiveRightRapidFireCount()
+            displayHeight = displaySize.height
         )
 
         NativeTgkDiagnostics.recordApply(
@@ -200,7 +219,7 @@ object NativeTgkCoordinator {
         if (result.success) {
             android.util.Log.i(
                 TAG,
-                "Applied $orientation TGK mapping " +
+                "Applied $orientation trigger mapping " +
                     "for $packageName using ${result.backend}"
             )
         } else {
@@ -208,12 +227,16 @@ object NativeTgkCoordinator {
 
             android.util.Log.e(
                 TAG,
-                "Failed to apply TGK mapping for " +
+                "Failed to apply trigger mapping for " +
                     "$packageName: ${result.message}"
             )
         }
 
         return result
+    }
+
+    fun readActiveState(context: Context): NativeTgkApplyResult {
+        return TriggerMappingBackend.readState(context)
     }
 
     fun disable(
@@ -222,7 +245,7 @@ object NativeTgkCoordinator {
     ): NativeTgkApplyResult {
         NativeTgkGameplayOverlay.hide()
 
-        val result = NativeTgkBridge.disable(context)
+        val result = TriggerMappingBackend.disable(context)
 
         NativeTgkDiagnostics.recordDisable(
             context,
@@ -233,12 +256,12 @@ object NativeTgkCoordinator {
         if (result.success) {
             android.util.Log.i(
                 TAG,
-                "Disabled native TGK: $reason"
+                "Disabled trigger mapping: $reason"
             )
         } else {
             android.util.Log.e(
                 TAG,
-                "Native TGK cleanup failed: " +
+                "Trigger mapping cleanup failed: " +
                     "$reason: ${result.message}"
             )
         }
