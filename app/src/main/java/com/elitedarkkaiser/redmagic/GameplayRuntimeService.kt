@@ -1123,7 +1123,23 @@ class GameplayRuntimeService : Service() {
                 return
             }
 
-            GameplayRuntimeWatchdogService.ensureRunning(context)
+                        /*
+             * Start the runtime from the live app/accessibility process before
+             * asking the independent watchdog to bind it. REDMAGIC may reject
+             * the watchdog's foreground-service launch immediately after an
+             * APK replacement, even though an in-process service start is
+             * allowed. The watchdog remains the long-term recovery owner.
+             */
+            if (!serviceRunning) {
+                startRuntimeIntent(
+                    context,
+                    Intent(
+                        context,
+                        GameplayRuntimeService::class.java
+                    )
+                )
+            }
+GameplayRuntimeWatchdogService.ensureRunning(context)
         }
 
         internal fun forwardForegroundHint(
@@ -1136,9 +1152,15 @@ class GameplayRuntimeService : Service() {
             ).setAction(ACTION_FOREGROUND_HINT).apply {
                 putExtra(EXTRA_FOREGROUND_PACKAGE, packageName)
             }
-            if (serviceRunning) {
-                startRuntimeIntent(context, intent)
-            } else {
+                                    /*
+             * Never discard the event that woke recovery. Besides restoring
+             * the runtime directly, this lets it reconcile the selected game
+             * before the root foreground monitor produces its first sample.
+             */
+startRuntimeIntent(context, intent)
+            if (!serviceRunning) {
+                
+            
                 GameplayRuntimeWatchdogService.ensureRunning(context)
             }
         }
