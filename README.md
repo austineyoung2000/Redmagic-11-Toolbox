@@ -1,7 +1,7 @@
 # Redmagic 11 Toolbox
 
 [![Android CI](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml/badge.svg?branch=sixteen)](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml)
-![Version](https://img.shields.io/badge/version-2.5.2-red)
+![Version](https://img.shields.io/badge/version-2.5.3-red)
 ![Android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)
 ![Device](https://img.shields.io/badge/device-RedMagic%2011%20Pro-red)
 ![Root](https://img.shields.io/badge/root-required-orange)
@@ -19,7 +19,7 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | Item | Configuration |
 |---|---|
 | Application ID | `com.elitedarkkaiser.redmagic` |
-| Version | `2.5.2` (`versionCode 8`) |
+| Version | `2.5.3` (`versionCode 9`) |
 | Development branch | `sixteen` |
 | Minimum Android | Android 9 / API 28 |
 | Target and compile SDK | API 35 |
@@ -28,6 +28,18 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | UI | Material Components |
 | Root | Required for hardware controls; native TGK itself is non-root |
 | Supported device | RedMagic 11 Pro / NX809J |
+
+## What's new in 2.5.3
+
+Version 2.5.3 completes module-backed shoulder-trigger haptics. When Trigger
+Bridge 0.3.1 or newer owns a configured game, Toolbox writes the profile's
+haptics toggle plus the selected Hardware-tab Low, Medium, or High gain and
+duration to the module. Native TGK remains unchanged and preferred on stock
+firmware.
+
+The companion module now detects landscape rotation through Android window and
+display state when the vendor `SurfaceOrientation` field is absent. This keeps
+saved L/R targets accurate without a manual property override.
 
 ## What's new in 2.5.2
 
@@ -69,7 +81,7 @@ rejects configuration.
   produce a one-time reboot notice because Android may retain stale service and
   input state until the next boot.
 
-Version 2.5.2 retains the complete 2.5.1 Game Space-style control surface and
+Version 2.5.3 retains the complete 2.5.1 Game Space-style control surface and
 runtime recovery stack described below.
 
 ### Game Space-style in-game controls
@@ -127,7 +139,7 @@ The complete native TGK investigation—including firmware classes, Binder trans
 
 Stock Game Space package roles, privileged gesture-monitor behavior, overlay-window evidence, AutoLaunch recovery policy, failed prototypes, and the Toolbox's compatible implementation are documented in the living [`docs/GAME_SPACE_REVERSE_ENGINEERING.md`](docs/GAME_SPACE_REVERSE_ENGINEERING.md) report. New verified Game Space findings should be added there as the investigation continues.
 
-The sections below document the complete 2.5.2 behavior and current architecture.
+The sections below document the complete 2.5.3 behavior and current architecture.
 
 ## Compatibility
 
@@ -142,7 +154,7 @@ LineageOS-based and other custom ROMs can work when they retain the stock RedMag
 - `/sys/class/leds/sar1/*`
 - RedMagic/Nubia Magic Key system settings
 - Either the REDMAGIC Android 16 `IInputManager` TGK additions or the optional
-  [Redmagic Trigger Bridge v0.3.0 or newer](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge/releases/tag/v0.3.0)
+  [Redmagic Trigger Bridge v0.3.1 or newer](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge/releases/tag/v0.3.1)
   companion module for per-app touch mapping
 - Stock display, touch-tuning, performance, and charge-separation services for their corresponding per-app features
 
@@ -152,7 +164,7 @@ The compatibility layer centralizes the confirmed fan, pump, LED, and trigger pa
 
 For NX809J custom ROMs, CPU temperature detection resolves the confirmed `cpullc-0-0` sensor by thermal-zone type before falling back to known zone numbers. This tolerates framework-level thermal-zone reordering while remaining restricted to NX809J hardware.
 
-Native TGK and the stock per-app gaming controls are exposed only after their specific compatibility probes pass. A custom ROM may retain the fan, pump, LED, trigger, and thermal interfaces while omitting the proprietary framework APIs. Trigger Bridge v0.3.0 or newer can provide merged physical-touch and L/R mapping on an NX809J ROM that retains the confirmed SAR inputs, Synaptics touchscreen, arming nodes, and `/dev/uinput`; stock-only display, touch, performance, and charging controls remain independently gated. Restoring the actual native TGK implementation still requires porting the matching REDMAGIC framework, system-server, native input, vendor, and SELinux pieces rather than copying the application-side Binder calls alone.
+Native TGK and the stock per-app gaming controls are exposed only after their specific compatibility probes pass. A custom ROM may retain the fan, pump, LED, trigger, and thermal interfaces while omitting the proprietary framework APIs. Trigger Bridge v0.3.1 or newer can provide merged physical-touch, L/R mapping, automatic rotation, and trigger haptics on an NX809J ROM that retains the confirmed SAR inputs, Synaptics touchscreen, arming nodes, vibrator nodes, and `/dev/uinput`; stock-only display, touch, performance, and charging controls remain independently gated. Restoring the actual native TGK implementation still requires porting the matching REDMAGIC framework, system-server, native input, vendor, and SELinux pieces rather than copying the application-side Binder calls alone.
 
 ## Application layout
 
@@ -313,7 +325,7 @@ Manual **Disable Triggers** stops the service and hardware without erasing the A
 
 ### Game trigger mapping
 
-The Hardware tab exposes a separate per-app trigger-mapping manager. This is not the media-action trigger service described above. On compatible stock Android 16 firmware it programs REDMAGIC's native TGK engine so physical L/R events become screen contacts at user-selected coordinates. On a compatible custom ROM, Trigger Bridge v0.3.0 or newer merges the retained physical touchscreen with the `KEY_F7`/`KEY_F8` trigger contacts through one virtual multitouch device.
+The Hardware tab exposes a separate per-app trigger-mapping manager. This is not the media-action trigger service described above. On compatible stock Android 16 firmware it programs REDMAGIC's native TGK engine so physical L/R events become screen contacts at user-selected coordinates. On a compatible custom ROM, Trigger Bridge v0.3.1 or newer merges the retained physical touchscreen with the `KEY_F7`/`KEY_F8` trigger contacts through one virtual multitouch device and can provide hardware-vibrator feedback.
 
 Each selected application can store named layouts with independent portrait and landscape targets. The editor launches the selected application, places draggable L/R controls over it, and saves the resulting rectangles. During normal play those targets are shown as nearly transparent, touch-through markers: they cannot steal gameplay input or be dragged until the user deliberately enters edit mode again.
 
@@ -322,14 +334,14 @@ The unified foreground runtime performs the following lifecycle:
 1. Confirm that the selected package is the top-resumed application.
 2. Load the matching orientation and active named layout.
 3. Prefer Native TGK when its state can be read and its mapping can be applied.
-4. If Native TGK is unavailable or rejects the mapping, release its state and activate an installed, compatible Trigger Bridge v0.3.0 or newer.
+4. If Native TGK is unavailable or rejects the mapping, release its state and activate an installed, compatible Trigger Bridge v0.3.0 or newer; v0.3.1 adds automatic rotation and module haptics.
 5. Keep the unselected backend inactive so the two implementations never own the triggers simultaneously.
 6. Keep the saved markers and optional performance telemetry attached to the same foreground owner.
 7. Disable both backend paths and remove every related overlay immediately when the app loses the foreground, the screen turns off, or the runtime stops.
 
 Single-touch, long-press, and rapid-fire behaviors can be chosen independently for L and R. Rapid-fire counts are restricted to the confirmed stock values. The framework's own top-edge and mapped-target visual effects provide down/up feedback without the app intercepting F7/F8 events.
 
-Native TGK configuration is performed through ordinary app-accessible InputManager calls and does not require root on the tested stock firmware. It remains the preferred backend and retains the complete stock effects and behavior modes. Trigger Bridge v0.3.0 is a root module for NX809J ROMs that preserve the required vendor/kernel trigger and touchscreen interfaces; it is not a generic Android trigger solution. Its daemon boots inactive without a virtual touchscreen, creates the merged proxy only for a configured foreground game, and releases every virtual contact and physical device during cleanup. See the [native TGK reverse-engineering report](docs/NATIVE_TGK_REVERSE_ENGINEERING.md) and the companion module's [control contract](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge/blob/main/docs/CONTROL.md).
+Native TGK configuration is performed through ordinary app-accessible InputManager calls and does not require root on the tested stock firmware. It remains the preferred backend and retains the complete stock effects and behavior modes. Trigger Bridge v0.3.1 is a root module for NX809J ROMs that preserve the required vendor/kernel trigger, touchscreen, and vibrator interfaces; it is not a generic Android trigger solution. Its daemon boots inactive without a virtual touchscreen, creates the merged proxy only for a configured foreground game, and releases every virtual contact and physical device during cleanup. See the [native TGK reverse-engineering report](docs/NATIVE_TGK_REVERSE_ENGINEERING.md) and the companion module's [control contract](https://github.com/austineyoung2000/Redmagic-Trigger-Bridge/blob/main/docs/CONTROL.md).
 
 ### Haptic feedback
 

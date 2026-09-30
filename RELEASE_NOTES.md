@@ -1,9 +1,20 @@
-# Redmagic 11 Toolbox 2.5.2
+# Redmagic 11 Toolbox 2.5.3
 
-Version 2.5.2 adds the production Trigger Bridge fallback and completes the
-gameplay-runtime lifecycle fixes introduced after 2.5.1. It preserves the
-existing application ID and signing identity, so it installs over earlier
-versions without clearing saved profiles.
+Version 2.5.3 completes haptic integration with the optional Trigger Bridge
+fallback. It preserves the existing application ID and signing identity, so it
+installs over earlier versions without clearing saved profiles.
+
+## Module-backed trigger haptics
+
+- Passes each game's existing haptics toggle to Trigger Bridge.
+- Passes the Hardware-tab Low, Medium, or High gain and duration to Trigger
+  Bridge 0.3.1 and newer.
+- Keeps Native TGK first on compatible stock firmware, preserving its complete
+  proprietary haptic behavior.
+- Leaves module haptics independent from touch injection failures: unavailable
+  vibrator nodes disable feedback without disabling mapped trigger contacts.
+- Uses automatic module rotation detection so saved landscape targets require
+  no manual property override.
 
 ## Automatic trigger backend selection
 
@@ -21,7 +32,7 @@ versions without clearing saved profiles.
 
 ## Verified merged-touch gameplay
 
-Trigger Bridge v0.3.0 combines the physical Synaptics touchscreen and two
+Trigger Bridge v0.3.1 combines the physical Synaptics touchscreen and two
 reserved shoulder-trigger slots into one protocol-B input device. On-device COD
 Mobile validation covered:
 
@@ -33,9 +44,10 @@ Mobile validation covered:
 - A final two-minute combined-input stress test
 
 Native TGK remains the preferred full-fidelity backend for stock haptics,
-rapid-fire modes, and vendor visual effects. The module backend is intended for
+rapid-fire modes, and vendor visual effects. Trigger Bridge 0.3.1 provides a
+validated hardware-vibrator approximation. The module backend is intended for
 compatible NX809J ROMs retaining the required SAR, touchscreen, arming-node,
-uinput, root, and SELinux interfaces.
+vibrator, uinput, root, and SELinux interfaces.
 
 ## Gameplay runtime and overlay recovery
 
@@ -71,5 +83,5 @@ uinput, root, and SELinux interfaces.
 
 Install the signed APK over the existing Toolbox installation, then reboot the
 phone once before testing gameplay overlays or trigger mapping. Keep Trigger
-Bridge v0.3.0 enabled in KernelSU, Magisk, or APatch; Toolbox leaves it inactive
+Bridge v0.3.1 enabled in KernelSU, Magisk, or APatch; Toolbox leaves it inactive
 unless the module backend is actually selected.
