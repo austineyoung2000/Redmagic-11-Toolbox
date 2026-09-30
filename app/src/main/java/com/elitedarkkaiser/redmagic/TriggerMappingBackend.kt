@@ -104,7 +104,7 @@ object TriggerMappingBackend {
         /* Best effort: a partial vendor implementation must not remain armed. */
         runCatching { NativeTgkBridge.disable(context) }
 
-        return TriggerBridgeModule.apply(profile)
+        return TriggerBridgeModule.apply(context, profile)
     }
 
     fun readState(
@@ -174,9 +174,12 @@ private object TriggerBridgeModule {
         )
     }
 
-    fun apply(profile: NativeTgkProfile): NativeTgkApplyResult {
+    fun apply(
+        context: Context,
+        profile: NativeTgkProfile
+    ): NativeTgkApplyResult {
         val encoded = Base64.encodeToString(
-            buildConfig(profile).toByteArray(Charsets.UTF_8),
+            buildConfig(context, profile).toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP
         )
 
@@ -315,9 +318,15 @@ private object TriggerBridgeModule {
         )
     }
 
-    private fun buildConfig(profile: NativeTgkProfile): String {
+    private fun buildConfig(
+        context: Context,
+        profile: NativeTgkProfile
+    ): String {
         val portrait = profile.mappingFor(NativeTgkOrientation.PORTRAIT)
         val landscape = profile.mappingFor(NativeTgkOrientation.LANDSCAPE)
+        val hapticStrength = HapticFeedback.Strength.fromKey(
+            HapticFeedback.read(context).strength
+        )
 
         val portraitLeft = portrait?.left.normalizedOr(2500, 5000)
         val portraitRight = portrait?.right.normalizedOr(7500, 5000)
@@ -333,6 +342,8 @@ private object TriggerBridgeModule {
             appendLine("left_rapid_fire=${profile.effectiveLeftRapidFireCount()}")
             appendLine("right_rapid_fire=${profile.effectiveRightRapidFireCount()}")
             appendLine("haptics_enabled=${if (profile.hapticsEnabled) 1 else 0}")
+            appendLine("haptic_gain=${hapticStrength.gain}")
+            appendLine("haptic_duration_ms=${hapticStrength.durationMs}")
 
             for (rotation in 0..3) {
                 val left = if (rotation % 2 == 0) {

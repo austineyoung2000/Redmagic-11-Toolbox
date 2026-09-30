@@ -333,7 +333,7 @@ Native TGK configuration is performed through ordinary app-accessible InputManag
 
 ### Haptic feedback
 
-The Hardware tab contains optional hardware haptic feedback for shoulder-trigger actions, successful dual-app slider launches, and Master Profile application. It is disabled by default and offers Low, Medium, and High strengths with an immediate test pulse when a strength is selected.
+The Hardware tab contains optional hardware haptic feedback for shoulder-trigger actions, successful dual-app slider launches, and Master Profile application. It is disabled by default and offers Low, Medium, and High strengths with an immediate test pulse when a strength is selected. Trigger Bridge 0.3.1 and newer also use the selected strength for module-backed shoulder-trigger feedback when that game profile enables haptics.
 
 Haptic pulses use the confirmed NX809J `zte_vibrator` duration, gain, and activate nodes through the shared root broker. Feedback is event-driven, rate-limited, and performs no continuous polling.
 

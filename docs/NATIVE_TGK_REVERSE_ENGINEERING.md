@@ -420,10 +420,13 @@ snapping. Protocol-B slot reselection was required after every injected trigger
 event because the physical stream can continue a contact without repeating
 `ABS_MT_SLOT`.
 
-Native TGK remains the full-fidelity backend for firmware haptics, rapid-fire
-behavior, and system-server visual effects. End-to-end automatic selection on
-an actual custom ROM without native TGK remains unverified because the tested
-device remains on stock firmware.
+Trigger Bridge 0.3.1 adds a rate-limited approximation of trigger haptics by
+driving the confirmed NX809J `zte_vibrator` nodes on trigger-down edges. It
+uses the profile haptics toggle and Toolbox strength selection, but does not
+reproduce ZTE's proprietary TGK waveform. Native TGK remains the full-fidelity
+backend for firmware haptics, rapid-fire behavior, and system-server visual
+effects. End-to-end automatic selection on an actual custom ROM without native
+TGK remains unverified because the tested device remains on stock firmware.
 
 ### APK replacement and reboot boundary
 
