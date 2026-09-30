@@ -5,19 +5,59 @@ internal object PermissionBootstrapPolicy {
         currentValue: String?,
         requiredService: String
     ): String {
+        val seen = mutableSetOf<String>()
+
         return buildList {
             currentValue
                 .orEmpty()
                 .split(':')
                 .map(String::trim)
                 .filter { it.isNotEmpty() && it != "null" }
-                .forEach(::add)
+                .forEach { service ->
+                    if (seen.add(canonicalServiceName(service))) {
+                        add(service)
+                    }
+                }
 
-            add(requiredService.trim())
+            val required = requiredService.trim()
+            if (
+                required.isNotEmpty() &&
+                seen.add(canonicalServiceName(required))
+            ) {
+                add(required)
+            }
         }
-            .filter { it.isNotEmpty() }
-            .distinct()
             .joinToString(":")
+    }
+
+    fun containsAccessibilityService(
+        currentValue: String?,
+        requiredService: String
+    ): Boolean {
+        val required = canonicalServiceName(requiredService)
+        return currentValue
+            .orEmpty()
+            .split(':')
+            .map(String::trim)
+            .filter { it.isNotEmpty() && it != "null" }
+            .any { canonicalServiceName(it) == required }
+    }
+
+    private fun canonicalServiceName(value: String): String {
+        val trimmed = value.trim()
+        val separator = trimmed.indexOf('/')
+        if (separator <= 0 || separator == trimmed.lastIndex) {
+            return trimmed
+        }
+
+        val packageName = trimmed.substring(0, separator)
+        val className = trimmed.substring(separator + 1)
+        val expandedClass = if (className.startsWith('.')) {
+            packageName + className
+        } else {
+            className
+        }
+        return "$packageName/$expandedClass"
     }
 
     fun missingPermissionLabels(

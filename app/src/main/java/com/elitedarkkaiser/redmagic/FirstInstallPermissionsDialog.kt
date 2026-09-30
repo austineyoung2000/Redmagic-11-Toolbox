@@ -26,7 +26,7 @@ object FirstInstallPermissionsDialog {
         }
 
         val title = TextView(activity).apply {
-            text = "Root permission setup"
+            text = "Finish permission setup"
             textSize = 20f
             setTextColor(AppTheme.textPrimary)
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
@@ -38,9 +38,11 @@ object FirstInstallPermissionsDialog {
                     "Tap Grant with root to allow:\n" +
                     "• Usage Access for Game Mode detection\n" +
                     "• Display over other apps for trigger setup\n" +
+                    "• Accessibility for overlays and trigger input\n" +
                     "• Notifications for foreground services\n" +
                     "• Phone state for Call Lighting\n\n" +
-                    "Your root manager should ask for superuser access before continuing."
+                    "All five items are checked after setup. Your root manager " +
+                    "may ask for superuser access before continuing."
             textSize = 14f
             setTextColor(AppTheme.textSecondary)
             setPadding(0, dp(12), 0, dp(18))
@@ -112,23 +114,17 @@ object FirstInstallPermissionsDialog {
                         grantButton.isEnabled = true
                         grantButton.text = "Grant with root"
 
-                        Toast.makeText(
-                            activity,
-                            buildString {
-                                append("Permission setup incomplete")
-                                if (!result.rootCommandSucceeded) {
-                                    append(": root command failed")
-                                }
-                                if (result.missingPermissions.isNotEmpty()) {
-                                    append(". Missing: ")
-                                    append(
-                                        result.missingPermissions
-                                            .joinToString(", ")
-                                    )
-                                }
-                            },
-                            Toast.LENGTH_LONG
-                        ).show()
+                        MaterialAlertDialogBuilder(activity)
+                            .setTitle("Permission setup incomplete")
+                            .setMessage(result.statusMessage())
+                            .setNegativeButton("Close", null)
+                            .setPositiveButton("Open settings") { _, _ ->
+                                PermissionActions.openSettingsForFirstMissing(
+                                    activity,
+                                    result
+                                )
+                            }
+                            .show()
                     }
                 }
             }, "RedMagicPermissionSetup").start()

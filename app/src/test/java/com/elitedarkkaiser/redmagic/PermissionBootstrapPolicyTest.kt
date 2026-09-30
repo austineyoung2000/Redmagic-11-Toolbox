@@ -42,6 +42,36 @@ class PermissionBootstrapPolicyTest {
     }
 
     @Test
+    fun mergeTreatsShortAndFullyQualifiedServicesAsEquivalent() {
+        val full =
+            "com.elitedarkkaiser.redmagic/" +
+                "com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
+
+        assertEquals(
+            full,
+            PermissionBootstrapPolicy.mergeAccessibilityServices(
+                full,
+                required
+            )
+        )
+    }
+
+    @Test
+    fun containsServiceAcceptsShortAndFullyQualifiedForms() {
+        val full =
+            "com.elitedarkkaiser.redmagic/" +
+                "com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
+
+        assertEquals(
+            true,
+            PermissionBootstrapPolicy.containsAccessibilityService(
+                full,
+                required
+            )
+        )
+    }
+
+    @Test
     fun missingLabelsReportsOnlyFailedPermissions() {
         assertEquals(
             listOf("Display over other apps", "Phone state"),

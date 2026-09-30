@@ -561,9 +561,9 @@ The public repository contains the application source, Gradle configuration, and
 
 ## First launch
 
-On first launch, the app validates the device, requests root, applies approved feature permissions, scans the hardware interfaces, and then opens the main interface.
+On first launch, the app validates the device and presents a complete setup checklist before requesting root. It applies the approved feature permissions, verifies every item, scans the hardware interfaces, and then opens the main interface.
 
-The root-assisted setup can grant Usage Access, notification permission, phone-state permission, display-over-other-apps access, and accessibility-service activation. Review the root request before approving it.
+The root-assisted setup can grant Usage Access, notification permission, phone-state permission, display-over-other-apps access, and accessibility-service activation. If Android or the root manager rejects an item, the app displays the full five-item status instead of a shortened toast and links directly to the first relevant Android settings page. Review the root request before approving it.
 
 ## Installation
 

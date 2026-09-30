@@ -179,7 +179,7 @@ class MainActivity : Activity() {
 
         val needsFirstInstallSetup =
             !isFirstInstallPermissionsPromptedStorage(this) ||
-                !PermissionActions.hasUsageStatsPermission(this)
+                !PermissionBootstrap.inspect(this).success
 
         if (needsFirstInstallSetup) {
             FirstInstallPermissionsDialog.show(this) {
