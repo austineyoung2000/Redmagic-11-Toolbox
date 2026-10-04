@@ -22,6 +22,17 @@ internal object GameModeLedZoneUi {
         onEffectChanged: (String) -> Unit,
         onColorChanged: (Int) -> Unit
     ): List<View> {
+        if (shoulderZone) {
+            return listOf(TriggerLedProfileUi.create(activity, title, enableLabel,
+                com.elitedarkkaiser.redmagic.state.LedState(initialEnabled, initialEffect, initialColor),
+                TriggerLedProfileUi.Deps(deps.textPrimary, deps.textSecondary, deps.accent,
+                    deps.panelPressed, deps.borderColor, deps.dp, deps.colorDotGeneric, deps.colorDotDrawable)
+            ) { state ->
+                onEnabledChanged(state.enabled)
+                onEffectChanged(state.effect)
+                onColorChanged(state.color)
+            })
+        }
         var effect = initialEffect
         var color = initialColor
 

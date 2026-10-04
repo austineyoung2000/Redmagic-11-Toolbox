@@ -88,7 +88,11 @@ internal object CallLightingProfileUi {
 
         container.addView(zoneEditor(activity, fanKeys.label, fan, deps, modeLabel, showFanPresets = true) { fan = it })
         container.addView(zoneEditor(activity, logoKeys.label, logo, deps, modeLabel, showFanPresets = false) { logo = it })
-        container.addView(zoneEditor(activity, shoulderKeys.label, shoulder, deps, modeLabel, showFanPresets = false) { shoulder = it })
+        container.addView(TriggerLedProfileUi.create(activity, shoulderKeys.label,
+            "Enable trigger LEDs for $modeLabel", shoulder,
+            TriggerLedProfileUi.Deps(deps.textPrimary, deps.textSecondary, deps.accent,
+                deps.panelPressed, deps.borderColor, deps.dp, deps.colorDotGeneric, deps.colorDotDrawable)
+        ) { shoulder = it })
 
         val buttonRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL

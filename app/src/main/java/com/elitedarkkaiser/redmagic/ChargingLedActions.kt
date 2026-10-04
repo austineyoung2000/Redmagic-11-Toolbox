@@ -83,27 +83,26 @@ object ChargingLedActions {
             defaultColor = 8
         )
 
-        ChargingLedProfileDialog.show(
+        TriggerLedProfileUi.show(
             activity = activity,
-            title = "Charging Shoulder LEDs",
+            title = "Charging Trigger LEDs",
             subtitle = "Shoulder LED profile used only while plugged in and charging.",
-            originalEnabled = profile.enabled,
-            originalEffect = profile.effect,
-            originalColor = profile.color,
-            onSave = { enabled, effect, color ->
+            initial = com.elitedarkkaiser.redmagic.state.LedState(profile.enabled, profile.effect, profile.color),
+            onSave = { state ->
                 runBackground {
                     saveProfileAndApplyIfCharging(
                         activity,
                         ChargingLedState.SHOULDER_ENABLED_KEY,
                         ChargingLedState.SHOULDER_EFFECT_KEY,
                         ChargingLedState.SHOULDER_COLOR_KEY,
-                        enabled,
-                        effect,
-                        color
+                        state.enabled,
+                        state.effect,
+                        state.color
                     )
                 }
             },
-            deps = deps
+            deps = TriggerLedProfileUi.Deps(deps.textPrimary, deps.textSecondary, deps.accent,
+                deps.panelPressed, deps.borderColor, deps.dp, deps.colorDotGeneric, deps.colorDotDrawable)
         )
     }
 

@@ -120,6 +120,10 @@ The Lighting tab places Trigger LEDs alongside fan and logo controls inside LED 
 
 RGB Studio can enable separate top and bottom preset sequences. Each sequence loops independently, including when their lengths differ, with a shared trigger cycle speed and effect. Synchronized mode shares timing with fan/logo cycles while preserving the selected trigger combinations. The split pair is applied after other zone writes, using the same validated vendor-program path. Saved RGB Studio settings, Master Profiles, and portable JSON backups retain both sequences; older settings default to matching triggers. The matching-color Apply to All action is hidden while split triggers are selected.
 
+## Mode profile integration
+
+Game Mode, Charging Mode, and both ringing/connected Call Lighting profiles use a shared preset-only trigger editor. Each saves matching or split top/bottom colors and a shared effect in its existing effect field. Changing the effect retains the split colors. The existing services already forward that field through `setShoulderLedEffect`, and save/restore and Master Profile JSON paths preserve it without normalization. The editor stages changes until the owning profile is saved; Cancel leaves persisted settings unchanged. Lighting ownership and priorities are unchanged.
+
 ## Automated validation and remaining checks
 
 `ShoulderLedSplitTest.kt` uses the four captured templates in `app/src/test/resources/trigger-led/` and simulated sysfs files. Four JVM tests passed:

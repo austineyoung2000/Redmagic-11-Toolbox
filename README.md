@@ -398,6 +398,14 @@ The Lighting tab controls:
 
 Each zone can be enabled, disabled, and configured independently. Effects include Steady, Breathe, Flashing, and Rapid where supported. Colors include Red, Orange, Yellow, Green, Cyan, Blue, Purple, and Pink. Confirmed stock fan-light presets are also supported.
 
+### Split trigger colors
+
+Open **Trigger LEDs** inside LED Zones and enable **Separate top and bottom colors** to choose a preset for each trigger. The same option is available in the Game Mode profile, Charging Trigger LEDs, and both incoming-call and connected-call profiles. Each mode saves its own combination. Both triggers share one effect: Steady, Breathe, Flashing, or Rapid. The controls use the existing eight-color palette; there are no custom hex inputs or RGB sliders.
+
+Master Profiles and portable backups retain each mode's saved trigger combination. The existing lighting priority and restoration rules still decide which mode applies. Turning off the split option returns that profile to a matching-color selection.
+
+RGB Studio also supports separate top/bottom preset sequences. Select one color for each trigger for a fixed combination, or multiple colors to cycle. Split colors use the validated vendor-program mapping described in the [reverse-engineering report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md). Rapid remains available but its physical split output still needs device confirmation.
+
 The **Real-time preview** switch is located inside LED Zones and controls whether changes are written immediately while editing a profile.
 
 ## RGB Studio
@@ -417,7 +425,7 @@ RGB Studio uses the shared persistent root broker instead of launching `su` for 
 
 ## Game Mode
 
-Game Mode applies a saved fan, pump, and LED profile when a selected application becomes active. It uses Usage Access and accessibility foreground-app events instead of continuous idle polling.
+Game Mode applies a saved fan, pump, and LED profile when a selected application becomes active. Its trigger editor can save separate top/bottom preset colors with a shared effect. It uses Usage Access and accessibility foreground-app events instead of continuous idle polling.
 
 While a selected game is active, a slow two-minute verification poll checks state. Polling stops when the game closes or the screen turns off, and the normal hardware profile is restored.
 
@@ -438,11 +446,11 @@ Charge separation uses the stock ZTE provider and `charge_separation_switch` sys
 
 ## Charging Mode
 
-Charging Mode applies dedicated fan, logo, and shoulder LED profiles while power is connected. Android power and battery broadcasts drive the service, so charging state is not continuously polled. The previous valid lighting owner is restored after charging ends.
+Charging Mode applies dedicated fan, logo, and shoulder LED profiles while power is connected. Open **Charging Trigger LEDs** to select matching or split top/bottom colors and their shared effect. Android power and battery broadcasts drive the service, so charging state is not continuously polled. The previous valid lighting owner is restored after charging ends.
 
 ## Call Lighting
 
-Call Lighting supports separate profiles for ringing and connected calls. An optional fan-pause feature saves the previous fan state, stops automatic fan control, turns the fan off during the call, then restores the previous state when the call ends.
+Call Lighting supports separate profiles for ringing and connected calls. Each profile has its own top/bottom trigger color combination and shared effect. An optional fan-pause feature saves the previous fan state, stops automatic fan control, turns the fan off during the call, then restores the previous state when the call ends.
 
 ## LED priority
 
