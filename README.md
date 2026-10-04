@@ -436,12 +436,12 @@ The Lighting tab controls:
 
 - Cooling fan LED
 - Rear logo LED
-- Illuminated side GAME MODE bar (2.6.0 test branch)
+- Illuminated side GAME MODE bar (2.6.0)
 - Shoulder LED strips
 
 Each zone can be enabled, disabled, and configured independently. Effects include Steady, Breathe, Flashing, and Rapid where supported. Colors include Red, Orange, Yellow, Green, Cyan, Blue, Purple, and Pink. Confirmed stock fan-light presets are also supported.
 
-### Independent logo and GAME MODE bar (2.6.0 test branch)
+### Independent logo and GAME MODE bar (2.6.0)
 
 Open the separate **LOGO LED** or **GAME MODE BAR** entry to edit that area while preserving its companion. Both retain separate preset colors, brightness, and enable switches. Their effect remains shared. Game Mode, charging, incoming/connected calls, and Master Profiles preserve the pair. RGB Studio also has an independent bar sequence and cycle speed. See the [mapping and test report](docs/LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md).
 
