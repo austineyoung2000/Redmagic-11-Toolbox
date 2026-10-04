@@ -53,8 +53,8 @@ class ShoulderLedSplitTest {
             Files.write(dir.resolve("firmware/aw_touch3_7.bin"), original)
             val result = execute(command, dir)
             assertNotEquals(result.second, 0, result.first)
-            assertEquals("", Files.readString(dir.resolve("device/reg")))
-            assertEquals("effect = 0x2000000\n", Files.readString(dir.resolve("device/effect")))
+            assertEquals("", dir.resolve("device/reg").toFile().readText())
+            assertEquals("effect = 0x2000000\n", dir.resolve("device/effect").toFile().readText())
             assertEquals(0, dir.resolve("temp").toFile().listFiles()!!.size)
         }
     }
@@ -67,7 +67,7 @@ class ShoulderLedSplitTest {
             )
             assertNotEquals("failure must be injected", command, failing)
             assertNotEquals(0, execute(failing, dir).first)
-            assertEquals("0x2000000\n", Files.readString(dir.resolve("device/effect")))
+            assertEquals("0x2000000\n", dir.resolve("device/effect").toFile().readText())
             assertEquals(0, dir.resolve("temp").toFile().listFiles()!!.size)
         }
     }
@@ -82,8 +82,8 @@ class ShoulderLedSplitTest {
             Files.createDirectories(dir.resolve("device"))
             Files.createDirectories(dir.resolve("temp"))
             Files.write(dir.resolve("firmware/$file"), original)
-            Files.writeString(dir.resolve("device/effect"), "effect = 0x2000000\n")
-            Files.writeString(dir.resolve("device/reg"), "")
+            dir.resolve("device/effect").toFile().writeText("effect = 0x2000000\n")
+            dir.resolve("device/reg").toFile().writeText("")
             val command = ShoulderLedSplit.command(ShoulderLedSplit.encode(effect, 0x123456, 0xfedcba))!!
                 .replace("/sys/class/leds/aw22xxx_led", dir.resolve("device").toString())
                 .replace("/vendor/firmware", dir.resolve("firmware").toString())
