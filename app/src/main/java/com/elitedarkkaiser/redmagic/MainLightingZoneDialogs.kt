@@ -126,9 +126,7 @@ internal class MainLightingZoneDialogs(
             },
             applyEffect = { effect, color ->
                 disableRgbStudioForManualControl()
-                runBackground {
-                    HardwareController.setLogoLedEffect(effect, color)
-                }
+                applyLogoSelection(effect, color)
             },
             disableLed = {
                 disableRgbStudioForManualControl()
@@ -329,10 +327,9 @@ internal class MainLightingZoneDialogs(
 
         runBackground {
             if (state.logoEnabled) {
-                HardwareController.setLogoLedEffect(
-                    state.logoEffect,
-                    state.logoColor
-                )
+                if (!HardwareController.setLogoLedEffect(state.logoEffect, state.logoColor)) {
+                    reportLightingFailure("Logo")
+                }
             } else {
                 HardwareController.setLogoLedEnabled(false)
             }
@@ -363,15 +360,26 @@ internal class MainLightingZoneDialogs(
         }
     }
 
+    private fun reportLightingFailure(zone: String) {
+        activity.runOnUiThread {
+            android.widget.Toast.makeText(activity,
+                "$zone lighting could not be applied. Check root access and ROM compatibility.",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun applyLogoSelection(effect: String, color: Int) {
+        runBackground {
+            if (!HardwareController.setLogoLedEffect(effect, color)) reportLightingFailure("Logo")
+        }
+    }
+
     private fun applyFanSelection(effect: String, color: Int) {
         runBackground {
-            if (effect.startsWith("preset:")) {
-                HardwareController.setFanLedStockPreset(
-                    effect.removePrefix("preset:")
-                )
-            } else {
-                HardwareController.setFanLedEffect(effect, color)
-            }
+            val success = if (effect.startsWith("preset:")) {
+                HardwareController.setFanLedStockPreset(effect.removePrefix("preset:"))
+            } else HardwareController.setFanLedEffect(effect, color)
+            if (!success) reportLightingFailure("Fan")
         }
     }
 

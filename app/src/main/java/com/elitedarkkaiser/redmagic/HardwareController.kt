@@ -256,7 +256,7 @@ object HardwareController {
             LedBrightness.encode(LedBrightness.level(effectName), normalizedEffect)
         } else normalizedEffect
         val replay = LedBrightness.command(name, selection, normalizedColor)
-        if (replay == null && (LedBrightness.level(selection) != 255 || selection.startsWith("split:"))) return false
+        if (replay == null && (LedBrightness.level(selection) != 255 || base.startsWith("split:"))) return false
         val stock = "echo ${buildUnifiedLedEffectValue(zone, normalizedEffect, normalizedColor)} > $LED_EFFECT; echo 1 > $LED_CFG"
         val command = (if (zone.enableFanFirst) "echo 1 > $FAN_ENABLE;\n" else "") + (replay ?: stock)
         val previous = lastZoneCommands[name]
