@@ -1,87 +1,40 @@
-# Redmagic 11 Toolbox 2.5.3
+# Redmagic 11 Toolbox 2.5.4
 
-Version 2.5.3 completes haptic integration with the optional Trigger Bridge
-fallback. It preserves the existing application ID and signing identity, so it
-installs over earlier versions without clearing saved profiles.
+Version 2.5.4 adds independent top and bottom shoulder-trigger LED colors across the app's lighting modes. Choose any combination from Red, Orange, Yellow, Green, Cyan, Blue, Purple, and Pink, with one shared lighting effect.
 
-## Module-backed trigger haptics
+## Split trigger colors in every lighting profile
 
-- Passes each game's existing haptics toggle to Trigger Bridge.
-- Passes the Hardware-tab Low, Medium, or High gain and duration to Trigger
-  Bridge 0.3.1 and newer.
-- Keeps Native TGK first on compatible stock firmware, preserving its complete
-  proprietary haptic behavior.
-- Leaves module haptics independent from touch injection failures: unavailable
-  vibrator nodes disable feedback without disabling mapped trigger contacts.
-- Uses automatic module rotation detection so saved landscape targets require
-  no manual property override.
+- Open **Trigger LEDs** inside **LED Zones** and enable **Separate top and bottom colors**.
+- Save a different combination for normal lighting, Game Mode, Charging Mode, and each incoming-call/connected-call profile.
+- Select Steady, Breathe, Flashing, or Rapid. Changing the effect preserves both selected colors.
+- Keep the existing matching-color option. Controls use preset colors only, without custom hex values or RGB color sliders.
+- Profile editors stage changes until Save; Cancel leaves saved mode settings unchanged.
 
-## Automatic trigger backend selection
+## RGB Studio split sequences
 
-- Continues to prefer REDMAGIC Native TGK on compatible stock firmware.
-- Falls back to the optional root companion module when Native TGK is missing
-  or rejects the active mapping.
-- Requires Redmagic Trigger Bridge v0.3.0 (`versionCode 10`) or newer; older
-  separate-touchscreen builds are rejected.
-- Writes normalized portrait and landscape targets to the module and activates
-  it only while a configured game owns the foreground.
-- Disables partial native state before module activation and disables both
-  paths during game exit, screen-off, editing, and runtime teardown.
-- Keeps a root-only exact validation marker for maintainers without changing
-  normal native-first production selection.
+- Select separate preset sequences for the top and bottom triggers.
+- Select one color per trigger for a fixed combination, or multiple colors to cycle.
+- Each sequence wraps independently, even when the two lists have different lengths.
+- Both triggers share the selected effect and trigger cycle speed. Synchronized mode shares timing with fan/logo cycles while retaining the chosen trigger pair.
+- Apply the split pair after other zone writes so those updates do not replace it. The matching-color Apply to All action is hidden while split triggers are selected.
 
-## Verified merged-touch gameplay
+## Saved profiles and lighting ownership
 
-Trigger Bridge v0.3.1 combines the physical Synaptics touchscreen and two
-reserved shoulder-trigger slots into one protocol-B input device. On-device COD
-Mobile validation covered:
+- Master Profiles and portable JSON backups retain each mode's split selection and RGB Studio sequences.
+- Older settings retain matching-trigger behavior.
+- Charging, calls, games, RGB Studio, and normal lighting keep their existing priority and restoration rules.
 
-- Continuous thumbstick movement while tapping and holding L/R
-- Both shoulder triggers with one and two physical screen contacts
-- Repeated lifting and replacement of physical fingers during trigger input
-- Accurate saved targets in the measured landscape orientation
-- Stable slot ownership without stuck contacts, dropped touch, or aim snapping
-- A final two-minute combined-input stress test
+## How the feature was achieved
 
-Native TGK remains the preferred full-fidelity backend for stock haptics,
-rapid-fire modes, and vendor visual effects. Trigger Bridge 0.3.1 provides a
-validated hardware-vibrator approximation. The module backend is intended for
-compatible NX809J ROMs retaining the required SAR, touchscreen, arming-node,
-vibrator, uinput, root, and SELinux interfaces.
+Comparing stock AW22xxx effect programs identified the RGB value-byte locations for each trigger. The split path copies an exact supported vendor template to temporary storage, validates its checksum and byte layout, replaces only the mapped RGB values, and replays the program through the serialized root broker. Vendor firmware files, stock timing/routing bytes, current limits, and hardware reset controls are unchanged. Unrecognized program versions are rejected before split-program writes.
 
-## Gameplay runtime and overlay recovery
+Device testing confirmed split Steady, Breathe, and Flashing output. A community test confirmed blue top/purple bottom breathing without requiring the app. Rapid is implemented and covered by byte-preservation tests, but its physical split output still needs confirmation.
 
-- Restart a missing gameplay runtime when a valid foreground hint arrives.
-- Retire stale foreground-monitor authority so overlays do not remain visible
-  outside the configured application.
-- Preserve the movable GS button, movable drawer, saved per-app positions, and
-  Android Back-gesture access from 2.5.1.
-- Show a one-time reboot notice after an APK replacement changes the gameplay,
-  overlay, accessibility, watchdog, or trigger stack. Android may otherwise
-  retain stale service or input state until the next boot.
-
-## Diagnostics and documentation
-
-- Device scanning reports Native TGK and compatible Trigger Bridge availability
-  independently.
-- Trigger diagnostics identify the selected backend and its live state.
-- README and native TGK reverse-engineering documentation now cover the merged
-  input architecture, minimum module version, validation evidence, and custom
-  ROM boundary.
-
-## Compatibility boundary
-
-- Primary target: REDMAGIC 11 Pro / NX809J.
-- The module fallback was forced and verified end to end on stock Android 16.
-- Automatic selection on an actual custom ROM without Native TGK remains
-  unverified because the test device remains on stock firmware.
-- Stock-only performance, display, touch-tuning, charge-separation, haptic,
-  rapid-fire, and visual-effect features still require their corresponding
-  REDMAGIC framework implementations.
+The README and [reverse-engineering/test report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md) document the mappings, firmware checksums, reported physical tests, implementation, and remaining validation. Regression tests cover program byte preservation, rejected firmware, failure cleanup, sequence wrapping, and saved-profile editing behavior.
 
 ## Installation
 
-Install the signed APK over the existing Toolbox installation, then reboot the
-phone once before testing gameplay overlays or trigger mapping. Keep Trigger
-Bridge v0.3.1 enabled in KernelSU, Magisk, or APatch; Toolbox leaves it inactive
-unless the module backend is actually selected.
+- Target device: REDMAGIC 11 Pro / NX809J, with root and the supported vendor LED interfaces/programs.
+- App version: **2.5.4**, Android `versionCode` **10**.
+- Install the signed APK over your existing Toolbox installation. The application ID and signing configuration are unchanged, preserving saved profiles.
+- This lighting feature uses the phone's LED controller and does not require Trigger Bridge. Existing gameplay and Trigger Bridge support from 2.5.3 remains available.

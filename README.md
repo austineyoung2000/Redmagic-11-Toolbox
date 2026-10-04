@@ -1,7 +1,7 @@
 # Redmagic 11 Toolbox
 
 [![Android CI](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml/badge.svg?branch=sixteen)](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml)
-![Version](https://img.shields.io/badge/version-2.5.3-red)
+![Version](https://img.shields.io/badge/version-2.5.4-red)
 ![Android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)
 ![Device](https://img.shields.io/badge/device-RedMagic%2011%20Pro-red)
 ![Root](https://img.shields.io/badge/root-required-orange)
@@ -19,7 +19,7 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | Item | Configuration |
 |---|---|
 | Application ID | `com.elitedarkkaiser.redmagic` |
-| Version | `2.5.3` (`versionCode 9`) |
+| Version | `2.5.4` (`versionCode 10`) |
 | Development branch | `sixteen` |
 | Minimum Android | Android 9 / API 28 |
 | Target and compile SDK | API 35 |
@@ -28,6 +28,18 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | UI | Material Components |
 | Root | Required for hardware controls; native TGK itself is non-root |
 | Supported device | RedMagic 11 Pro / NX809J |
+
+## What's new in 2.5.4
+
+Version 2.5.4 adds independent top and bottom trigger LED preset colors with a shared lighting effect. Trigger LEDs remain inside **LED Zones**, alongside the fan and logo controls.
+
+- Choose any combination of the eight preset colors for the two triggers.
+- Save separate combinations in normal lighting, Game Mode, Charging Mode, and incoming/connected Call Lighting profiles.
+- Use separate top/bottom color sequences in RGB Studio, including fixed combinations and sequences of different lengths.
+- Retain split selections through Master Profiles, portable backups, and mode restoration.
+- Use Steady, Breathe, Flashing, or Rapid with preset-only controls; no custom hex inputs or RGB sliders.
+
+The feature uses the reverse-engineered AW22xxx vendor effect programs and validates their checksums and RGB byte locations before applying a split selection. It does not rewrite vendor firmware or increase LED current limits. Steady, Breathe, and Flashing split output was confirmed during device/community testing; Rapid still needs physical split-output confirmation. See the [test and reverse-engineering report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md).
 
 ## What's new in 2.5.3
 
@@ -139,7 +151,7 @@ The complete native TGK investigation—including firmware classes, Binder trans
 
 Stock Game Space package roles, privileged gesture-monitor behavior, overlay-window evidence, AutoLaunch recovery policy, failed prototypes, and the Toolbox's compatible implementation are documented in the living [`docs/GAME_SPACE_REVERSE_ENGINEERING.md`](docs/GAME_SPACE_REVERSE_ENGINEERING.md) report. New verified Game Space findings should be added there as the investigation continues.
 
-The sections below document the complete 2.5.3 behavior and current architecture.
+The sections below document the complete 2.5.4 behavior and current architecture.
 
 ## Compatibility
 
