@@ -659,6 +659,18 @@ object NativeTgkProfileDialog {
                             profile.hapticsEnabled
                     }
 
+                val bridgeFeedbackSwitch = MaterialSwitch(activity).apply {
+                    text = "Trigger Bridge edge highlights"
+                    setTextColor(AppTheme.textPrimary)
+                    isChecked = profile.bridgeVisualFeedback
+                    setOnCheckedChangeListener { _, checked ->
+                        val current = NativeTgkStorage.getProfile(activity, profile.packageName)
+                            ?: return@setOnCheckedChangeListener
+                        NativeTgkStorage.saveProfile(activity, current.copy(bridgeVisualFeedback = checked))
+                        if (!checked) TriggerBridgeFeedback.hide()
+                    }
+                }
+
                 val savedTargetsSwitch =
                     MaterialSwitch(activity).apply {
                         text = "Show saved targets in game"
@@ -731,6 +743,7 @@ object NativeTgkProfileDialog {
 
                 card.addView(enabledSwitch)
                 card.addView(hapticsSwitch)
+                card.addView(bridgeFeedbackSwitch)
                 card.addView(savedTargetsSwitch)
 
                 val optionsRow = LinearLayout(activity).apply {

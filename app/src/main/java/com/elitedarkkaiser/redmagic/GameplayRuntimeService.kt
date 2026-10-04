@@ -634,6 +634,7 @@ class GameplayRuntimeService : Service() {
                         orientation
                     )
                     NativeTgkGameplayOverlay.hide()
+        TriggerBridgeFeedback.hide()
                     return@nativeApply
                 }
 
@@ -654,6 +655,12 @@ class GameplayRuntimeService : Service() {
                         orientation,
                         result.backend
                     )
+                    if (result.backend == TriggerMappingBackend.MODULE_BACKEND &&
+                        NativeTgkStorage.getProfile(applicationContext, packageName)?.bridgeVisualFeedback == true) {
+                        TriggerBridgeFeedback.show(applicationContext)
+                    } else {
+                        TriggerBridgeFeedback.hide()
+                    }
                 }
             }
         }.onFailure {
@@ -662,12 +669,14 @@ class GameplayRuntimeService : Service() {
                 orientation
             )
             NativeTgkGameplayOverlay.hide()
+        TriggerBridgeFeedback.hide()
         }
     }
 
     private fun deactivateNativeTgk(reason: String) {
         NativeTgkRuntimeState.clear()
         NativeTgkGameplayOverlay.hide()
+        TriggerBridgeFeedback.hide()
 
         val generation =
             nativeTgkGeneration.incrementAndGet()
@@ -698,6 +707,7 @@ class GameplayRuntimeService : Service() {
         lastNativeHealthCheckAt = 0L
         NativeTgkRuntimeState.clear()
         NativeTgkGameplayOverlay.hide()
+        TriggerBridgeFeedback.hide()
     }
 
     private fun isNativeHealthCheckDue(): Boolean {
