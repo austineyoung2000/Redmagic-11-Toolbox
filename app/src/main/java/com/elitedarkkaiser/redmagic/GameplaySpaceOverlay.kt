@@ -407,7 +407,7 @@ internal class GameplaySpaceOverlay(
             "L  ${behaviorLabel(profile.effectiveLeftBehavior(), profile.effectiveLeftRapidFireCount())}",
             "R  ${behaviorLabel(profile.effectiveRightBehavior(), profile.effectiveRightRapidFireCount())}",
             "LAYOUT  ${orientationLabel().uppercase()}",
-            "Native TGK mapping active"
+            "${NativeTgkRuntimeState.activeBackend() ?: "Trigger backend unavailable"} mapping active"
         ))
         renderDashboard(content, status, listOf(
             actionRow(

@@ -766,3 +766,7 @@ The brightness feature was developed and owner-tested on `test/led-brightness`, 
 ### Logo and GAME MODE bar implementation
 
 Version 2.6.0 uses separate physical RGB groups in the existing logo vendor program. [The reverse-engineering report](docs/LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md) records the discovery and validation. The owner authorized the merge and release on October 4, 2026.
+
+### Trigger Bridge edge highlights
+
+Toolbox adds an optional per-game red/blue edge glow for module-backed gameplay. It observes the bridge's reserved left/right touch IDs without grabbing input or modifying the module. Native TGK retains its stock visuals. See [implementation and device checklist](docs/TRIGGER_BRIDGE_VISUAL_FEEDBACK_TEST.md); The owner confirmed working mapping and highlights together after reboot on October 4, 2026, and authorized merging into `sixteen`.

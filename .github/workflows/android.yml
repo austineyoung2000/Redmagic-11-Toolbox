@@ -7,6 +7,7 @@ on:
       - sixteen
       - test/led-brightness
       - test/logo-game-mode-bar
+      - test/bridge-edge-feedback
     tags:
       - 'v*'
   pull_request:

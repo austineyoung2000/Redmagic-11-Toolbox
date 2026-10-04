@@ -141,6 +141,7 @@ data class NativeTgkProfile(
     val appLabel: String,
     val enabled: Boolean = true,
     val hapticsEnabled: Boolean = true,
+    val bridgeVisualFeedback: Boolean = true,
     val showSavedTargets: Boolean = true,
     val savedTargetOpacityPercent: Int = 12,
     val leftBehavior: NativeTgkTriggerBehavior =
@@ -597,6 +598,7 @@ object NativeTgkStorage {
             .put("appLabel", appLabel)
             .put("enabled", enabled)
             .put("hapticsEnabled", hapticsEnabled)
+            .put("bridgeVisualFeedback", bridgeVisualFeedback)
             .put("showSavedTargets", showSavedTargets)
             .put(
                 "savedTargetOpacityPercent",
@@ -707,6 +709,7 @@ object NativeTgkStorage {
             packageName = packageName,
             appLabel = appLabel,
             enabled = optBoolean("enabled", true),
+            bridgeVisualFeedback = optBoolean("bridgeVisualFeedback", true),
             hapticsEnabled = optBoolean(
                 "hapticsEnabled",
                 true
