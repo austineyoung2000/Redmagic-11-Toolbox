@@ -4,15 +4,10 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
-import android.text.InputFilter
-import android.text.method.DigitsKeyListener
-import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.SeekBar
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
@@ -85,75 +80,6 @@ internal object ShoulderLedDialogUi {
             setTextColor(deps.textSecondary)
             setPadding(0, deps.dp(12), 0, deps.dp(6))
         }
-        fun showColorPicker(top: Boolean) {
-            val split = selection() ?: return
-            val initial = if (top) split.topRgb else split.bottomRgb
-            val picker = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(deps.dp(22), deps.dp(12), deps.dp(22), deps.dp(12))
-            }
-            val sample = label("Color preview").apply {
-                gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
-                setShadowLayer(2f, 0f, 0f, Color.BLACK)
-            }
-            val hexInput = EditText(activity).apply {
-                setSingleLine(true)
-                hint = "RRGGBB"
-                keyListener = DigitsKeyListener.getInstance("0123456789abcdefABCDEF")
-                filters = arrayOf(InputFilter.LengthFilter(6))
-                setText(ShoulderLedSplit.hex(initial))
-                setTextColor(deps.textPrimary)
-            }
-            val channels = intArrayOf((initial shr 16) and 255, (initial shr 8) and 255, initial and 255)
-            fun refreshSample() {
-                val rgb = (channels[0] shl 16) or (channels[1] shl 8) or channels[2]
-                hexInput.setText(ShoulderLedSplit.hex(rgb))
-                sample.background = deps.roundedFill(Color.rgb(channels[0], channels[1], channels[2]), 12)
-            }
-            picker.addView(sample, LinearLayout.LayoutParams(-1, deps.dp(40)))
-            picker.addView(label("Hex color"))
-            picker.addView(hexInput)
-            listOf("Red", "Green", "Blue").forEachIndexed { index, name ->
-                val channelLabel = label("$name: ${channels[index]}")
-                picker.addView(channelLabel)
-                picker.addView(SeekBar(activity).apply {
-                    max = 255
-                    progress = channels[index]
-                    progressTintList = ColorStateList.valueOf(deps.accent)
-                    thumbTintList = ColorStateList.valueOf(deps.accent)
-                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                        override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                            if (!fromUser) return
-                            channels[index] = value
-                            channelLabel.text = "$name: $value"
-                            refreshSample()
-                        }
-                        override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-                        override fun onStopTrackingTouch(bar: SeekBar?) = Unit
-                    })
-                })
-            }
-            refreshSample()
-            val pickerDialog = MaterialAlertDialogBuilder(activity)
-                .setTitle(if (top) "Top trigger color" else "Bottom trigger color")
-                .setView(picker)
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Use color", null)
-                .create()
-            pickerDialog.setOnShowListener {
-                pickerDialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                    val rgb = ShoulderLedSplit.parseRgb(hexInput.text.toString())
-                    if (rgb == null) hexInput.error = "Enter six hexadecimal digits"
-                    else {
-                        changeRgb(top, rgb)
-                        pickerDialog.dismiss()
-                    }
-                }
-            }
-            pickerDialog.show()
-        }
-
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(deps.dp(22), deps.dp(18), deps.dp(22), deps.dp(12))
@@ -164,7 +90,7 @@ internal object ShoulderLedDialogUi {
             setTextColor(deps.textPrimary)
             setTypeface(deps.typeface, Typeface.BOLD)
         })
-        container.addView(label("Choose matching colors or customize each trigger separately."))
+        container.addView(label("Choose matching colors or select a preset color for each trigger."))
         val enableCheck = MaterialCheckBox(activity).apply {
             text = "Enable trigger LEDs"
             isChecked = currentEnabled()
@@ -233,11 +159,7 @@ internal object ShoulderLedDialogUi {
         }
         addPalette(singlePanel, null, "Color")
         addPalette(splitPanel, true, "Top trigger")
-        val topCustom = deps.filterChip("Custom top color", false) { showColorPicker(true) }
-        splitPanel.addView(topCustom)
         addPalette(splitPanel, false, "Bottom trigger")
-        val bottomCustom = deps.filterChip("Custom bottom color", false) { showColorPicker(false) }
-        splitPanel.addView(bottomCustom)
         container.addView(singlePanel)
         container.addView(splitPanel)
 
@@ -265,8 +187,6 @@ internal object ShoulderLedDialogUi {
                 }
             }
             dotUpdates.forEach { it() }
-            topCustom.text = split?.let { "Custom: #${ShoulderLedSplit.hex(it.topRgb)}" } ?: "Custom top color"
-            bottomCustom.text = split?.let { "Custom: #${ShoulderLedSplit.hex(it.bottomRgb)}" } ?: "Custom bottom color"
         }
         dialogRefresh = ::refreshUi
         setDialogRefresh(dialogRefresh)

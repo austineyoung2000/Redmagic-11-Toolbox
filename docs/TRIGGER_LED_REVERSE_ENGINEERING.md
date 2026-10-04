@@ -114,7 +114,7 @@ This rollback is an attempt, not a guarantee: communication failures can also pr
 
 The code does not modify vendor firmware files, flash partitions, change `imax`, toggle `hwen`, or reset the controller. Root access and supported vendor interfaces/programs are required. Unknown checksums fail before controller writes.
 
-The Lighting tab gives Trigger LEDs a separate section from fan/logo LED Zones. Users select matching stock colors or separate top/bottom colors through presets, RGB sliders, and six-digit hex input, with one shared effect. Cancel restores the original app selection. This is independent color control; it is not independent effect timing per trigger.
+The Lighting tab gives Trigger LEDs a separate section from fan/logo LED Zones. Users select matching stock colors or separate top/bottom colors from the preset palette, with one shared effect. The UI has no hex input or RGB sliders. Cancel restores the original app selection. This is independent color control; it is not independent effect timing per trigger.
 
 ## Automated validation and remaining checks
 
@@ -127,4 +127,4 @@ The Lighting tab gives Trigger LEDs a separate section from fan/logo LED Zones. 
 
 The new color dialog also passed a Kotlin 2.0.21 compile check against Android 35 and Material libraries. Local Gradle dependency downloads were blocked, but GitHub Actions subsequently passed the complete unit-test and signed release APK build after the test harness was adjusted to use Android-compatible file APIs. The successful run is [Android CI 1085](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/runs/37169567638). These JVM checks do not emulate the LED controller or prove physical output.
 
-Before release, verify the built app on hardware: both trigger orientations, custom colors and black/off, each effect, Save/Cancel, disable/re-enable, restart/restoration, and transitions to other lighting profiles. Rapid requires an explicit community/device result.
+Before release, verify the built app on hardware: both trigger orientations, preset color combinations, each effect, Save/Cancel, disable/re-enable, restart/restoration, and transitions to other lighting profiles. Rapid requires an explicit community/device result.
