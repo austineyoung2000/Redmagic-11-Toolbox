@@ -125,6 +125,6 @@ The Lighting tab gives Trigger LEDs a separate section from fan/logo LED Zones. 
 - A modified template is rejected before controller writes.
 - An injected register-write failure exercises numeric-effect rollback and temporary-file cleanup.
 
-The new color dialog also passed a Kotlin 2.0.21 compile check against Android 35 and Material libraries. A complete APK build was blocked in the development environment by Gradle dependency-download connectivity; that check remains for CI. These JVM checks do not emulate the LED controller or prove physical output.
+The new color dialog also passed a Kotlin 2.0.21 compile check against Android 35 and Material libraries. Local Gradle dependency downloads were blocked, but GitHub Actions subsequently passed the complete unit-test and signed release APK build after the test harness was adjusted to use Android-compatible file APIs. The successful run is [Android CI 1085](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/runs/37169567638). These JVM checks do not emulate the LED controller or prove physical output.
 
 Before release, verify the built app on hardware: both trigger orientations, custom colors and black/off, each effect, Save/Cancel, disable/re-enable, restart/restoration, and transitions to other lighting profiles. Rapid requires an explicit community/device result.
