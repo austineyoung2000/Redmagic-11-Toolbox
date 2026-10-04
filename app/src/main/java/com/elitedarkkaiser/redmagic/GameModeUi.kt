@@ -369,19 +369,14 @@ internal object GameModeUi {
 
                 canvas.restoreToCount(save)
 
-                ringPaint.color = if (
-                    FanLedPalette.isSelected(
-                        gmFanLedEffect,
-                        gmFanLedColor,
-                        value
-                    )
-                ) {
-                    Color.WHITE
-                } else {
-                    Color.TRANSPARENT
+                if (FanLedPalette.isSelected(gmFanLedEffect, gmFanLedColor, value)) {
+                    ringPaint.strokeWidth = deps.dp(5).toFloat()
+                    ringPaint.color = Color.DKGRAY
+                    canvas.drawOval(rect, ringPaint)
+                    ringPaint.strokeWidth = deps.dp(3).toFloat()
+                    ringPaint.color = Color.WHITE
+                    canvas.drawOval(rect, ringPaint)
                 }
-
-                canvas.drawOval(rect, ringPaint)
             }
         }
     }
