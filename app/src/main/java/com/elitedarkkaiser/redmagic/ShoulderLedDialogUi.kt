@@ -53,6 +53,9 @@ internal object ShoulderLedDialogUi {
         deps: Deps
     ) {
         var dialogRefresh: (() -> Unit)? = null
+        fun setSelectionEffect(value: String) {
+            setEffect(LedBrightness.withEffect(currentEffect(), value))
+        }
         var bottomRgb = ShoulderLedSplit.decode(currentEffect())?.bottomRgb
             ?: ShoulderLedSplit.presetRgb(currentColor())
         fun selection() = ShoulderLedSplit.decode(currentEffect())
@@ -63,7 +66,7 @@ internal object ShoulderLedDialogUi {
         }
         fun changeEffect(effect: String) {
             val split = selection()
-            setEffect(if (split == null) effect else ShoulderLedSplit.encode(effect, split.topRgb, split.bottomRgb))
+            setSelectionEffect(if (split == null) effect else ShoulderLedSplit.encode(effect, split.topRgb, split.bottomRgb))
             previewAndRefresh()
         }
         fun changeRgb(top: Boolean, rgb: Int) {
@@ -71,7 +74,7 @@ internal object ShoulderLedDialogUi {
             val upper = if (top) rgb else split.topRgb
             val lower = if (top) split.bottomRgb else rgb
             bottomRgb = lower
-            setEffect(ShoulderLedSplit.encode(split.effect, upper, lower))
+            setSelectionEffect(ShoulderLedSplit.encode(split.effect, upper, lower))
             previewAndRefresh()
         }
         fun label(text: String) = TextView(activity).apply {
@@ -108,10 +111,10 @@ internal object ShoulderLedDialogUi {
             buttonTintList = ColorStateList.valueOf(deps.accent)
             setOnCheckedChangeListener { _, checked ->
                 if (checked) {
-                    setEffect(ShoulderLedSplit.encode(baseEffect(), ShoulderLedSplit.presetRgb(currentColor()), bottomRgb))
+                    setSelectionEffect(ShoulderLedSplit.encode(baseEffect(), ShoulderLedSplit.presetRgb(currentColor()), bottomRgb))
                 } else {
                     selection()?.let { bottomRgb = it.bottomRgb }
-                    setEffect(baseEffect())
+                    setSelectionEffect(baseEffect())
                 }
                 previewAndRefresh()
             }
@@ -163,6 +166,8 @@ internal object ShoulderLedDialogUi {
         container.addView(singlePanel)
         container.addView(splitPanel)
 
+        val brightness = LedBrightnessUi(activity, container, "triggers", currentEffect, currentColor,
+            setEffect, applyPreviewIfEnabled, deps.textSecondary, deps.accent, deps.dp)
         var saved = false
         fun restoreOriginal() {
             ShoulderLedActions.restoreOriginalState(originalEnabled, originalEffect, originalColor,
@@ -175,6 +180,7 @@ internal object ShoulderLedDialogUi {
             .setPositiveButton("Save", null)
             .create()
         fun refreshUi() {
+            brightness.refresh()
             val split = selection()
             singlePanel.visibility = if (split == null) View.VISIBLE else View.GONE
             splitPanel.visibility = if (split == null) View.GONE else View.VISIBLE

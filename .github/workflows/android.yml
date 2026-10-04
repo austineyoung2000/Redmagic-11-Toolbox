@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - sixteen
+      - test/led-brightness
     tags:
       - 'v*'
   pull_request:

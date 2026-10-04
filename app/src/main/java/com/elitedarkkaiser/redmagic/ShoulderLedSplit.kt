@@ -20,7 +20,7 @@ internal object ShoulderLedSplit {
     )
 
     fun decode(value: String): Selection? {
-        val parts = value.split(':')
+        val parts = LedBrightness.effect(value).split(':')
         if (parts.size != 4 || parts[0] != "split" || parts[1] !in programs) return null
         val top = parseRgb(parts[2]) ?: return null
         val bottom = parseRgb(parts[3]) ?: return null
@@ -41,7 +41,7 @@ internal object ShoulderLedSplit {
     fun hex(rgb: Int): String = rgb.toString(16).padStart(6, '0').uppercase()
     fun presetRgb(id: Int): Int = parseRgb(colors.firstOrNull { it.id == id }?.hex ?: "#00FF00")!!
 
-    fun baseEffect(value: String): String = decode(value)?.effect ?: value
+    fun baseEffect(value: String): String = decode(value)?.effect ?: LedBrightness.effect(value)
 
     /** Replay only an exact, validated vendor program; never modify vendor files or IMAX. */
     fun command(value: String): String? {

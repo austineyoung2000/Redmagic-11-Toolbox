@@ -19,7 +19,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 10
-        versionName = "2.5.4"
+        versionName = "2.5.4-brightness-test"
     }
 
     signingConfigs {

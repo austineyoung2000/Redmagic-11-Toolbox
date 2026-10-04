@@ -14,6 +14,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 
 internal object FanLedDialogUi {
     data class Deps(
@@ -65,9 +66,16 @@ internal object FanLedDialogUi {
         deps: Deps,
         title: String = "Fan LED",
         subtitle: String = "Confirmed working options for fan LED",
-        enableLabel: String = "Enable fan light"
+        enableLabel: String = "Enable fan light",
+        brightnessControls: Boolean = false
     ) {
         var dialogRefresh: (() -> Unit)? = null
+        fun visibleEffect() = LedBrightness.effect(currentEffect())
+        fun changeEffect(value: String) {
+            val selected = LedBrightness.withEffect(currentEffect(), value)
+            setEffect(if (brightnessControls && !LedBrightness.supported("fan", selected, currentColor()))
+                LedBrightness.encode(255, value) else selected)
+        }
 
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -117,26 +125,26 @@ internal object FanLedDialogUi {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        val steadyBtn = deps.filterChip("Steady", currentEffect() == "steady") {
-            setEffect("steady")
+        val steadyBtn = deps.filterChip("Steady", visibleEffect() == "steady") {
+            changeEffect("steady")
             applyPreviewIfEnabled()
             dialogRefresh?.invoke()
         }
 
-        val breatheBtn = deps.filterChip("Breathe", currentEffect() == "breathe") {
-            setEffect("breathe")
+        val breatheBtn = deps.filterChip("Breathe", visibleEffect() == "breathe") {
+            changeEffect("breathe")
             applyPreviewIfEnabled()
             dialogRefresh?.invoke()
         }
 
-        val flashingBtn = deps.filterChip("Flashing", currentEffect() == "flashing") {
-            setEffect("flashing")
+        val flashingBtn = deps.filterChip("Flashing", visibleEffect() == "flashing") {
+            changeEffect("flashing")
             applyPreviewIfEnabled()
             dialogRefresh?.invoke()
         }
 
-        val rapidBtn = deps.filterChip("Rapid", currentEffect() == "rapid") {
-            setEffect("rapid")
+        val rapidBtn = deps.filterChip("Rapid", visibleEffect() == "rapid") {
+            changeEffect("rapid")
             applyPreviewIfEnabled()
             dialogRefresh?.invoke()
         }
@@ -168,7 +176,7 @@ internal object FanLedDialogUi {
         fun addColor(row: LinearLayout, colorId: Int, hex: String) {
             row.addView(deps.colorDot(colorId, hex) {
                 setColor(colorId)
-                if (currentEffect().startsWith("preset:")) setEffect("steady")
+                if (visibleEffect().startsWith("preset:")) changeEffect("steady")
                 applyPreviewIfEnabled()
                 dialogRefresh?.invoke()
             })
@@ -312,15 +320,19 @@ internal object FanLedDialogUi {
         container.addView(colorRow2)
         container.addView(presetBubbleRow1)
         container.addView(presetBubbleRow2)
+        val brightness = if (brightnessControls) LedBrightnessUi(activity, container, "fan",
+            currentEffect, currentColor, setEffect, applyPreviewIfEnabled,
+            deps.textSecondary, deps.accent, deps.dp) else null
         container.addView(buttonRow)
 
         val dialog = MaterialAlertDialogBuilder(activity)
-            .setView(container)
+            .setView(ScrollView(activity).apply { addView(container) })
             .setCancelable(true)
             .create()
 
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
+        var saved = false
         fun restoreOriginal() {
             setEnabled(originalEnabled)
             setEffect(originalEffect)
@@ -334,11 +346,11 @@ internal object FanLedDialogUi {
         }
 
         cancelBtn.setOnClickListener {
-            restoreOriginal()
             dialog.dismiss()
         }
 
         saveBtn.setOnClickListener {
+            saved = true
             saveState()
             if (currentEnabled()) {
                 applySelection(currentEffect(), currentColor())
@@ -353,9 +365,7 @@ internal object FanLedDialogUi {
             dialog.dismiss()
         }
 
-        dialog.setOnCancelListener {
-            restoreOriginal()
-        }
+
 
         fun updateEffectButton(
             button: Button,
@@ -393,19 +403,19 @@ internal object FanLedDialogUi {
         fun repaint() {
             updateEffectButton(
                 steadyBtn,
-                currentEffect() == "steady"
+                visibleEffect() == "steady"
             )
             updateEffectButton(
                 breatheBtn,
-                currentEffect() == "breathe"
+                visibleEffect() == "breathe"
             )
             updateEffectButton(
                 flashingBtn,
-                currentEffect() == "flashing"
+                visibleEffect() == "flashing"
             )
             updateEffectButton(
                 rapidBtn,
-                currentEffect() == "rapid"
+                visibleEffect() == "rapid"
             )
         }
 
@@ -429,6 +439,7 @@ internal object FanLedDialogUi {
         }
 
         fun refreshUi() {
+            brightness?.refresh()
             repaint()
             updateColorDots()
             presetBubbleRow1.invalidate()
@@ -444,6 +455,7 @@ internal object FanLedDialogUi {
         dialogRefresh = { refreshUi() }
         setDialogRefresh(dialogRefresh)
         dialog.setOnDismissListener {
+            if (!saved) restoreOriginal()
             setDialogRefresh(null)
         }
 

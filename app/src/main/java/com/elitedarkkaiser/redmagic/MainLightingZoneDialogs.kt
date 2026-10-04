@@ -109,6 +109,7 @@ internal class MainLightingZoneDialogs(
 
     fun showLogo() {
         LogoLedDialogUi.showLogoLedDialog(
+            brightnessControls = true,
             activity = activity,
             originalEnabled = state.logoEnabled,
             originalEffect = state.logoEffect,
@@ -180,6 +181,7 @@ internal class MainLightingZoneDialogs(
 
     fun showFan() {
         FanLedDialogUi.showFanLedDialog(
+            brightnessControls = true,
             activity = activity,
             originalEnabled = state.fanEnabled,
             originalEffect = state.fanEffect,
@@ -387,6 +389,9 @@ internal class MainLightingZoneDialogs(
         val palette = FanLedPalette.fromStockPreset(effectValue) ?: return
         state.fanEnabled = true
         state.fanEffect = FanLedPalette.normalizeEffect(state.fanEffect)
+        if (!LedBrightness.supported("fan", state.fanEffect, palette) && LedBrightness.level(state.fanEffect) != 255) {
+            state.fanEffect = LedBrightness.encode(255, LedBrightness.effect(state.fanEffect))
+        }
         state.fanColor = palette
         applyFanSelection(state.fanEffect, state.fanColor)
         refreshFan?.invoke()

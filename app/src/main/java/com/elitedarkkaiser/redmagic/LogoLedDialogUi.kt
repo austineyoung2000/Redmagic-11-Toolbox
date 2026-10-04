@@ -14,6 +14,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 
 internal object LogoLedDialogUi {
     data class Deps(
@@ -52,9 +53,16 @@ internal object LogoLedDialogUi {
         stopFanLedService: () -> Unit,
         anyLedEnabled: () -> Boolean,
         setDialogRefresh: (((() -> Unit)?) -> Unit),
-        deps: Deps
+        deps: Deps,
+        brightnessControls: Boolean = false
     ) {
         var dialogRefresh: (() -> Unit)? = null
+        fun visibleEffect() = LedBrightness.effect(currentEffect())
+        fun changeEffect(value: String) {
+            val selected = LedBrightness.withEffect(currentEffect(), value)
+            setEffect(if (brightnessControls && !LedBrightness.supported("logo", selected, currentColor()))
+                LedBrightness.encode(255, value) else selected)
+        }
 
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -104,26 +112,26 @@ internal object LogoLedDialogUi {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        val steadyBtn = deps.filterChip("Steady", currentEffect() == "steady") {
-            setEffect("steady")
+        val steadyBtn = deps.filterChip("Steady", visibleEffect() == "steady") {
+            changeEffect("steady")
             if (currentEnabled()) applyEffect(currentEffect(), currentColor())
             dialogRefresh?.invoke()
         }
 
-        val breatheBtn = deps.filterChip("Breathe", currentEffect() == "breathe") {
-            setEffect("breathe")
+        val breatheBtn = deps.filterChip("Breathe", visibleEffect() == "breathe") {
+            changeEffect("breathe")
             if (currentEnabled()) applyEffect(currentEffect(), currentColor())
             dialogRefresh?.invoke()
         }
 
-        val flashingBtn = deps.filterChip("Flashing", currentEffect() == "flashing") {
-            setEffect("flashing")
+        val flashingBtn = deps.filterChip("Flashing", visibleEffect() == "flashing") {
+            changeEffect("flashing")
             if (currentEnabled()) applyEffect(currentEffect(), currentColor())
             dialogRefresh?.invoke()
         }
 
-        val rapidBtn = deps.filterChip("Rapid", currentEffect() == "rapid") {
-            setEffect("rapid")
+        val rapidBtn = deps.filterChip("Rapid", visibleEffect() == "rapid") {
+            changeEffect("rapid")
             if (currentEnabled()) applyEffect(currentEffect(), currentColor())
             dialogRefresh?.invoke()
         }
@@ -247,15 +255,19 @@ internal object LogoLedDialogUi {
         container.addView(colorLabel)
         container.addView(colorRow)
         container.addView(colorRow2)
+        val brightness = if (brightnessControls) LedBrightnessUi(activity, container, "logo",
+            currentEffect, currentColor, setEffect, applyPreviewIfEnabled,
+            deps.textSecondary, deps.accent, deps.dp) else null
         container.addView(buttonRow)
 
         val dialog = MaterialAlertDialogBuilder(activity)
-            .setView(container)
+            .setView(ScrollView(activity).apply { addView(container) })
             .setCancelable(true)
             .create()
 
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
+        var saved = false
         fun restoreOriginal() {
             setEnabled(originalEnabled)
             setEffect(originalEffect)
@@ -269,11 +281,11 @@ internal object LogoLedDialogUi {
         }
 
         cancelBtn.setOnClickListener {
-            restoreOriginal()
             dialog.dismiss()
         }
 
         saveBtn.setOnClickListener {
+            saved = true
             saveState()
             if (currentEnabled()) {
                 applyEffect(currentEffect(), currentColor())
@@ -288,9 +300,7 @@ internal object LogoLedDialogUi {
             dialog.dismiss()
         }
 
-        dialog.setOnCancelListener {
-            restoreOriginal()
-        }
+
 
         fun updateEffectButton(
             button: Button,
@@ -328,19 +338,19 @@ internal object LogoLedDialogUi {
         fun repaint() {
             updateEffectButton(
                 steadyBtn,
-                currentEffect() == "steady"
+                visibleEffect() == "steady"
             )
             updateEffectButton(
                 breatheBtn,
-                currentEffect() == "breathe"
+                visibleEffect() == "breathe"
             )
             updateEffectButton(
                 flashingBtn,
-                currentEffect() == "flashing"
+                visibleEffect() == "flashing"
             )
             updateEffectButton(
                 rapidBtn,
-                currentEffect() == "rapid"
+                visibleEffect() == "rapid"
             )
         }
 
@@ -357,6 +367,7 @@ internal object LogoLedDialogUi {
         }
 
         fun refreshUi() {
+            brightness?.refresh()
             repaint()
             updateColorDots()
         }
@@ -364,6 +375,7 @@ internal object LogoLedDialogUi {
         dialogRefresh = { refreshUi() }
         setDialogRefresh(dialogRefresh)
         dialog.setOnDismissListener {
+            if (!saved) restoreOriginal()
             setDialogRefresh(null)
         }
 

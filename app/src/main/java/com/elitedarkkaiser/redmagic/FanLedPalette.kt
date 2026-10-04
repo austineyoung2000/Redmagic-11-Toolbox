@@ -26,12 +26,13 @@ internal object FanLedPalette {
     }
 
     fun fromLegacyEffect(effect: String): Int? {
-        if (!effect.startsWith(LEGACY_PREFIX)) return null
-        return fromStockPreset(effect.removePrefix(LEGACY_PREFIX))
+        val base = LedBrightness.effect(effect)
+        if (!base.startsWith(LEGACY_PREFIX)) return null
+        return fromStockPreset(base.removePrefix(LEGACY_PREFIX))
     }
 
     fun normalizeEffect(effect: String): String {
-        return if (fromLegacyEffect(effect) != null) "steady" else effect
+        return if (fromLegacyEffect(effect) != null) LedBrightness.withEffect(effect, "steady") else effect
     }
 
     fun normalizeColor(effect: String, color: Int): Int {
