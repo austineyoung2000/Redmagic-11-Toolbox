@@ -12,6 +12,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.elitedarkkaiser.redmagic.ui.AppTheme
+import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -181,48 +182,42 @@ object RgbStudioDialog {
 
         content.addView(label("Logo / fan / matching triggers color sequence"))
         content.addView(TextView(activity).apply {
-            text = "Selected colors play from top to bottom. Keep at least one color enabled."
+            text = "White rings mark selected colors, played left to right, then the next row. Keep at least one color enabled."
             textSize = 12f
             setTextColor(AppTheme.textSecondary)
             setPadding(0, 0, 0, deps.dp(4))
         })
 
         fun addPalette(parent: LinearLayout, selectedColors: MutableList<Int>) {
-            colorChoices.forEach { choice ->
-                parent.addView(MaterialCheckBox(activity).apply {
-                    text = choice.label
-                    isChecked = choice.id in selectedColors
-                    textSize = 13f
-                    setTextColor(Color.parseColor(choice.hex))
-                    buttonTintList = ColorStateList.valueOf(
-                        Color.parseColor(choice.hex)
-                    )
-                    setOnCheckedChangeListener { button, checked ->
-                        if (checked) {
-                            if (choice.id !in selectedColors) {
-                                val targetIndex = colorChoices
-                                    .indexOfFirst { it.id == choice.id }
-                                val insertAt = selectedColors.indexOfFirst { current ->
-                                    colorChoices.indexOfFirst { it.id == current } > targetIndex
-                                }
-                                if (insertAt >= 0) {
-                                    selectedColors.add(insertAt, choice.id)
-                                } else {
-                                    selectedColors.add(choice.id)
-                                }
-                            }
-                        } else if (selectedColors.size > 1) {
-                            selectedColors.remove(choice.id)
+            val swatches = LedControlViewFactory(activity)
+            colorChoices.chunked(4).forEach { choices ->
+                val row = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, deps.dp(6), 0, deps.dp(4))
+                }
+                choices.forEachIndexed { index, choice ->
+                    if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(deps.dp(10), 1))
+                    lateinit var dot: View
+                    dot = swatches.colorDot(choice.hex, choice.id in selectedColors) {
+                        if (choice.id in selectedColors) {
+                            if (selectedColors.size > 1) selectedColors.remove(choice.id)
+                            else Toast.makeText(activity, "Keep at least one cycle color", Toast.LENGTH_SHORT).show()
                         } else {
-                            button.isChecked = true
-                            Toast.makeText(
-                                activity,
-                                "Keep at least one cycle color",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            selectedColors.add(choice.id)
+                            selectedColors.sortBy { id -> colorChoices.indexOfFirst { it.id == id } }
                         }
+                        val selected = choice.id in selectedColors
+                        dot.background = swatches.colorDotDrawable(choice.hex, selected)
+                        dot.isSelected = selected
+                        dot.contentDescription = "${choice.label}: ${if (selected) "selected" else "not selected"}"
+                    }.apply {
+                        isSelected = choice.id in selectedColors
+                        isFocusable = true
+                        contentDescription = "${choice.label}: ${if (isSelected) "selected" else "not selected"}"
                     }
-                })
+                    row.addView(dot)
+                }
+                parent.addView(row)
             }
         }
         addPalette(content, colors)

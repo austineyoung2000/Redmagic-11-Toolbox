@@ -298,7 +298,7 @@ internal object FanLedDialogUi {
                         value
                     )
                 },
-                { applyFanPreset(value) }
+                { applyFanPreset(value); dialogRefresh?.invoke() }
             )
         }
 
