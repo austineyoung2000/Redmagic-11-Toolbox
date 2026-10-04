@@ -39,20 +39,13 @@ object LightingTabUi {
 
         val zonesCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("✦", "LED ZONES"))
-            addView(deps.bodyText("Configure fan LEDs and logo lighting."))
+            addView(deps.bodyText("Configure fan, logo, and trigger lighting."))
             addView(previewRow)
             addView(deps.singleRow(deps.actionButton("FAN LED", false) {
                 deps.showFanLedDialog()
             }))
             addView(deps.singleRow(deps.actionButton("LOGO LED", false) { deps.showLogoLedDialog() }))
-        }
-
-        val triggerCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("◉", "TRIGGER LEDs"))
-            addView(deps.bodyText("Choose matching colors or a separate color for each trigger, with a shared lighting effect."))
-            addView(deps.singleRow(deps.actionButton("CONFIGURE TRIGGER LEDs", false) {
-                deps.showShoulderLedDialog()
-            }))
+            addView(deps.singleRow(deps.actionButton("TRIGGER LEDs", false) { deps.showShoulderLedDialog() }))
         }
 
         val rgbStudioStatus = deps.subtleLabel(deps.rgbStudioSummary())
@@ -118,8 +111,6 @@ object LightingTabUi {
                 zonesCard to
                     "LED controls unavailable: required vendor " +
                     "interfaces were not detected.",
-                triggerCard to
-                    "Trigger lighting is unavailable on this ROM.",
                 rgbStudioCard to
                     "RGB Studio is unavailable on this ROM.",
                 chargingModeCard to
@@ -134,7 +125,6 @@ object LightingTabUi {
         }
 
         container.addView(zonesCard)
-        container.addView(triggerCard)
         container.addView(rgbStudioCard)
         val callLightingCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("☎", "CALL LIGHTING"))

@@ -114,7 +114,7 @@ This rollback is an attempt, not a guarantee: communication failures can also pr
 
 The code does not modify vendor firmware files, flash partitions, change `imax`, toggle `hwen`, or reset the controller. Root access and supported vendor interfaces/programs are required. Unknown checksums fail before controller writes.
 
-The Lighting tab gives Trigger LEDs a separate section from fan/logo LED Zones. Users select matching stock colors or separate top/bottom colors from the preset palette, with one shared effect. The UI has no hex input or RGB sliders. Cancel restores the original app selection. This is independent color control; it is not independent effect timing per trigger.
+The Lighting tab places Trigger LEDs alongside fan and logo controls inside LED Zones. Users select matching stock colors or separate top/bottom colors from the preset palette, with one shared effect. The UI has no hex input or RGB sliders. Cancel restores the original app selection. This is independent color control; it is not independent effect timing per trigger.
 
 ## Automated validation and remaining checks
 
