@@ -165,10 +165,11 @@ class RgbCycleService : Service() {
                     logoColor = color,
                     shoulderColor = color,
                     fanColor = color,
+                    triggerIndex = colorIndexShoulder,
                 )
                 frameApplied = true
                 colorIndexLogo = advanceIndex(colorIndexLogo)
-                colorIndexShoulder = colorIndexLogo
+                colorIndexShoulder = state.advanceTriggerIndex(colorIndexShoulder)
                 colorIndexFan = colorIndexLogo
                 nextLogoAt = now + state.logoSpeedMs
                 nextShoulderAt = nextLogoAt
@@ -177,6 +178,7 @@ class RgbCycleService : Service() {
         } else {
             var logoColor: Int? = null
             var shoulderColor: Int? = null
+            val triggerIndex = colorIndexShoulder
             var fanColor: Int? = null
 
             if (now >= nextLogoAt) {
@@ -185,8 +187,8 @@ class RgbCycleService : Service() {
                 nextLogoAt = now + state.logoSpeedMs
             }
             if (now >= nextShoulderAt) {
-                shoulderColor = nextColor(colorIndexShoulder)
-                colorIndexShoulder = advanceIndex(colorIndexShoulder)
+                shoulderColor = if (state.splitTriggers) state.triggerPair(colorIndexShoulder).first else nextColor(colorIndexShoulder)
+                colorIndexShoulder = state.advanceTriggerIndex(colorIndexShoulder)
                 nextShoulderAt = now + state.shoulderSpeedMs
             }
             if (now >= nextFanAt) {
@@ -205,6 +207,7 @@ class RgbCycleService : Service() {
                     logoColor = logoColor,
                     shoulderColor = shoulderColor,
                     fanColor = fanColor,
+                    triggerIndex = triggerIndex,
                 )
                 frameApplied = true
             }
@@ -222,13 +225,16 @@ class RgbCycleService : Service() {
         effectName: String,
         logoColor: Int?,
         shoulderColor: Int?,
-        fanColor: Int?
+        fanColor: Int?,
+        triggerIndex: Int
     ) {
+        val pair = if (state.splitTriggers) state.triggerPair(if (shoulderColor != null) triggerIndex else triggerIndex - 1) else null
         val signature = listOf(
             effectName,
             logoColor,
             shoulderColor,
-            fanColor
+            fanColor,
+            pair
         ).joinToString("|")
 
         ModeTransitionCoordinator.applyLedProfile(
@@ -239,7 +245,8 @@ class RgbCycleService : Service() {
             HardwareController.setRgbCycleFrame(
                 effectName = effectName,
                 logoColor = logoColor,
-                shoulderColor = shoulderColor,
+                shoulderColor = pair?.first ?: shoulderColor,
+                shoulderBottomColor = pair?.second,
                 fanColor = fanColor
             )
         }
@@ -268,7 +275,7 @@ class RgbCycleService : Service() {
     private fun normalizeIndexes() {
         val size = state.colors.size.coerceAtLeast(1)
         colorIndexLogo %= size
-        colorIndexShoulder %= size
+        colorIndexShoulder = 0
         colorIndexFan %= size
     }
 

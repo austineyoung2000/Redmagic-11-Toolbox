@@ -290,7 +290,8 @@ object HardwareController {
         logoColor: Int?,
         shoulderColor: Int?,
         fanColor: Int?,
-        rootSession: RootShell.Session? = null
+        rootSession: RootShell.Session? = null,
+        shoulderBottomColor: Int? = null
     ): Boolean {
         if (
             logoColor == null &&
@@ -299,6 +300,12 @@ object HardwareController {
         ) {
             return true
         }
+
+        val splitCommand = if (shoulderColor != null && shoulderBottomColor != null) {
+            ShoulderLedSplit.command(ShoulderLedSplit.encode(effectName,
+                ShoulderLedSplit.presetRgb(shoulderColor), ShoulderLedSplit.presetRgb(shoulderBottomColor)))
+                ?: return false
+        } else null
 
         val commands = buildString {
             if (shoulderColor != null || fanColor != null) {
@@ -310,7 +317,7 @@ object HardwareController {
                 )
                 append("echo 1 > $LED_CFG; ")
             }
-            if (shoulderColor != null) {
+            if (shoulderColor != null && splitCommand == null) {
                 append(
                     "echo ${buildUnifiedLedEffectValue(LedZone.SHOULDER, effectName, shoulderColor)} > $LED_EFFECT; "
                 )
@@ -322,6 +329,7 @@ object HardwareController {
                 )
                 append("echo 1 > $LED_CFG; ")
             }
+            if (splitCommand != null) { append("\n"); append(splitCommand) }
         }
 
         return execHardwareWrite(

@@ -8,6 +8,9 @@ object RgbStudioStorage {
     private const val SYNC_ZONES = "rgb_studio_sync_zones"
     private const val EFFECT = "rgb_studio_effect"
     private const val COLORS = "rgb_studio_colors"
+    private const val SPLIT_TRIGGERS = "rgb_studio_split_triggers"
+    private const val TOP_COLORS = "rgb_studio_top_trigger_colors"
+    private const val BOTTOM_COLORS = "rgb_studio_bottom_trigger_colors"
     private const val LOGO_SPEED_MS = "rgb_studio_logo_speed_ms"
     private const val SHOULDER_SPEED_MS = "rgb_studio_shoulder_speed_ms"
     private const val FAN_SPEED_MS = "rgb_studio_fan_speed_ms"
@@ -47,6 +50,9 @@ object RgbStudioStorage {
                 syncZones = prefs.getBoolean(SYNC_ZONES, true),
                 effect = prefs.getString(EFFECT, "steady") ?: "steady",
                 colors = colors,
+                splitTriggers = prefs.getBoolean(SPLIT_TRIGGERS, false),
+                topTriggerColors = prefs.getString(TOP_COLORS, null)?.split(',')?.mapNotNull { it.toIntOrNull() } ?: colors,
+                bottomTriggerColors = prefs.getString(BOTTOM_COLORS, null)?.split(',')?.mapNotNull { it.toIntOrNull() } ?: colors,
                 logoSpeedMs = prefs.getLong(
                     LOGO_SPEED_MS,
                     RgbStudioState.DEFAULT_SPEED_MS
@@ -78,6 +84,9 @@ object RgbStudioStorage {
             .putBoolean(SYNC_ZONES, safe.syncZones)
             .putString(EFFECT, safe.effect)
             .putString(COLORS, safe.colors.joinToString(","))
+            .putBoolean(SPLIT_TRIGGERS, safe.splitTriggers)
+            .putString(TOP_COLORS, safe.topTriggerColors.joinToString(","))
+            .putString(BOTTOM_COLORS, safe.bottomTriggerColors.joinToString(","))
             .putLong(LOGO_SPEED_MS, safe.logoSpeedMs)
             .putLong(SHOULDER_SPEED_MS, safe.shoulderSpeedMs)
             .putLong(FAN_SPEED_MS, safe.fanSpeedMs)
@@ -105,7 +114,7 @@ object RgbStudioStorage {
         if (!state.enabled) return "Off"
 
         val mode = if (state.syncZones) "Synchronized" else "Per-zone"
-        return "$mode • ${state.colors.size} colors • ${effectLabel(state.effect)}"
+        return "$mode${if (state.splitTriggers) " • Split triggers" else ""} • ${state.colors.size} colors • ${effectLabel(state.effect)}"
     }
 
     private fun sanitize(state: RgbStudioState): RgbStudioState {
@@ -115,6 +124,8 @@ object RgbStudioStorage {
             .ifEmpty { RgbStudioState.DEFAULT_COLORS }
 
         return state.copy(
+            topTriggerColors = state.topTriggerColors.filter { it in allowedColors }.distinct().ifEmpty { colors },
+            bottomTriggerColors = state.bottomTriggerColors.filter { it in allowedColors }.distinct().ifEmpty { colors },
             effect = state.effect.takeIf { it in allowedEffects } ?: "steady",
             colors = colors,
             logoSpeedMs = state.logoSpeedMs.coerceIn(500L, 6_000L),

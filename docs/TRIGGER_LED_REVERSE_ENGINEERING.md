@@ -116,6 +116,10 @@ The code does not modify vendor firmware files, flash partitions, change `imax`,
 
 The Lighting tab places Trigger LEDs alongside fan and logo controls inside LED Zones. Users select matching stock colors or separate top/bottom colors from the preset palette, with one shared effect. The UI has no hex input or RGB sliders. Cancel restores the original app selection. This is independent color control; it is not independent effect timing per trigger.
 
+## RGB Studio integration
+
+RGB Studio can enable separate top and bottom preset sequences. Each sequence loops independently, including when their lengths differ, with a shared trigger cycle speed and effect. Synchronized mode shares timing with fan/logo cycles while preserving the selected trigger combinations. The split pair is applied after other zone writes, using the same validated vendor-program path. Saved RGB Studio settings, Master Profiles, and portable JSON backups retain both sequences; older settings default to matching triggers. The matching-color Apply to All action is hidden while split triggers are selected.
+
 ## Automated validation and remaining checks
 
 `ShoulderLedSplitTest.kt` uses the four captured templates in `app/src/test/resources/trigger-led/` and simulated sysfs files. Four JVM tests passed:

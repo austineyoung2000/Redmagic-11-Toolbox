@@ -53,6 +53,10 @@ object RgbStudioDialog {
         var syncZones = initial.syncZones
         var effect = initial.effect
         val colors = initial.colors.toMutableList()
+        var splitTriggers = initial.splitTriggers
+        val topColors = initial.topTriggerColors.toMutableList()
+        val bottomColors = initial.bottomTriggerColors.toMutableList()
+        var refreshApplyButton: (() -> Unit)? = null
         var timeoutMinutes = initial.screenOffTimeoutMinutes
 
         val content = LinearLayout(activity).apply {
@@ -153,42 +157,69 @@ object RgbStudioDialog {
             setPadding(0, 0, 0, deps.dp(4))
         })
 
-        colorChoices.forEach { choice ->
-            content.addView(MaterialCheckBox(activity).apply {
-                text = choice.label
-                isChecked = choice.id in colors
-                textSize = 13f
-                setTextColor(Color.parseColor(choice.hex))
-                buttonTintList = ColorStateList.valueOf(
-                    Color.parseColor(choice.hex)
-                )
-                setOnCheckedChangeListener { button, checked ->
-                    if (checked) {
-                        if (choice.id !in colors) {
-                            val targetIndex = colorChoices
-                                .indexOfFirst { it.id == choice.id }
-                            val insertAt = colors.indexOfFirst { current ->
-                                colorChoices.indexOfFirst { it.id == current } > targetIndex
+        fun addPalette(parent: LinearLayout, selectedColors: MutableList<Int>) {
+            colorChoices.forEach { choice ->
+                parent.addView(MaterialCheckBox(activity).apply {
+                    text = choice.label
+                    isChecked = choice.id in selectedColors
+                    textSize = 13f
+                    setTextColor(Color.parseColor(choice.hex))
+                    buttonTintList = ColorStateList.valueOf(
+                        Color.parseColor(choice.hex)
+                    )
+                    setOnCheckedChangeListener { button, checked ->
+                        if (checked) {
+                            if (choice.id !in selectedColors) {
+                                val targetIndex = colorChoices
+                                    .indexOfFirst { it.id == choice.id }
+                                val insertAt = selectedColors.indexOfFirst { current ->
+                                    colorChoices.indexOfFirst { it.id == current } > targetIndex
+                                }
+                                if (insertAt >= 0) {
+                                    selectedColors.add(insertAt, choice.id)
+                                } else {
+                                    selectedColors.add(choice.id)
+                                }
                             }
-                            if (insertAt >= 0) {
-                                colors.add(insertAt, choice.id)
-                            } else {
-                                colors.add(choice.id)
-                            }
+                        } else if (selectedColors.size > 1) {
+                            selectedColors.remove(choice.id)
+                        } else {
+                            button.isChecked = true
+                            Toast.makeText(
+                                activity,
+                                "Keep at least one cycle color",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
-                    } else if (colors.size > 1) {
-                        colors.remove(choice.id)
-                    } else {
-                        button.isChecked = true
-                        Toast.makeText(
-                            activity,
-                            "Keep at least one cycle color",
-                            Toast.LENGTH_SHORT
-                        ).show()
                     }
-                }
-            })
+                })
+            }
         }
+        addPalette(content, colors)
+
+        val splitPanel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        val splitSwitch = MaterialSwitch(activity).apply {
+            text = "Separate top and bottom trigger colors"
+            isChecked = splitTriggers
+            setTextColor(AppTheme.textPrimary)
+            setOnCheckedChangeListener { _, checked ->
+                splitTriggers = checked
+                splitPanel.visibility = if (checked) View.VISIBLE else View.GONE
+                refreshApplyButton?.invoke()
+            }
+        }
+        content.addView(splitSwitch)
+        splitPanel.addView(label("Top trigger color sequence"))
+        addPalette(splitPanel, topColors)
+        splitPanel.addView(label("Bottom trigger color sequence"))
+        addPalette(splitPanel, bottomColors)
+        splitPanel.addView(TextView(activity).apply {
+            text = "Each trigger repeats its own sequence. Both share the selected effect and trigger cycle speed. Select one color in each list for a fixed combination."
+            textSize = 12f
+            setTextColor(AppTheme.textSecondary)
+        })
+        splitPanel.visibility = if (splitTriggers) View.VISIBLE else View.GONE
+        content.addView(splitPanel)
 
         fun speedControl(
             title: String,
@@ -323,6 +354,9 @@ object RgbStudioDialog {
                 syncZones = syncZones,
                 effect = effect,
                 colors = colors.toList(),
+                splitTriggers = splitTriggers,
+                topTriggerColors = topColors.toList(),
+                bottomTriggerColors = bottomColors.toList(),
                 logoSpeedMs = logoMs,
                 shoulderSpeedMs = shoulderMs,
                 fanSpeedMs = fanMs,
@@ -334,7 +368,7 @@ object RgbStudioDialog {
             addView(content)
         }
 
-        MaterialAlertDialogBuilder(activity)
+        val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle("RGB Studio")
             .setView(scroll)
             .setNegativeButton("CANCEL", null)
@@ -344,6 +378,12 @@ object RgbStudioDialog {
             .setPositiveButton("SAVE & APPLY") { _, _ ->
                 deps.onSaveAndApply(buildState())
             }
-            .show()
+            .create()
+        refreshApplyButton = {
+            dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).visibility =
+                if (splitTriggers) View.GONE else View.VISIBLE
+        }
+        dialog.setOnShowListener { refreshApplyButton?.invoke() }
+        dialog.show()
     }
 }

@@ -406,6 +406,7 @@ RGB Studio provides a persistent multi-zone color cycle with:
 
 - Synchronized or independent LED zones
 - Selectable ordered color sequence
+- Optional separate top/bottom trigger preset sequences with a shared effect and cycle speed
 - Steady, Breathe, Flash, and Rapid effects
 - Per-zone speeds from 0.5 to 6 seconds
 - Immediate, 1, 5, 15, or 30-minute screen-off timeouts
