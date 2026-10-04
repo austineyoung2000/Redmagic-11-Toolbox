@@ -48,6 +48,11 @@ object RgbStudioStorage {
             RgbStudioState(
                 enabled = prefs.getBoolean(ENABLED, false),
                 logoBrightness = prefs.getInt("rgb_studio_logo_brightness", 255),
+                logoEnabled = prefs.getBoolean("rgb_studio_logo_enabled", true),
+                barEnabled = prefs.getBoolean("rgb_studio_bar_enabled", true),
+                barColors = prefs.getString("rgb_studio_bar_colors", null)?.split(',')?.mapNotNull { it.toIntOrNull() } ?: colors,
+                barBrightness = prefs.getInt("rgb_studio_bar_brightness", prefs.getInt("rgb_studio_logo_brightness", 255)),
+                barSpeedMs = prefs.getLong("rgb_studio_bar_speed_ms", prefs.getLong(LOGO_SPEED_MS, RgbStudioState.DEFAULT_SPEED_MS)),
                 shoulderBrightness = prefs.getInt("rgb_studio_shoulder_brightness", 255),
                 fanBrightness = prefs.getInt("rgb_studio_fan_brightness", 255),
 
@@ -86,6 +91,11 @@ object RgbStudioStorage {
         ).edit()
             .putBoolean(ENABLED, safe.enabled)
             .putInt("rgb_studio_logo_brightness", safe.logoBrightness)
+            .putBoolean("rgb_studio_logo_enabled", safe.logoEnabled)
+            .putBoolean("rgb_studio_bar_enabled", safe.barEnabled)
+            .putString("rgb_studio_bar_colors", safe.barColors.joinToString(","))
+            .putInt("rgb_studio_bar_brightness", safe.barBrightness)
+            .putLong("rgb_studio_bar_speed_ms", safe.barSpeedMs)
             .putInt("rgb_studio_shoulder_brightness", safe.shoulderBrightness)
             .putInt("rgb_studio_fan_brightness", safe.fanBrightness)
 
@@ -133,6 +143,9 @@ object RgbStudioStorage {
 
         return state.copy(
             logoBrightness = state.logoBrightness.coerceIn(32, 255),
+            barBrightness = state.barBrightness.coerceIn(32, 255),
+            barColors = state.barColors.filter { it in allowedColors }.distinct().ifEmpty { colors },
+            barSpeedMs = state.barSpeedMs.coerceIn(500L, 6_000L),
             shoulderBrightness = state.shoulderBrightness.coerceIn(32, 255),
             fanBrightness = state.fanBrightness.coerceIn(32, 255),
 

@@ -87,7 +87,7 @@ internal object CallLightingProfileUi {
         val modeLabel = if (title.contains("Incoming", ignoreCase = true)) "incoming calls" else "connected calls"
 
         container.addView(zoneEditor(activity, fanKeys.label, fan, deps, modeLabel, showFanPresets = true) { fan = it })
-        container.addView(zoneEditor(activity, logoKeys.label, logo, deps, modeLabel, showFanPresets = false) { logo = it })
+        container.addView(LogoBarProfileUi.create(activity, logo) { logo = it })
         container.addView(TriggerLedProfileUi.create(activity, shoulderKeys.label,
             "Enable trigger LEDs for $modeLabel", shoulder,
             TriggerLedProfileUi.Deps(deps.textPrimary, deps.textSecondary, deps.accent,

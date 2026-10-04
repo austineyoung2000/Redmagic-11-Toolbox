@@ -185,7 +185,8 @@ internal class MainLightingTabActions(
         onAllLedStateApplied(selection, color)
 
         saveFanLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.fanBrightness, selection.effect), color))
-        saveLogoLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.logoBrightness, selection.effect), color))
+        saveLogoLedStateStorage(activity, LogoBarSelection(selection.effect, selection.logoEnabled, selection.logoBrightness,
+            selection.barEnabled, selection.barColors.firstOrNull() ?: color, selection.barBrightness).state(color))
         saveShoulderLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.shoulderBrightness, selection.effect), color))
 
         runBackground {
@@ -196,7 +197,11 @@ internal class MainLightingTabActions(
                 fanColor = color,
                 logoBrightness = selection.logoBrightness,
                 shoulderBrightness = selection.shoulderBrightness,
-                fanBrightness = selection.fanBrightness
+                fanBrightness = selection.fanBrightness,
+                barColor = selection.barColors.firstOrNull() ?: color,
+                barBrightness = selection.barBrightness,
+                logoEnabled = selection.logoEnabled,
+                barEnabled = selection.barEnabled
             )
             HardwareServiceActions.startFanLed(activity)
         }

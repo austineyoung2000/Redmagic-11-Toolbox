@@ -74,7 +74,8 @@ object LedController {
     }
 
     fun normalizeEffect(effect: String): String {
-        if (com.elitedarkkaiser.redmagic.LedBrightness.decode(effect) != null) return effect
+        if (com.elitedarkkaiser.redmagic.LedBrightness.decode(effect) != null ||
+            effect.startsWith("areas:")) return effect
         return when (effect.lowercase()) {
             EFFECT_BREATHE -> EFFECT_BREATHE
             EFFECT_FLASHING -> EFFECT_FLASHING

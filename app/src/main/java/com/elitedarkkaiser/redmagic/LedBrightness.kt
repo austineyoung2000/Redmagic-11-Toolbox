@@ -13,7 +13,7 @@ internal object LedBrightness {
         return Selection(level, effect)
     }
     fun level(value: String) = decode(value)?.level ?: MAX
-    fun effect(value: String) = decode(value)?.effect ?: value
+    fun effect(value: String) = LogoBarSelection.decode(value)?.effect ?: decode(value)?.effect ?: value
     fun encode(level: Int, effect: String): String {
         require(level in MIN..MAX)
         val base = this.effect(effect)
@@ -99,14 +99,17 @@ internal object LedBrightness {
     /** Build one serialized RGB cycle update; only due zones are replayed. */
     fun cycleCommand(effect: String, logoColor: Int?, triggerColor: Int?, fanColor: Int?,
         bottomColor: Int? = null, logoBrightness: Int = 255, triggerBrightness: Int = 255,
-        fanBrightness: Int = 255): String? {
+        fanBrightness: Int = 255, barColor: Int? = null, barBrightness: Int = logoBrightness,
+        logoEnabled: Boolean = true, barEnabled: Boolean = true): String? {
         val commands = mutableListOf<String>()
         fun add(zone: String, color: Int?, brightness: Int, bottom: Int? = null): Boolean {
             if (color == null) return true
             if (brightness !in MIN..MAX) return false
-            val base = if (bottom != null) ShoulderLedSplit.encode(effect,
+            val base = if (zone == "logo" && barColor != null) LogoBarSelection(effect, logoEnabled, brightness,
+                barEnabled, barColor, barBrightness).encode()
+            else if (bottom != null) ShoulderLedSplit.encode(effect,
                 ShoulderLedSplit.presetRgb(color), ShoulderLedSplit.presetRgb(bottom)) else effect
-            val rendered = command(zone, encode(brightness, base), color) ?: return false
+            val rendered = command(zone, if (base.startsWith("areas:")) base else encode(brightness, base), color) ?: return false
             commands.add(rendered)
             return true
         }
@@ -119,9 +122,11 @@ internal object LedBrightness {
     /** Null means unsupported; callers must reject dimmed requests rather than silently use stock output. */
     fun command(zone: String, value: String, color: Int): String? {
         if (value.startsWith("dim:") && decode(value) == null) return null
+        val areas = LogoBarSelection.decode(value)
+        if (value.startsWith("areas:") && (zone != "logo" || areas == null)) return null
         if (!supported(zone, value, color)) return null
         val base = effect(value)
-        val intensity = level(value)
+        val intensity = areas?.logoBrightness ?: level(value)
         if (zone == "triggers") {
             val split = ShoulderLedSplit.decode(base)
             val rgb = stockRgb(color)
@@ -133,7 +138,9 @@ internal object LedBrightness {
         val program = if (palette && base != "steady") animatedPalettes.getValue("$base:$color")
         else if (palette) Program("aw_fan2_${color.toString(16)}.bin", 364,
             paletteHashes[color - 0x101], listOf(255,287,319,351)) else single.getValue("$zone:$base")
-        val rgb = scale(stockRgb(color), intensity)
+        val rgb = if (areas?.logoEnabled == false) 0 else scale(stockRgb(color), intensity)
+        val barRgb = if (areas == null) rgb else if (!areas.barEnabled) 0 else scale(stockRgb(areas.barColor), areas.barBrightness)
+        val barComponents = listOf((barRgb shr 16) and 255, (barRgb shr 8) and 255, barRgb and 255)
         val components = listOf((rgb shr 16) and 255, (rgb shr 8) and 255, rgb and 255)
         val effectValue = "0x" + (if (zone == "logo") "1" else "3") +
             (when (base) { "breathe" -> "003"; "flashing" -> "004"; "blink" -> "006"; "rapid" -> "00a"; else -> "002" }) + (if (palette) color.toString(16) else "007")
@@ -157,7 +164,7 @@ internal object LedBrightness {
                 for (j=1; j<=count; j++) {
                     o=offsets[j]+0
                     if (b[o-1]!=6 || b[o+3]!=6 || b[o+7]!=6) exit 1
-                    ${if (palette) "for (k=0; k<=8; k+=4) b[o+k]=int((b[o+k]*$intensity+127)/255)" else "if (b[o]!=0 || b[o+4]!=84 || b[o+8]!=255) exit 1; b[o]=${components[0]}; b[o+4]=${components[1]}; b[o+8]=${components[2]}"}
+                    ${if (palette) "for (k=0; k<=8; k+=4) b[o+k]=int((b[o+k]*$intensity+127)/255)" else "if (b[o]!=0 || b[o+4]!=84 || b[o+8]!=255) exit 1; b[o]=(j>count/2 && ${if (areas != null) 1 else 0}) ? ${barComponents[0]} : ${components[0]}; b[o+4]=(j>count/2 && ${if (areas != null) 1 else 0}) ? ${barComponents[1]} : ${components[1]}; b[o+8]=(j>count/2 && ${if (areas != null) 1 else 0}) ? ${barComponents[2]} : ${components[2]}"}
                 }
                 for (i=0; i<n; i+=2) printf "%02x %02x\n", b[i], b[i+1]
             }' "${'$'}tmp/bytes" > "${'$'}tmp/pairs"

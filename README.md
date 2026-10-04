@@ -29,6 +29,16 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | Root | Required for hardware controls; native TGK itself is non-root |
 | Supported device | RedMagic 11 Pro / NX809J |
 
+## Upcoming 2.6.0 — independent GAME MODE bar (APK testing pending)
+
+The `test/logo-game-mode-bar` client build separates the illuminated side **GAME MODE bar** from the rear logo. LED Zones and charging have dedicated bar entries; gaming and both call profiles have separate logo/bar sections. Each area saves its own enable state, preset color, and 32–255 brightness. Their shared Steady, Breathe, Flashing, or Rapid effect is labeled in the editor.
+
+RGB Studio adds a bar color sequence, intensity, enable switch, and per-zone cycle speed. Master Profiles and JSON backups preserve both areas. Existing profiles initialize the bar from the logo to retain matching behavior. Editing one area composes a complete logo/bar program and preserves the other.
+
+Owner root-shell tests confirmed independent colors and brightness on all four effects. The app build still needs owner acceptance before merge and the **2.6.0 release**; the latest production release remains **2.5.5**. Separate simultaneous effects are unverified and are not exposed. Reloading the shared program can restart both areas' effect phase.
+
+See the [logo/bar reverse-engineering report](docs/LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md) for the exact byte mappings, hashes, test observations, implementation, and APK checklist.
+
 ## What's new in 2.5.5
 
 Version 2.5.5 adds adjustable **32–255 LED brightness** across LED Zones, gaming, charging, incoming/connected calls, RGB Studio, and Master Profiles. Changing a preset color or effect preserves the selected brightness. Colors remain preset-only; brightness has its own slider.
@@ -424,9 +434,14 @@ The Lighting tab controls:
 
 - Cooling fan LED
 - Rear logo LED
+- Illuminated side GAME MODE bar (2.6.0 test branch)
 - Shoulder LED strips
 
 Each zone can be enabled, disabled, and configured independently. Effects include Steady, Breathe, Flashing, and Rapid where supported. Colors include Red, Orange, Yellow, Green, Cyan, Blue, Purple, and Pink. Confirmed stock fan-light presets are also supported.
+
+### Independent logo and GAME MODE bar (2.6.0 test branch)
+
+Open the separate **LOGO LED** or **GAME MODE BAR** entry to edit that area while preserving its companion. Both retain separate preset colors, brightness, and enable switches. Their effect remains shared. Game Mode, charging, incoming/connected calls, and Master Profiles preserve the pair. RGB Studio also has an independent bar sequence and cycle speed. See the [mapping and test report](docs/LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md).
 
 ### Split trigger colors
 
@@ -434,7 +449,7 @@ Open **Trigger LEDs** inside LED Zones and enable **Separate top and bottom colo
 
 Master Profiles and portable backups retain each mode's saved trigger combination. The existing lighting priority and restoration rules still decide which mode applies. Turning off the split option returns that profile to a matching-color selection.
 
-RGB Studio also supports separate top/bottom preset sequences. Select one color for each trigger for a fixed combination, or multiple colors to cycle. Split colors use the validated vendor-program mapping described in the [reverse-engineering report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md). Rapid remains available but its physical split output still needs device confirmation.
+RGB Studio also supports separate top/bottom preset sequences. Select one color for each trigger for a fixed combination, or multiple colors to cycle. Split colors use the validated vendor-program mapping described in the [reverse-engineering report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md). Later owner testing confirmed all four trigger effects; see the updated test report.
 
 The **Real-time preview** switch is located inside LED Zones and controls whether changes are written immediately while editing a profile.
 
@@ -444,6 +459,7 @@ RGB Studio provides a persistent multi-zone color cycle with:
 
 - Synchronized or independent LED zones
 - Selectable ordered color sequence
+- Independent GAME MODE bar sequence, enable, brightness, and cycle speed in the 2.6.0 test build; shared logo/bar effect
 - Optional separate top/bottom trigger preset sequences with a shared effect and cycle speed
 - Steady, Breathe, Flash, and Rapid effects
 - Per-zone speeds from 0.5 to 6 seconds
@@ -744,3 +760,7 @@ See [Trigger LED reverse engineering and split-color tests](docs/TRIGGER_LED_REV
 ### Lighting brightness implementation
 
 The brightness feature was developed and owner-tested on `test/led-brightness`, then merged into `sixteen` for 2.5.5. It covers LED Zones, gaming, charging, incoming/connected calls, RGB Studio, and Master Profiles. See the [reverse-engineering report](docs/LED_BRIGHTNESS_REVERSE_ENGINEERING.md) for the discovery, driver findings, payload mappings, safeguards, and physical evidence.
+
+### Logo and GAME MODE bar implementation
+
+The 2.6.0 test branch uses separate physical RGB groups in the existing logo vendor program. [The reverse-engineering report](docs/LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md) records the discovery and validation. The release is held pending owner APK confirmation.

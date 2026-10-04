@@ -76,3 +76,7 @@ do not write vendor partitions.
    active?
 7. Does failure leave the prior hardware state intact and report the backend
    used?
+
+## 2.6.0 logo / GAME MODE bar test branch
+
+The physical bar is exposed as a separate UI area while sharing one composed logo program and the existing serialized root broker. Only checksum-validated RGB bytes are changed; current limits, firmware files, routing, resets, and effect timing remain unchanged. No extra daemon or register polling is added. RGB Studio retains the 500 ms grouped-frame limit; a due logo/bar update preserves the companion color and does not advance its sequence. Both areas can restart animation phase when the shared program reloads. See [the mapping and test report](LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md).

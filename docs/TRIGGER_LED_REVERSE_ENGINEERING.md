@@ -140,3 +140,7 @@ Before release, verify the built app on hardware: both trigger orientations, pre
 ## Brightness extension in 2.5.5
 
 The same validated RGB payload mappings now support a shared 32–255 intensity for matching/split triggers. Original preset colors remain stored, avoiding cumulative scaling. See [LED brightness reverse engineering](LED_BRIGHTNESS_REVERSE_ENGINEERING.md).
+
+## Follow-up: independent logo and GAME MODE bar (2.6.0 test branch)
+
+Owner root-shell tests on October 4, 2026 established separate physical logo/bar RGB groups, independent brightness, and separate colors with Steady, Breathe, Flashing, and Rapid. See [the complete discovery report](LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md) for exact mappings, checksums, observations, persistence, and the pending APK acceptance checklist. This follow-up does not change the earlier evidence in this report. The app test branch adds a dedicated bar zone across lighting modes and RGB Studio; release awaits owner confirmation.

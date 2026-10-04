@@ -32,7 +32,8 @@ object ChargingLedActions {
     internal fun showLogoDialog(
         activity: MainActivity,
         runBackground: (() -> Unit) -> Boolean,
-        deps: ChargingLedProfileDialog.Deps
+        deps: ChargingLedProfileDialog.Deps,
+        bar: Boolean = false
     ) {
         val profile = ChargingLedState.readProfile(
             activity,
@@ -44,28 +45,17 @@ object ChargingLedActions {
             defaultColor = 1
         )
 
-        ChargingLedProfileDialog.show(
-            activity = activity,
-            title = "Charging Logo LED",
-            subtitle = "Logo LED profile used only while plugged in and charging.",
-            originalEnabled = profile.enabled,
-            originalEffect = profile.effect,
-            originalColor = profile.color,
-            onSave = { enabled, effect, color ->
+        LogoBarProfileUi.show(activity,
+            if (bar) "Charging GAME MODE bar" else "Charging Logo LED",
+            com.elitedarkkaiser.redmagic.state.LedState(profile.enabled, profile.effect, profile.color),
+            onlyBar = bar,
+            onSave = { selection ->
                 runBackground {
-                    saveProfileAndApplyIfCharging(
-                        activity,
-                        ChargingLedState.LOGO_ENABLED_KEY,
-                        ChargingLedState.LOGO_EFFECT_KEY,
-                        ChargingLedState.LOGO_COLOR_KEY,
-                        enabled,
-                        effect,
-                        color
-                    )
+                    saveProfileAndApplyIfCharging(activity, ChargingLedState.LOGO_ENABLED_KEY,
+                        ChargingLedState.LOGO_EFFECT_KEY, ChargingLedState.LOGO_COLOR_KEY,
+                        selection.enabled, selection.effect, selection.color)
                 }
-            },
-            deps = deps
-        )
+            })
     }
 
     internal fun showShoulderDialog(

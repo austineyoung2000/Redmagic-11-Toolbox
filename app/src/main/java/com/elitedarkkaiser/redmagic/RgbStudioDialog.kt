@@ -53,6 +53,10 @@ object RgbStudioDialog {
         var syncZones = initial.syncZones
         var effect = initial.effect
         var logoBrightness = initial.logoBrightness.coerceIn(32,255)
+        var barBrightness = initial.barBrightness.coerceIn(32,255)
+        var logoEnabled = initial.logoEnabled
+        var barEnabled = initial.barEnabled
+        val barColors = initial.barColors.ifEmpty { initial.colors }.toMutableList()
         var shoulderBrightness = initial.shoulderBrightness.coerceIn(32,255)
         var fanBrightness = initial.fanBrightness.coerceIn(32,255)
 
@@ -153,9 +157,20 @@ object RgbStudioDialog {
         addEffect("Rapid", "rapid")
         content.addView(effectRow)
         content.addView(label("Zone brightness"))
+        content.addView(MaterialCheckBox(activity).apply {
+            text = "Enable logo LED"; isChecked = logoEnabled; setTextColor(AppTheme.textPrimary)
+            setOnCheckedChangeListener { _, checked -> logoEnabled = checked }
+        })
         content.addView(label("Logo"))
         LedBrightnessUi(activity, content, "logo", { LedBrightness.encode(logoBrightness, effect) }, { 7 },
             { logoBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+        content.addView(MaterialCheckBox(activity).apply {
+            text = "Enable GAME MODE bar"; isChecked = barEnabled; setTextColor(AppTheme.textPrimary)
+            setOnCheckedChangeListener { _, checked -> barEnabled = checked }
+        })
+        content.addView(label("GAME MODE bar"))
+        LedBrightnessUi(activity, content, "logo", { LedBrightness.encode(barBrightness, effect) }, { 7 },
+            { barBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
         content.addView(label("Triggers (top and bottom)"))
         LedBrightnessUi(activity, content, "triggers", { LedBrightness.encode(shoulderBrightness, effect) }, { 7 },
             { shoulderBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
@@ -164,7 +179,7 @@ object RgbStudioDialog {
             { fanBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
 
 
-        content.addView(label("Color sequence"))
+        content.addView(label("Logo / fan / matching triggers color sequence"))
         content.addView(TextView(activity).apply {
             text = "Selected colors play from top to bottom. Keep at least one color enabled."
             textSize = 12f
@@ -211,6 +226,9 @@ object RgbStudioDialog {
             }
         }
         addPalette(content, colors)
+        content.addView(label("GAME MODE bar color sequence"))
+        addPalette(content, barColors)
+        content.addView(label("Logo and GAME MODE bar share the effect. Each has its own color sequence and brightness."))
 
         val splitPanel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         val splitSwitch = MaterialSwitch(activity).apply {
@@ -285,11 +303,14 @@ object RgbStudioDialog {
             "Fan LED",
             initial.fanSpeedMs
         )
+        val (barSpeedRow, barSpeed) = speedControl("GAME MODE bar", initial.barSpeedMs)
         content.addView(logoSpeedRow)
+        content.addView(barSpeedRow)
         content.addView(shoulderSpeedRow)
         content.addView(fanSpeedRow)
 
         fun refreshSpeedVisibility() {
+            barSpeedRow.visibility = if (syncZones) View.GONE else View.VISIBLE
             shoulderSpeedRow.visibility = if (syncZones) View.GONE else View.VISIBLE
             fanSpeedRow.visibility = if (syncZones) View.GONE else View.VISIBLE
         }
@@ -369,6 +390,11 @@ object RgbStudioDialog {
                 syncZones = syncZones,
                 effect = effect,
                 logoBrightness = logoBrightness,
+                logoEnabled = logoEnabled,
+                barEnabled = barEnabled,
+                barColors = barColors.toList(),
+                barBrightness = barBrightness,
+                barSpeedMs = if (syncZones) logoMs else (barSpeed.value * 1000f).toLong(),
                 shoulderBrightness = shoulderBrightness,
                 fanBrightness = fanBrightness,
 
