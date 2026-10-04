@@ -129,6 +129,58 @@ class LedBrightnessTest {
         }
     }
 
+    @Test fun logoBarProgramsPreserveRoutingAndIndependentColorsBrightnessAndOff() {
+        val cases = listOf(
+            Case("logo", "steady", 1, "aw_cfg2_7", listOf(183,215)),
+            Case("logo", "breathe", 1, "aw_cfg3_7", listOf(183,211,239,267,299,327,355,383)),
+            Case("logo", "flashing", 1, "aw_cfg4_7", listOf(183,211,243,271)),
+            Case("logo", "rapid", 1, "aw_cfga_7", listOf(183,211,239,267,295,323,351,383,411,439,467,495,523,551))
+        )
+        for (case in cases) withDevice(case) { dir, original ->
+            for ((logoOn, barOn) in listOf(true to true, false to true, true to false, false to false)) {
+                for ((logoLevel, barLevel) in listOf(32 to 255, 255 to 32, 128 to 96)) {
+                    dir.resolve("device/reg").toFile().writeText("")
+                    val selection = LogoBarSelection(case.effect, logoOn, logoLevel, barOn, 5, barLevel)
+                    val rendered = LedBrightness.command("logo", selection.encode(), 1)!!
+                    val result = execute(simulated(rendered, dir), dir)
+                    assertEquals(result.second, 0, result.first)
+                    val expected = original.clone()
+                    case.offsets.forEachIndexed { index, o ->
+                        val bar = index >= case.offsets.size / 2
+                        val rgb = if (bar) { if (barOn) LedBrightness.scale(0x06eb00, barLevel) else 0 }
+                            else { if (logoOn) LedBrightness.scale(0xff0000, logoLevel) else 0 }
+                        expected[o] = (rgb shr 16).toByte()
+                        expected[o+4] = (rgb shr 8).toByte()
+                        expected[o+8] = rgb.toByte()
+                    }
+                    assertArrayEquals("${case.effect}: only mapped RGB groups may change", expected, replayed(dir))
+                }
+            }
+        }
+    }
+
+    @Test fun barCycleComposesBothAreasAndRejectsMalformedProfilesBeforeWrites() {
+        val selection = LogoBarSelection("breathe", true, 32, true, 5, 255)
+        assertEquals(LedBrightness.command("logo", selection.encode(), 1),
+            LedBrightness.cycleCommand("breathe", 1, null, null,
+                logoBrightness=32, barColor=5, barBrightness=255))
+        for (bad in listOf("areas:steady:1:31:1:5:255", "areas:blink:1:255:1:5:255",
+            "areas:steady:1:255:1:2:255", "areas:steady:2:255:1:5:255", "areas:steady")) {
+            assertNull(LogoBarSelection.decode(bad))
+            assertNull(LedBrightness.command("logo", bad, 1))
+        }
+        assertNull(LedBrightness.command("fan", selection.encode(), 1))
+        val case = Case("logo", "steady", 1, "aw_cfg2_7", listOf(183,215))
+        withDevice(case) { dir, original ->
+            original[20] = (original[20].toInt() xor 1).toByte()
+            Files.write(dir.resolve("firmware/${case.file}.bin"), original)
+            assertNotEquals(0, execute(simulated(LedBrightness.command("logo",
+                selection.copy(effect="steady").encode(), 1)!!, dir), dir).first)
+            assertEquals("", dir.resolve("device/reg").toFile().readText())
+            assertEquals("effect = 0x1002001\n", dir.resolve("device/effect").toFile().readText())
+        }
+    }
+
     private data class Case(val zone: String, val effect: String, val color: Int, val file: String, val offsets: List<Int>)
     private fun fixture(case: Case): ByteArray = javaClass.getResourceAsStream("/led-brightness/${case.file}.hex")!!
         .bufferedReader().use { it.readText().trim() }.chunked(2).map { it.toInt(16).toByte() }.toByteArray()

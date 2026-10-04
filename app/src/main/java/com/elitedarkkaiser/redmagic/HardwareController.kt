@@ -252,12 +252,15 @@ object HardwareController {
         val base = LedBrightness.effect(effectName)
         val normalizedEffect = if (zone == LedZone.FAN) FanLedPalette.normalizeEffect(base) else base
         val normalizedColor = if (zone == LedZone.FAN) FanLedPalette.normalizeColor(base, color) else color
-        val selection = if (effectName.startsWith("dim:")) {
+        val selection = if (effectName.startsWith("areas:")) {
+            if (zone != LedZone.LOGO || LogoBarSelection.decode(effectName) == null) return false
+            effectName
+        } else if (effectName.startsWith("dim:")) {
             if (LedBrightness.decode(effectName) == null) return false
             LedBrightness.encode(LedBrightness.level(effectName), normalizedEffect)
         } else normalizedEffect
         val replay = LedBrightness.command(name, selection, normalizedColor)
-        if (replay == null && (LedBrightness.level(selection) != 255 || base.startsWith("split:"))) return false
+        if (replay == null && (LedBrightness.level(selection) != 255 || base.startsWith("split:") || effectName.startsWith("areas:"))) return false
         val stock = "echo ${buildUnifiedLedEffectValue(zone, normalizedEffect, normalizedColor)} > $LED_EFFECT; echo 1 > $LED_CFG"
         val command = (if (zone.enableFanFirst) "echo 1 > $FAN_ENABLE;\n" else "") + (replay ?: stock)
         val previous = lastZoneCommands[name]
@@ -284,10 +287,15 @@ object HardwareController {
         shoulderBottomColor: Int? = null,
         logoBrightness: Int = 255,
         shoulderBrightness: Int = 255,
-        fanBrightness: Int = 255
+        fanBrightness: Int = 255,
+        barColor: Int? = null,
+        barBrightness: Int = logoBrightness,
+        logoEnabled: Boolean = true,
+        barEnabled: Boolean = true
     ): Boolean {
         val commands = LedBrightness.cycleCommand(effectName, logoColor, shoulderColor, fanColor,
-            shoulderBottomColor, logoBrightness, shoulderBrightness, fanBrightness) ?: return false
+            shoulderBottomColor, logoBrightness, shoulderBrightness, fanBrightness,
+            barColor, barBrightness, logoEnabled, barEnabled) ?: return false
         if (commands.isEmpty()) return true
         val enable = if (shoulderColor != null || fanColor != null) "echo 1 > $FAN_ENABLE &&\n" else ""
         return execHardwareWrite("led_control", enable + commands, rootSession)

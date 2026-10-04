@@ -57,3 +57,7 @@ The merge was authorized after owner device reports, not solely CI success. The 
 On 2026-10-04 the owner confirmed the expanded LED Zones APK worked across its newly enabled effects. The owner subsequently reported the profile/RGB Studio expansion working and authorized the 2.5.5 merge.
 
 The discovery and mechanism are documented in [LED brightness reverse engineering](LED_BRIGHTNESS_REVERSE_ENGINEERING.md).
+
+## Follow-up: independent logo and GAME MODE bar (2.6.0 test branch)
+
+Owner root-shell tests on October 4, 2026 established separate physical logo/bar RGB groups, independent brightness, and separate colors with Steady, Breathe, Flashing, and Rapid. See [the complete discovery report](LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md) for exact mappings, checksums, observations, persistence, and the regression checklist. This follow-up does not change the earlier evidence in this report. Version 2.6.0 adds a dedicated bar zone across lighting modes and RGB Studio. The owner authorized merge and release on October 4, 2026; selected palettes also receive consistent white rings with dark contrast outlines.

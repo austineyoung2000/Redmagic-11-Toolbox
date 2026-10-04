@@ -8,6 +8,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -147,12 +149,14 @@ class LedControlViewFactory(
 
                 canvas.restoreToCount(saveCount)
 
-                ringPaint.color = if (selected()) {
-                    Color.WHITE
-                } else {
-                    Color.TRANSPARENT
+                if (selected()) {
+                    ringPaint.strokeWidth = dp(5).toFloat()
+                    ringPaint.color = Color.DKGRAY
+                    canvas.drawOval(rect, ringPaint)
+                    ringPaint.strokeWidth = dp(3).toFloat()
+                    ringPaint.color = Color.WHITE
+                    canvas.drawOval(rect, ringPaint)
                 }
-                canvas.drawOval(rect, ringPaint)
             }
         }
     }
@@ -173,14 +177,19 @@ class LedControlViewFactory(
     fun colorDotDrawable(
         hex: String,
         selected: Boolean
-    ): GradientDrawable {
-        return GradientDrawable().apply {
+    ): Drawable {
+        val fill = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor(hex))
-            setStroke(
-                dp(3),
-                if (selected) Color.WHITE else Color.TRANSPARENT
-            )
+            setStroke(dp(3), if (selected) Color.WHITE else Color.TRANSPARENT)
+        }
+        if (!selected) return fill
+        val outline = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.DKGRAY)
+        }
+        return LayerDrawable(arrayOf(outline, fill)).apply {
+            setLayerInset(1, dp(1), dp(1), dp(1), dp(1))
         }
     }
 

@@ -20,6 +20,10 @@ class RgbCycleService : Service() {
     private lateinit var handler: Handler
     private var state = RgbStudioState()
     private var colorIndexLogo = 0
+    private var colorIndexBar = 0
+    private var currentLogoColor = 1
+    private var currentBarColor = 1
+    private var nextBarAt = 0L
     private var colorIndexShoulder = 0
     private var colorIndexFan = 0
     private var nextLogoAt = 0L
@@ -160,6 +164,9 @@ class RgbCycleService : Service() {
         if (state.syncZones) {
             if (now >= nextLogoAt) {
                 val color = nextColor(colorIndexLogo)
+                currentLogoColor = color
+                currentBarColor = state.barColors[Math.floorMod(colorIndexBar, state.barColors.size)]
+                colorIndexBar = (colorIndexBar + 1) % state.barColors.size
                 applyFrame(
                     effectName = state.effect,
                     logoColor = color,
@@ -172,20 +179,30 @@ class RgbCycleService : Service() {
                 colorIndexShoulder = state.advanceTriggerIndex(colorIndexShoulder)
                 colorIndexFan = colorIndexLogo
                 nextLogoAt = now + state.logoSpeedMs
+                nextBarAt = nextLogoAt
                 nextShoulderAt = nextLogoAt
                 nextFanAt = nextLogoAt
             }
         } else {
             var logoColor: Int? = null
+            var barDue = false
             var shoulderColor: Int? = null
             val triggerIndex = colorIndexShoulder
             var fanColor: Int? = null
 
             if (now >= nextLogoAt) {
                 logoColor = nextColor(colorIndexLogo)
+                currentLogoColor = logoColor
                 colorIndexLogo = advanceIndex(colorIndexLogo)
                 nextLogoAt = now + state.logoSpeedMs
             }
+            if (now >= nextBarAt) {
+                currentBarColor = state.barColors[Math.floorMod(colorIndexBar, state.barColors.size)]
+                colorIndexBar = (colorIndexBar + 1) % state.barColors.size
+                nextBarAt = now + state.barSpeedMs
+                barDue = true
+            }
+            if (barDue && logoColor == null) logoColor = currentLogoColor
             if (now >= nextShoulderAt) {
                 shoulderColor = if (state.splitTriggers) state.triggerPair(colorIndexShoulder).first else nextColor(colorIndexShoulder)
                 colorIndexShoulder = state.advanceTriggerIndex(colorIndexShoulder)
@@ -217,7 +234,7 @@ class RgbCycleService : Service() {
             lastFrameAt = SystemClock.elapsedRealtime()
         }
 
-        val nextAt = minOf(nextLogoAt, nextShoulderAt, nextFanAt)
+        val nextAt = minOf(minOf(nextLogoAt, nextShoulderAt, nextFanAt), nextBarAt)
         scheduleNext((nextAt - SystemClock.elapsedRealtime()).coerceAtLeast(100L))
     }
 
@@ -234,7 +251,8 @@ class RgbCycleService : Service() {
             logoColor,
             shoulderColor,
             fanColor,
-            pair, state.logoBrightness, state.shoulderBrightness, state.fanBrightness
+            pair, state.logoBrightness, state.shoulderBrightness, state.fanBrightness,
+            currentBarColor, state.barBrightness, state.logoEnabled, state.barEnabled
         ).joinToString("|")
 
         ModeTransitionCoordinator.applyLedProfile(
@@ -250,7 +268,11 @@ class RgbCycleService : Service() {
                 fanColor = fanColor,
                 logoBrightness = state.logoBrightness,
                 shoulderBrightness = state.shoulderBrightness,
-                fanBrightness = state.fanBrightness
+                fanBrightness = state.fanBrightness,
+                barColor = if (logoColor != null) currentBarColor else null,
+                barBrightness = state.barBrightness,
+                logoEnabled = state.logoEnabled,
+                barEnabled = state.barEnabled
             )
         }
     }
@@ -271,6 +293,9 @@ class RgbCycleService : Service() {
     private fun resetDeadlines() {
         val now = SystemClock.elapsedRealtime()
         nextLogoAt = now
+        nextBarAt = now
+        currentLogoColor = state.colors.first()
+        currentBarColor = state.barColors.first()
         nextShoulderAt = now
         nextFanAt = now
     }
@@ -278,6 +303,7 @@ class RgbCycleService : Service() {
     private fun normalizeIndexes() {
         val size = state.colors.size.coerceAtLeast(1)
         colorIndexLogo %= size
+        colorIndexBar %= state.barColors.size.coerceAtLeast(1)
         colorIndexShoulder = 0
         colorIndexFan %= size
     }

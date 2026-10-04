@@ -107,74 +107,37 @@ internal class MainLightingZoneDialogs(
         )
     }
 
-    fun showLogo() {
-        LogoLedDialogUi.showLogoLedDialog(
-            brightnessControls = true,
-            activity = activity,
-            originalEnabled = state.logoEnabled,
-            originalEffect = state.logoEffect,
-            originalColor = state.logoColor,
-            currentEnabled = { state.logoEnabled },
-            currentEffect = { state.logoEffect },
-            currentColor = { state.logoColor },
-            setEnabled = { state.logoEnabled = it },
-            setEffect = { state.logoEffect = it },
-            setColor = { state.logoColor = it },
-            applyPreviewIfEnabled = {
-                disableRgbStudioForManualControl()
-                applyLogoPreviewIfEnabled()
-            },
-            applyEffect = { effect, color ->
-                disableRgbStudioForManualControl()
-                applyLogoSelection(effect, color)
-            },
-            disableLed = {
-                disableRgbStudioForManualControl()
-                runBackground {
-                    HardwareController.setLogoLedEnabled(false)
+    fun showLogo(bar: Boolean = false) {
+        val original = LedState(state.logoEnabled, state.logoEffect, state.logoColor)
+        fun apply(selection: LedState) {
+            if (selection.enabled) applyLogoSelection(selection.effect, selection.color)
+            else runBackground { HardwareController.setLogoLedEnabled(false) }
+        }
+        fun update(selection: LedState) {
+            state.logoEnabled = selection.enabled
+            state.logoEffect = selection.effect
+            state.logoColor = selection.color
+        }
+        LogoBarProfileUi.show(activity, if (bar) "GAME MODE bar" else "Logo LED",
+            original, onlyBar = bar,
+            onPreview = { selection ->
+                update(selection)
+                if (previewEnabled()) {
+                    disableRgbStudioForManualControl()
+                    apply(selection)
                 }
             },
-            saveState = {
-                saveLogoLedStateStorage(
-                    activity,
-                    LedState(
-                        state.logoEnabled,
-                        state.logoEffect,
-                        state.logoColor
-                    )
-                )
+            onSave = { selection ->
+                disableRgbStudioForManualControl()
+                update(selection)
+                saveLogoLedStateStorage(activity, selection)
+                apply(selection)
+                if (anyLedEnabled()) startFanLedService() else stopFanLedService()
             },
-            startFanLedService = ::startFanLedService,
-            stopFanLedService = ::stopFanLedService,
-            anyLedEnabled = ::anyLedEnabled,
-            setDialogRefresh = { refreshLogo = it },
-            deps = LogoLedDialogUi.Deps(
-                textPrimary = AppTheme.textPrimary,
-                textSecondary = AppTheme.textSecondary,
-                panelColor = AppTheme.panelColor,
-                borderColor = AppTheme.borderColor,
-                panelPressed = AppTheme.panelPressed,
-                accent = AppTheme.accentColor,
-                typeface = Typeface.SANS_SERIF,
-                dp = { value -> uiKit.dp(value) },
-                roundedBg = { fill, stroke, radius ->
-                    uiKit.roundedBg(fill, stroke, radius)
-                },
-                roundedFill = { color, radius ->
-                    uiKit.roundedFill(color, radius)
-                },
-                space = { value -> uiKit.space(value) },
-                filterChip = { label, selected, onClick ->
-                    ledViews.filterChip(label, selected, onClick)
-                },
-                colorDotGeneric = { hex, selected, onClick ->
-                    ledViews.colorDot(hex, selected, onClick)
-                },
-                colorDotDrawable = { hex, selected ->
-                    ledViews.colorDotDrawable(hex, selected)
-                }
-            )
-        )
+            onCancel = {
+                update(original)
+                if (previewEnabled()) apply(original)
+            })
     }
 
     fun showFan() {

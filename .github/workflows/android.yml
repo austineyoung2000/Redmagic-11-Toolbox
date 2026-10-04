@@ -6,6 +6,7 @@ on:
       - main
       - sixteen
       - test/led-brightness
+      - test/logo-game-mode-bar
     tags:
       - 'v*'
   pull_request:

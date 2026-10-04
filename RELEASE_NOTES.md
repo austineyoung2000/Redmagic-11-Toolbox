@@ -1,3 +1,34 @@
+# Redmagic 11 Toolbox 2.6.0
+
+Version 2.6.0 separates the side GAME MODE bar from rear logo lighting throughout the app. The owner authorized merge and release on October 4, 2026.
+
+## Independent GAME MODE bar lighting
+
+- LED Zones has a dedicated GAME MODE BAR entry beside Logo LED. Each saves its own enable switch, preset color, and brightness from 32 to 255.
+- Changing or disabling one area preserves its companion. Both share a clearly labeled Steady, Breathe, Flashing, or Rapid effect.
+- Charging has a dedicated bar entry. Game Mode, incoming calls, and connected calls have separate logo/bar sections.
+- RGB Studio adds independent bar colors, intensity, enable, and cycle speed. Synchronized timing retains different color sequences. Updating either area composes the whole shared program, so effect phase can restart on both.
+- RGB Apply to All, Master Profiles, and portable JSON backups preserve both areas. Older profiles retain matching logo/bar output.
+- Normal preview Cancel restores the complete original pair. Mode editors stage edits until Save.
+
+## Consistent palette selection
+
+All color pickers use compact circular swatches. Selected colors and multicolor fan palettes have a white ring with a thin dark outline for visibility on light dialogs. Charging and calling presets now read live selections, gaming clears old preset rings when choosing solid colors, and RGB Studio supports ring-based multiple selection while retaining at least one cycle color.
+
+## Reverse engineering and validation
+
+Owner device tests established the logo as the first RGB group and GAME MODE bar as the second, with separate colors and brightness across all four effects. The app copies an exact checksum-validated vendor template, replaces only mapped RGB values, and replays it through the existing root broker. Vendor files, routing/timing/current limits, and reset controls remain unchanged. There is no new daemon or Trigger Bridge requirement.
+
+See [logo/bar discovery and mappings](docs/LOGO_GAME_MODE_BAR_REVERSE_ENGINEERING.md). Automated tests cover both area groups, independent enable/brightness combinations, malformed inputs, legacy migration, and tampered templates. The owner authorized release after client APK testing; the device checklist remains documented for further regression testing. Different simultaneous logo/bar effects are unverified and are not exposed.
+
+## Installation
+
+- Version **2.6.0**, Android versionCode **12**.
+- Rooted REDMAGIC 11 Pro / NX809J with matching vendor programs and interfaces.
+- Install the signed release APK over 2.5.5 to retain settings. Application ID and signing configuration remain unchanged.
+
+---
+
 # Redmagic 11 Toolbox 2.5.5
 
 Version 2.5.5 brings adjustable LED brightness to the lighting controls and profiles throughout the app, building on the independent split-trigger colors introduced in 2.5.4.

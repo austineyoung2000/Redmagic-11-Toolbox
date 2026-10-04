@@ -39,12 +39,13 @@ object LightingTabUi {
 
         val zonesCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("✦", "LED ZONES"))
-            addView(deps.bodyText("Configure fan, logo, and trigger lighting."))
+            addView(deps.bodyText("Configure fan, logo, GAME MODE bar, and trigger lighting."))
             addView(previewRow)
             addView(deps.singleRow(deps.actionButton("FAN LED", false) {
                 deps.showFanLedDialog()
             }))
             addView(deps.singleRow(deps.actionButton("LOGO LED", false) { deps.showLogoLedDialog() }))
+            addView(deps.singleRow(deps.actionButton("GAME MODE BAR", false) { deps.showGameModeBarDialog() }))
             addView(deps.singleRow(deps.actionButton("TRIGGER LEDs", false) { deps.showShoulderLedDialog() }))
         }
 
@@ -101,6 +102,7 @@ object LightingTabUi {
                 deps.actionButton("CHARGING LOGO LED", false) { deps.showChargingLogoLedDialog() },
                 deps.actionButton("CHARGING SHOULDER LEDS", false) { deps.showChargingShoulderLedDialog() }
             ))
+            addView(deps.singleRow(deps.actionButton("CHARGING GAME MODE BAR", false) { deps.showChargingGameModeBarDialog() }))
         }
 
         if (

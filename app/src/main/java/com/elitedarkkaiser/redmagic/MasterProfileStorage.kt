@@ -529,6 +529,9 @@ object MasterProfileStorage {
         put("enabled", enabled); put("syncZones", syncZones); put("effect", effect)
         put("splitTriggers", splitTriggers)
         put("logoBrightness", logoBrightness)
+        put("logoEnabled", logoEnabled); put("barEnabled", barEnabled)
+        put("barColors", JSONArray(barColors)); put("barBrightness", barBrightness)
+        put("barSpeedMs", barSpeedMs)
         put("shoulderBrightness", shoulderBrightness)
         put("fanBrightness", fanBrightness)
 
@@ -543,6 +546,10 @@ object MasterProfileStorage {
         effect = optString("effect", "steady"),
         splitTriggers = optBoolean("splitTriggers", false),
         logoBrightness = optInt("logoBrightness", 255).coerceIn(32, 255),
+        logoEnabled = optBoolean("logoEnabled", true), barEnabled = optBoolean("barEnabled", true),
+        barBrightness = optInt("barBrightness", optInt("logoBrightness", 255)).coerceIn(32, 255),
+        barColors = (optJSONArray("barColors") ?: optJSONArray("colors") ?: JSONArray()).toIntList().ifEmpty { RgbStudioState.DEFAULT_COLORS },
+        barSpeedMs = optLong("barSpeedMs", optLong("logoSpeedMs", RgbStudioState.DEFAULT_SPEED_MS)),
         shoulderBrightness = optInt("shoulderBrightness", 255).coerceIn(32, 255),
         fanBrightness = optInt("fanBrightness", 255).coerceIn(32, 255),
 

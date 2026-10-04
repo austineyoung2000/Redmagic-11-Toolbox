@@ -82,8 +82,9 @@ internal class MainLightingController(
         zoneState.fanEnabled = true
         zoneState.fanEffect = LedBrightness.encode(selection.fanBrightness, selection.effect)
         zoneState.fanColor = color
-        zoneState.logoEnabled = true
-        zoneState.logoEffect = LedBrightness.encode(selection.logoBrightness, selection.effect)
+        zoneState.logoEnabled = selection.logoEnabled || selection.barEnabled
+        zoneState.logoEffect = LogoBarSelection(selection.effect, selection.logoEnabled, selection.logoBrightness,
+            selection.barEnabled, selection.barColors.firstOrNull() ?: color, selection.barBrightness).encode()
         zoneState.logoColor = color
         zoneState.shoulderEnabled = true
         zoneState.shoulderEffect = LedBrightness.encode(selection.shoulderBrightness, selection.effect)
@@ -141,6 +142,7 @@ internal class MainLightingController(
             },
             showFanLedDialog = { zoneDialogs.showFan() },
             showLogoLedDialog = { zoneDialogs.showLogo() },
+            showGameModeBarDialog = { zoneDialogs.showLogo(bar = true) },
             showShoulderLedDialog = { zoneDialogs.showShoulder() },
             rgbStudioSummary = { actions.rgbStudioSummary() },
             showRgbStudioDialog = { onUpdated ->
@@ -169,6 +171,9 @@ internal class MainLightingController(
                     runBackground = runBackground,
                     deps = chargingLedDialogDeps()
                 )
+            },
+            showChargingGameModeBarDialog = {
+                ChargingLedActions.showLogoDialog(activity, runBackground, chargingLedDialogDeps(), bar = true)
             },
             showChargingShoulderLedDialog = {
                 ChargingLedActions.showShoulderDialog(
