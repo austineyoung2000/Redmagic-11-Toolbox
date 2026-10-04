@@ -30,7 +30,7 @@ internal object ChargingLedProfileDialog {
         val space: (Int) -> View,
         val colorDotGeneric: (String, Boolean, () -> Unit) -> View,
         val colorDotDrawable: (String, Boolean) -> Drawable,
-        val fanPresetBubble: (String, String, String, String, String, Boolean, () -> Unit) -> View
+        val fanPresetBubble: (String, String, String, String, String, () -> Boolean, () -> Unit) -> View
     )
 
     fun show(
@@ -176,7 +176,9 @@ internal object ChargingLedProfileDialog {
             }
         }
 
+        val paletteViews = mutableListOf<View>()
         fun refreshButtons() {
+            paletteViews.forEach { it.invalidate() }
             updateEffectButton(
                 steadyBtn,
                 LedBrightness.effect(effect) == "steady"
@@ -285,25 +287,25 @@ internal object ChargingLedProfileDialog {
         val presetBubbleRow1 = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, deps.dp(12), 0, 0)
-            addView(deps.fanPresetBubble("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00", "0x3002101", color == 0x101) { applyFanPalette("0x3002101") })
+            addView(deps.fanPresetBubble("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00", "0x3002101", { color == 0x101 }) { applyFanPalette("0x3002101") }.apply { paletteViews.add(this) })
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#1565FF", "#00E676", "#22D3EE", "#FF69B4", "0x3002102", color == 0x102) { applyFanPalette("0x3002102") })
+            addView(deps.fanPresetBubble("#1565FF", "#00E676", "#22D3EE", "#FF69B4", "0x3002102", { color == 0x102 }) { applyFanPalette("0x3002102") }.apply { paletteViews.add(this) })
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FFD600", "#FF69B4", "0x3002103", color == 0x103) { applyFanPalette("0x3002103") })
+            addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FFD600", "#FF69B4", "0x3002103", { color == 0x103 }) { applyFanPalette("0x3002103") }.apply { paletteViews.add(this) })
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#00E676", "#FF69B4", "#FF8C00", "#22D3EE", "0x3002104", color == 0x104) { applyFanPalette("0x3002104") })
+            addView(deps.fanPresetBubble("#00E676", "#FF69B4", "#FF8C00", "#22D3EE", "0x3002104", { color == 0x104 }) { applyFanPalette("0x3002104") }.apply { paletteViews.add(this) })
         }
 
         val presetBubbleRow2 = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, deps.dp(10), 0, 0)
-            addView(deps.fanPresetBubble("#00E676", "#A020F0", "#FF8C00", "#FF69B4", "0x3002105", color == 0x105) { applyFanPalette("0x3002105") })
+            addView(deps.fanPresetBubble("#00E676", "#A020F0", "#FF8C00", "#FF69B4", "0x3002105", { color == 0x105 }) { applyFanPalette("0x3002105") }.apply { paletteViews.add(this) })
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#FF0000", "#FF0000", "#FF0000", "#FF0000", "0x3002106", color == 0x106) { applyFanPalette("0x3002106") })
+            addView(deps.fanPresetBubble("#FF0000", "#FF0000", "#FF0000", "#FF0000", "0x3002106", { color == 0x106 }) { applyFanPalette("0x3002106") }.apply { paletteViews.add(this) })
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0", "0x3002107", color == 0x107) { applyFanPalette("0x3002107") })
+            addView(deps.fanPresetBubble("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0", "0x3002107", { color == 0x107 }) { applyFanPalette("0x3002107") }.apply { paletteViews.add(this) })
             addView(deps.space(deps.dp(10)))
-            addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FF8C00", "#00E676", "0x3002108", color == 0x108) { applyFanPalette("0x3002108") })
+            addView(deps.fanPresetBubble("#22D3EE", "#FF0000", "#FF8C00", "#00E676", "0x3002108", { color == 0x108 }) { applyFanPalette("0x3002108") }.apply { paletteViews.add(this) })
         }
 
         val buttonRow = LinearLayout(activity).apply {
