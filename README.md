@@ -723,8 +723,8 @@ Use the application at your own risk.
 See [Trigger LED reverse engineering and split-color tests](docs/TRIGGER_LED_REVERSE_ENGINEERING.md) for the observed driver interface, vendor program mappings, physical test results, implementation checks, and remaining validation.
 
 
-### LED Zones brightness test branch
+### Lighting brightness test branch
 
-`test/led-brightness` adds separate 32–255 brightness sliders to normal fan, logo, and trigger LED controls. Colors remain preset-only; split trigger colors share brightness. It scales validated vendor RGB payloads, preserves effect timing, and saves/restores the complete normal profile. This is an owner-test build, not a merged release; other profile editors and RGB Studio have no brightness sliders yet. See [test scope, evidence, and acceptance checks](docs/LED_BRIGHTNESS_TEST.md).
+`test/led-brightness` adds 32–255 brightness controls to LED Zones, gaming, charging, incoming/connected calls, and RGB Studio. Colors remain preset-only; top/bottom trigger colors share their zone brightness. RGB Studio has separate fan, logo, and trigger intensities even with synchronized cycle timing. Master Profiles capture and export/import these values with old backups defaulting RGB Studio brightness to 255.
 
-The brightness test branch now covers all exposed LED Zones effects, including the fan Blink circular chase and animated fan palettes. See [test evidence and supported mappings](docs/LED_BRIGHTNESS_TEST.md).
+Fan brightness supports Steady, Breathe, Flashing, Blink (the circular chase), and Rapid, including all eight palettes. Logo and triggers support Steady, Breathe, Flashing, and Rapid. Validated vendor RGB payloads are scaled while routing and animation timing remain intact. See [test scope, evidence, and acceptance checks](docs/LED_BRIGHTNESS_TEST.md). This remains an owner-test build, not a merged release.

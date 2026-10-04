@@ -96,6 +96,26 @@ internal object LedBrightness {
         return if (zone == "fan" && FanLedPalette.isPalette(color)) base == "steady" || "$base:$color" in animatedPalettes
         else "$zone:$base" in single
     }
+    /** Build one serialized RGB cycle update; only due zones are replayed. */
+    fun cycleCommand(effect: String, logoColor: Int?, triggerColor: Int?, fanColor: Int?,
+        bottomColor: Int? = null, logoBrightness: Int = 255, triggerBrightness: Int = 255,
+        fanBrightness: Int = 255): String? {
+        val commands = mutableListOf<String>()
+        fun add(zone: String, color: Int?, brightness: Int, bottom: Int? = null): Boolean {
+            if (color == null) return true
+            if (brightness !in MIN..MAX) return false
+            val base = if (bottom != null) ShoulderLedSplit.encode(effect,
+                ShoulderLedSplit.presetRgb(color), ShoulderLedSplit.presetRgb(bottom)) else effect
+            val rendered = command(zone, encode(brightness, base), color) ?: return false
+            commands.add(rendered)
+            return true
+        }
+        if (!add("logo", logoColor, logoBrightness) ||
+            !add("triggers", triggerColor, triggerBrightness, bottomColor) ||
+            !add("fan", fanColor, fanBrightness)) return null
+        return commands.joinToString(" &&\n")
+    }
+
     /** Null means unsupported; callers must reject dimmed requests rather than silently use stock output. */
     fun command(zone: String, value: String, color: Int): String? {
         if (value.startsWith("dim:") && decode(value) == null) return null

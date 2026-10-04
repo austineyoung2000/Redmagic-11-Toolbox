@@ -168,35 +168,21 @@ object ChargingLedActions {
                         ChargingLedState.isEnabled(activity) &&
                         ChargingLedState.isChargingNow(activity)
                     ) {
-                        saveProfileAndApplyIfCharging(
-                            activity,
-                            ChargingLedState.FAN_ENABLED_KEY,
-                            ChargingLedState.FAN_EFFECT_KEY,
-                            ChargingLedState.FAN_COLOR_KEY,
-                            enabled,
-                            effect,
-                            color
-                        )
+                        if (enabled) HardwareController.setFanLedEffect(effect, color)
+                        else HardwareController.setFanLedEnabled(false)
                     }
                 }
             },
             applySelection = { effect, color ->
                 runBackground {
-                    if (effect.startsWith("preset:")) {
-                        HardwareController.setFanLedStockPreset(
-                            effect.removePrefix("preset:")
-                        )
-                    } else {
-                        HardwareController.setFanLedEffect(
-                            effect,
-                            color
-                        )
+                    if (LedOwnership.current(activity) == LedOwner.CHARGING) {
+                        HardwareController.setFanLedEffect(effect, color)
                     }
                 }
             },
             disableLed = {
                 runBackground {
-                    HardwareController.setFanLedEnabled(false)
+                    if (LedOwnership.current(activity) == LedOwner.CHARGING) HardwareController.setFanLedEnabled(false)
                 }
             },
             saveState = {
@@ -238,10 +224,9 @@ object ChargingLedActions {
                     chargingFanColor = palette
 
                     runBackground {
-                        HardwareController.setFanLedEffect(
-                            chargingFanEffect,
-                            chargingFanColor
-                        )
+                        if (LedOwnership.current(activity) == LedOwner.CHARGING) {
+                            HardwareController.setFanLedEffect(chargingFanEffect, chargingFanColor)
+                        }
                     }
                     chargingFanDialogRefresh?.invoke()
                 }
@@ -277,7 +262,8 @@ object ChargingLedActions {
             ),
             title = "Charging Fan LED",
             subtitle = "Fan LED profile used only while plugged in and charging.",
-            enableLabel = "Enable for charging mode"
+            enableLabel = "Enable for charging mode",
+            brightnessControls = true
         )
     }
 

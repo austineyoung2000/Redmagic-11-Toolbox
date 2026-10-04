@@ -234,7 +234,7 @@ class RgbCycleService : Service() {
             logoColor,
             shoulderColor,
             fanColor,
-            pair
+            pair, state.logoBrightness, state.shoulderBrightness, state.fanBrightness
         ).joinToString("|")
 
         ModeTransitionCoordinator.applyLedProfile(
@@ -247,7 +247,10 @@ class RgbCycleService : Service() {
                 logoColor = logoColor,
                 shoulderColor = pair?.first ?: shoulderColor,
                 shoulderBottomColor = pair?.second,
-                fanColor = fanColor
+                fanColor = fanColor,
+                logoBrightness = state.logoBrightness,
+                shoulderBrightness = state.shoulderBrightness,
+                fanBrightness = state.fanBrightness
             )
         }
     }

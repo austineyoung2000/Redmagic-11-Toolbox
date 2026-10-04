@@ -23,7 +23,7 @@ object RgbStudioDialog {
         val filterChip: (String, Boolean, () -> Unit) -> Button,
         val updateSelectableButton: (Button, Boolean) -> Unit,
         val onSaveAndApply: (RgbStudioState) -> Unit,
-        val onApplyToAll: (String, Int) -> Unit,
+        val onApplyToAll: (RgbStudioState) -> Unit,
         val onStopService: () -> Unit
     )
 
@@ -52,6 +52,10 @@ object RgbStudioDialog {
         var enabled = initial.enabled
         var syncZones = initial.syncZones
         var effect = initial.effect
+        var logoBrightness = initial.logoBrightness.coerceIn(32,255)
+        var shoulderBrightness = initial.shoulderBrightness.coerceIn(32,255)
+        var fanBrightness = initial.fanBrightness.coerceIn(32,255)
+
         val colors = initial.colors.toMutableList()
         var splitTriggers = initial.splitTriggers
         val topColors = initial.topTriggerColors.toMutableList()
@@ -148,6 +152,17 @@ object RgbStudioDialog {
         addEffect("Flash", "flashing")
         addEffect("Rapid", "rapid")
         content.addView(effectRow)
+        content.addView(label("Zone brightness"))
+        content.addView(label("Logo"))
+        LedBrightnessUi(activity, content, "logo", { LedBrightness.encode(logoBrightness, effect) }, { 7 },
+            { logoBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+        content.addView(label("Triggers (top and bottom)"))
+        LedBrightnessUi(activity, content, "triggers", { LedBrightness.encode(shoulderBrightness, effect) }, { 7 },
+            { shoulderBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+        content.addView(label("Fan"))
+        LedBrightnessUi(activity, content, "fan", { LedBrightness.encode(fanBrightness, effect) }, { 7 },
+            { fanBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+
 
         content.addView(label("Color sequence"))
         content.addView(TextView(activity).apply {
@@ -353,6 +368,10 @@ object RgbStudioDialog {
                 enabled = forceEnabled ?: enabled,
                 syncZones = syncZones,
                 effect = effect,
+                logoBrightness = logoBrightness,
+                shoulderBrightness = shoulderBrightness,
+                fanBrightness = fanBrightness,
+
                 colors = colors.toList(),
                 splitTriggers = splitTriggers,
                 topTriggerColors = topColors.toList(),
@@ -373,7 +392,7 @@ object RgbStudioDialog {
             .setView(scroll)
             .setNegativeButton("CANCEL", null)
             .setNeutralButton("APPLY TO ALL") { _, _ ->
-                deps.onApplyToAll(effect, colors.first())
+                deps.onApplyToAll(buildState())
             }
             .setPositiveButton("SAVE & APPLY") { _, _ ->
                 deps.onSaveAndApply(buildState())

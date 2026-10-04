@@ -207,6 +207,7 @@ internal object CallLightingProfileUi {
         lateinit var breatheBtn: Button
         lateinit var flashingBtn: Button
         lateinit var rapidBtn: Button
+        var blinkBtn: Button? = null
         lateinit var row1: LinearLayout
         lateinit var row2: LinearLayout
         lateinit var presetRow1: LinearLayout
@@ -250,21 +251,22 @@ internal object CallLightingProfileUi {
         }
 
         fun refreshEffects() {
+            blinkBtn?.let { updateEffectButton(it, LedBrightness.effect(effect) == "blink") }
             updateEffectButton(
                 steadyBtn,
-                effect == "steady"
+                LedBrightness.effect(effect) == "steady"
             )
             updateEffectButton(
                 breatheBtn,
-                effect == "breathe"
+                LedBrightness.effect(effect) == "breathe"
             )
             updateEffectButton(
                 flashingBtn,
-                effect == "flashing"
+                LedBrightness.effect(effect) == "flashing"
             )
             updateEffectButton(
                 rapidBtn,
-                effect == "rapid"
+                LedBrightness.effect(effect) == "rapid"
             )
         }
 
@@ -290,8 +292,8 @@ internal object CallLightingProfileUi {
         }
 
         fun effectButton(text: String, value: String): Button {
-            return deps.filterChip(text, effect == value) {
-                effect = value
+            return deps.filterChip(text, LedBrightness.effect(effect) == value) {
+                effect = LedBrightness.withEffect(effect, value)
                 refreshEffects()
                 publish()
             }
@@ -410,6 +412,12 @@ internal object CallLightingProfileUi {
             card.addView(presetRow2)
         }
 
+        if (showFanPresets) {
+            blinkBtn = effectButton("Blink", "blink")
+            card.addView(blinkBtn)
+        }
+        LedBrightnessUi(activity, card, if (showFanPresets) "fan" else "logo", { effect }, { color },
+            { effect = it; publish() }, {}, deps.textSecondary, deps.accent, deps.dp)
         refreshEffects()
         refreshColors()
         return card

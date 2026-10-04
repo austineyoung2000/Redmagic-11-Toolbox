@@ -11,7 +11,10 @@ data class RgbStudioState(
     val screenOffTimeoutMinutes: Int = 0,
     val splitTriggers: Boolean = false,
     val topTriggerColors: List<Int> = DEFAULT_COLORS,
-    val bottomTriggerColors: List<Int> = DEFAULT_COLORS
+    val bottomTriggerColors: List<Int> = DEFAULT_COLORS,
+    val logoBrightness: Int = 255,
+    val shoulderBrightness: Int = 255,
+    val fanBrightness: Int = 255
 ) {
     fun triggerPair(index: Int): Pair<Int, Int> {
         val top = topTriggerColors.ifEmpty { DEFAULT_COLORS }

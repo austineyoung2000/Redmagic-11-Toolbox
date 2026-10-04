@@ -78,15 +78,15 @@ internal class MainLightingController(
         zoneDialogs.refreshOpenDialogs()
     }
 
-    fun applyAllLedState(effect: String, color: Int) {
+    fun applyAllLedState(selection: RgbStudioState, color: Int) {
         zoneState.fanEnabled = true
-        zoneState.fanEffect = effect
+        zoneState.fanEffect = LedBrightness.encode(selection.fanBrightness, selection.effect)
         zoneState.fanColor = color
         zoneState.logoEnabled = true
-        zoneState.logoEffect = effect
+        zoneState.logoEffect = LedBrightness.encode(selection.logoBrightness, selection.effect)
         zoneState.logoColor = color
         zoneState.shoulderEnabled = true
-        zoneState.shoulderEffect = effect
+        zoneState.shoulderEffect = LedBrightness.encode(selection.shoulderBrightness, selection.effect)
         zoneState.shoulderColor = color
 
         zoneDialogs.refreshOpenDialogs()

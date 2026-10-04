@@ -1,14 +1,16 @@
-# LED Zones brightness test branch
+# Lighting brightness test branch
 
 Branch: `test/led-brightness`. Based on `sixteen` at `f1e08dd`. Build label: `2.5.4-brightness-test`, same application ID and signing key. This branch must remain separate until the owner tests the signed APK and approves merging.
 
 ## Scope and controls
 
-Only normal Lighting → LED Zones gets brightness controls in this first experiment. Fan, Logo, and Trigger LEDs each have a 32–255 integer slider; 255 is full output and old preferences default to 255. The trigger control scales both selected trigger colors together. Preset-only colors and split top/bottom selection remain available. The enable switch controls Off. 32 is the lowest level physically tested, not a hardware minimum.
+The initial LED Zones experiment passed owner APK testing. Brightness controls now also extend to gaming, charging, incoming/connected calls, and RGB Studio. Fan, Logo, and Trigger LEDs each have a 32–255 integer slider; 255 is full output and old preferences default to 255. The trigger control scales both selected trigger colors together. Preset-only colors and split top/bottom selection remain available. The enable switch controls Off. 32 is the lowest level physically tested, not a hardware minimum.
 
 Slider movement stages the value. Hardware previews happen when dragging ends, respecting the existing real-time preview setting. Save persists the complete selection; Cancel, Back, or outside dismissal restores the original enabled state, effect, color/palette, split colors, and brightness. Changing to an unsupported dimming effect resets brightness to 255 and disables the slider with an explanation.
 
-Other profile editors and RGB Studio do not gain sliders in this branch. Existing normal-state storage, Master Profile snapshots/backups, and mode-exit restoration preserve the encoded normal effect. No separate daemon is introduced.
+Gaming, charging, and call profiles stage brightness with their existing effect fields; changing effects preserves intensity and Cancel leaves staged preferences unsaved. Charging fan previews no longer persist preferences before Save and restore only while charging owns the LEDs. Master Profiles retain these encoded selections in existing snapshots/backups.
+
+RGB Studio stores independent `logoBrightness`, `shoulderBrightness`, and `fanBrightness` values. Preferences and Master Profile JSON preserve them; missing fields in old backups default to 255 and imported values are clamped to 32–255. Timing synchronization does not overwrite per-zone intensities. Both split trigger colors use the trigger brightness. Save & Apply starts the cycle with these values; Apply to All transfers each intensity to its corresponding normal LED Zone. Cycle frames use validated full-program replay even at 255, and include brightness in their ownership signature. Only due zones are updated, using the existing cycle interval and serialized root write path. No extra polling or daemon is introduced.
 
 ## Mechanism and compatibility
 
@@ -45,6 +47,11 @@ The hex fixtures reproduce the supplied dumps and match their recorded hashes. U
 4. Save, close/reopen the app, disable/re-enable, and return from a lighting mode. The saved normal brightness must return.
 5. Check 255 restores full output, especially fan palette 102 after dimming another palette.
 6. Check every fan effect with single colors and all eight palettes, including the Blink circular chase. Check logo Flashing/Rapid as well as Steady/Breathe.
-7. Check that the slider is present only in LED Zones and no other profile editor.
+7. Check gaming, charging, incoming calls, and connected calls: save different brightness values per zone, reopen the editors, activate the mode, then exit it. Normal saved brightness must return.
+8. Check RGB Studio with different brightness per zone, both synchronized and per-zone speeds, and split triggers. Changing effect/colors must preserve each intensity. Check Apply to All transfers the correct zone values and stopping the cycle restores normal selections.
+9. Capture a Master Profile, alter brightness in normal and mode profiles, then apply the snapshot. Export/import it and verify the same values return. Import an older backup and verify RGB Studio defaults to 255.
+10. Confirm RGB cycling stays responsive with the validated replay path, especially at the fastest cycle speed.
 
 Do not merge based solely on CI success. Merge only after the owner confirms the APK behavior.
+
+On 2026-10-04 the owner confirmed the expanded LED Zones APK worked across its newly enabled effects. The profile/RGB Studio expansion requires its own APK acceptance testing before merge.

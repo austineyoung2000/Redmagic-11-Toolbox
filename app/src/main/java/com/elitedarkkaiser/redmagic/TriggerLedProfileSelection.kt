@@ -4,6 +4,7 @@ import com.elitedarkkaiser.redmagic.state.LedState
 
 /** Editable preset selection shared by Game, Charging, and Call profiles. */
 internal class TriggerLedProfileSelection(initial: LedState) {
+    var brightness = LedBrightness.level(initial.effect)
     var enabled = initial.enabled
     var effect = ShoulderLedSplit.baseEffect(initial.effect)
         .takeIf { it in setOf("steady", "breathe", "flashing", "rapid") } ?: "steady"
@@ -21,6 +22,12 @@ internal class TriggerLedProfileSelection(initial: LedState) {
         }
     }
 
+    private val originallyDimmed = initial.effect.startsWith("dim:")
+    private fun selectionEffect(): String {
+        val base = if (split) ShoulderLedSplit.encode(effect, topRgb, bottomRgb) else effect
+        return if (brightness != 255 || originallyDimmed) LedBrightness.encode(brightness, base) else base
+    }
+
     fun snapshot(): LedState = LedState(enabled,
-        if (split) ShoulderLedSplit.encode(effect, topRgb, bottomRgb) else effect, color)
+        selectionEffect(), color)
 }

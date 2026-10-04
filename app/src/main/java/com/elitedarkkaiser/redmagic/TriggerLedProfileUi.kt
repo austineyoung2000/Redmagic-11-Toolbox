@@ -125,6 +125,9 @@ internal object TriggerLedProfileUi {
         palette(splitPanel, "Bottom trigger", false)
         panel.addView(singlePanel)
         panel.addView(splitPanel)
+        LedBrightnessUi(activity, panel, "triggers", { selection.snapshot().effect },
+            { selection.color }, { selection.brightness = LedBrightness.level(it); onChanged(selection.snapshot()) },
+            {}, deps.textSecondary, deps.accent, deps.dp)
         refreshEffects()
         refreshColors()
         return panel

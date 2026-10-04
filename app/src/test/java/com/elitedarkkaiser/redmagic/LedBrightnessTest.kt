@@ -88,6 +88,35 @@ class LedBrightnessTest {
         }
     }
 
+    @Test fun rgbCycleUsesIndependentBrightnessAndOnlyDueZones() {
+        val case = Case("logo", "steady", 7, "aw_cfg2_7", listOf(183,215))
+        withDevice(case) { dir, logo ->
+            val fanCase = Case("fan", "steady", 7, "aw_fan2_7", listOf(159))
+            val fan = fixture(fanCase)
+            Files.write(dir.resolve("firmware/${fanCase.file}.bin"), fan)
+            for ((logoLevel, fanLevel) in listOf(32 to 128, 255 to 255)) {
+                dir.resolve("device/reg").toFile().writeText("")
+                val rendered = LedBrightness.cycleCommand("steady", 7, null, 7,
+                    logoBrightness=logoLevel, fanBrightness=fanLevel)!!
+                val result = execute(simulated(rendered, dir), dir)
+                assertEquals(result.second, 0, result.first)
+                val expected = logo.clone() + fan.clone()
+                for ((offsets, start, level) in listOf(Triple(case.offsets, 0, logoLevel), Triple(fanCase.offsets, logo.size, fanLevel))) {
+                    for (o in offsets) for (k in listOf(0,4,8)) {
+                        val i = start+o+k
+                        expected[i] = (((expected[i].toInt() and 255)*level+127)/255).toByte()
+                    }
+                }
+                assertArrayEquals(expected, replayed(dir))
+            }
+        }
+        assertNull(LedBrightness.cycleCommand("steady", 7, null, null, logoBrightness=31))
+        assertEquals("", LedBrightness.cycleCommand("steady", null, null, null))
+        val split = LedBrightness.cycleCommand("breathe", null, 7, null, 8, triggerBrightness=96)!!
+        assertEquals(LedBrightness.command("triggers", LedBrightness.encode(96,
+            ShoulderLedSplit.encode("breathe", 0x0000ff, 0xff00ff)), 7), split)
+    }
+
     @Test fun modifiedTemplateFailsBeforeEffectOrRegisterWrites() {
         val case = Case("logo", "steady", 7, "aw_cfg2_7", listOf(183,215))
         withDevice(case) { dir, original ->
@@ -116,6 +145,8 @@ class LedBrightnessTest {
     }
     private fun command(case: Case, level: Int, dir: java.nio.file.Path): String =
         LedBrightness.command(case.zone, LedBrightness.encode(level, case.effect), case.color)!!
+            .let { simulated(it, dir) }
+    private fun simulated(rendered: String, dir: java.nio.file.Path): String = rendered
             .replace("/sys/class/leds/aw22xxx_led", dir.resolve("device").toString())
             .replace("/vendor/firmware", dir.resolve("firmware").toString())
             .replace("/data/local/tmp", dir.resolve("temp").toString())
