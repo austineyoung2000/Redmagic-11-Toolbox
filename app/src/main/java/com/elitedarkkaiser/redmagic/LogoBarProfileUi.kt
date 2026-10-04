@@ -11,6 +11,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import com.elitedarkkaiser.redmagic.state.LedState
 import com.elitedarkkaiser.redmagic.ui.AppTheme
+import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -80,26 +81,27 @@ internal object LogoBarProfileUi {
             })
             val colors = listOf(1 to "#FF0000", 3 to "#FF8C00", 4 to "#FFD600", 5 to "#00E676",
                 6 to "#00E5FF", 7 to "#1565FF", 8 to "#A020F0", 9 to "#FF69B4")
-            val colorButtons = mutableMapOf<Int, MaterialButton>()
+            val swatches = LedControlViewFactory(activity)
+            val colorDots = mutableMapOf<Int, View>()
             colors.chunked(4).forEach { rowColors ->
-                val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-                rowColors.forEach { (id, hex) ->
-                    val button = MaterialButton(activity).apply {
-                        text = if (id == (if (bar) selection.barColor else logoColor)) "✓" else ""
-                        contentDescription = "$name ${when(id) { 1 -> "Red"; 3 -> "Orange"; 4 -> "Yellow"; 5 -> "Green"; 6 -> "Cyan"; 7 -> "Blue"; 8 -> "Purple"; else -> "Pink" }}"
-                        backgroundTintList = ColorStateList.valueOf(Color.parseColor(hex))
-                        setTextColor(Color.WHITE)
-                        minWidth = 0
-                        minimumWidth = 0
-                        cornerRadius = dp(24)
-                        setOnClickListener {
-                            if (bar) selection = selection.copy(barColor = id) else logoColor = id
-                            colorButtons.forEach { (key, dot) -> dot.text = if (key == id) "✓" else "" }
-                            publish()
+                val row = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, dp(6), 0, 0)
+                }
+                rowColors.forEachIndexed { index, (id, hex) ->
+                    if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(dp(10), 1))
+                    val dot = swatches.colorDot(hex,
+                        id == (if (bar) selection.barColor else logoColor)) {
+                        if (bar) selection = selection.copy(barColor = id) else logoColor = id
+                        colors.forEach { (key, colorHex) ->
+                            colorDots[key]?.background = swatches.colorDotDrawable(colorHex, key == id)
                         }
+                        publish()
+                    }.apply {
+                        contentDescription = "$name ${when(id) { 1 -> "Red"; 3 -> "Orange"; 4 -> "Yellow"; 5 -> "Green"; 6 -> "Cyan"; 7 -> "Blue"; 8 -> "Purple"; else -> "Pink" }}"
                     }
-                    colorButtons[id] = button
-                    row.addView(button, LinearLayout.LayoutParams(0, dp(52), 1f))
+                    colorDots[id] = dot
+                    row.addView(dot)
                 }
                 card.addView(row)
             }
