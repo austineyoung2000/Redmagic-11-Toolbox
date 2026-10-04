@@ -193,9 +193,11 @@ internal object GameModeUi {
         lateinit var ledFlashingBtn: Button
         lateinit var ledRapidBtn: Button
 
+        var refreshBlink: (() -> Unit)? = null
         fun refreshLedEffectButtons() {
+            refreshBlink?.invoke()
             GameModeActions.refreshLedEffectButtons(
-                selectedEffect = gmFanLedEffect,
+                selectedEffect = LedBrightness.effect(gmFanLedEffect),
                 steadyBtn = ledSteadyBtn,
                 breatheBtn = ledBreatheBtn,
                 flashingBtn = ledFlashingBtn,
@@ -207,10 +209,10 @@ internal object GameModeUi {
         }
 
         fun gmLedEffectBtn(label: String, value: String): Button {
-            return deps.filterChip(label, gmFanLedEffect == value) {
+            return deps.filterChip(label, LedBrightness.effect(gmFanLedEffect) == value) {
                 GameModeActions.updateLedEffect(
                     value = value,
-                    onEffectChanged = { newValue -> gmFanLedEffect = newValue },
+                    onEffectChanged = { newValue -> gmFanLedEffect = LedBrightness.withEffect(gmFanLedEffect, newValue) },
                     refreshButtons = { refreshLedEffectButtons() }
                 )
             }
@@ -517,6 +519,21 @@ internal object GameModeUi {
         container.addView(colorRow2)
         container.addView(presetRow1)
         container.addView(presetRow2)
+        val fanBlink = deps.filterChip("Blink", LedBrightness.effect(gmFanLedEffect) == "blink") {
+            gmFanLedEffect = LedBrightness.withEffect(gmFanLedEffect, "blink")
+            refreshLedEffectButtons()
+        }
+        refreshBlink = {
+            val selected = LedBrightness.effect(gmFanLedEffect) == "blink"
+            fanBlink.isSelected = selected
+            if (fanBlink is com.google.android.material.button.MaterialButton) {
+                fanBlink.backgroundTintList = ColorStateList.valueOf(if (selected) deps.panelPressed else deps.panelColor)
+            } else fanBlink.background = deps.roundedFill(if (selected) deps.panelPressed else deps.panelColor, 999)
+        }
+        refreshBlink?.invoke()
+        container.addView(fanBlink)
+        LedBrightnessUi(activity, container, "fan", { gmFanLedEffect }, { gmFanLedColor },
+            { gmFanLedEffect = it }, {}, deps.textSecondary, deps.accent, deps.dp)
 
         var gmLogoLedEnabled = current.logoLedEnabled
         var gmLogoLedEffect = current.logoLedEffect

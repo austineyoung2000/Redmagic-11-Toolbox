@@ -61,7 +61,7 @@ internal object GameModeLedZoneUi {
         fun refreshEffects() {
             if (shoulderZone) {
                 GameModeActions.refreshShoulderEffectButtons(
-                    selectedEffect = effect,
+                    selectedEffect = LedBrightness.effect(effect),
                     steadyBtn = steady,
                     breatheBtn = breathe,
                     flashingBtn = flashing,
@@ -72,7 +72,7 @@ internal object GameModeLedZoneUi {
                 )
             } else {
                 GameModeActions.refreshLedEffectButtons(
-                    selectedEffect = effect,
+                    selectedEffect = LedBrightness.effect(effect),
                     steadyBtn = steady,
                     breatheBtn = breathe,
                     flashingBtn = flashing,
@@ -85,9 +85,9 @@ internal object GameModeLedZoneUi {
         }
 
         fun effectButton(text: String, value: String): Button {
-            return deps.filterChip(text, effect == value) {
-                effect = value
-                onEffectChanged(value)
+            return deps.filterChip(text, LedBrightness.effect(effect) == value) {
+                effect = LedBrightness.withEffect(effect, value)
+                onEffectChanged(effect)
                 refreshEffects()
             }
         }
@@ -157,12 +157,16 @@ internal object GameModeLedZoneUi {
         refreshEffects()
         refreshColors()
 
+        val brightnessPanel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        LedBrightnessUi(activity, brightnessPanel, "logo", { effect }, { color },
+            { effect = it; onEffectChanged(it) }, {}, deps.textSecondary, deps.accent, deps.dp)
         return listOf(
             label,
             enabled,
             effectRow,
             firstColorRow,
-            secondColorRow
+            secondColorRow,
+            brightnessPanel
         )
     }
 }

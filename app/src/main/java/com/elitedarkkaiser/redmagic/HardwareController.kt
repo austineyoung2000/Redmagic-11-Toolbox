@@ -217,6 +217,7 @@ object HardwareController {
             "steady" -> 0x002
             "breathe" -> 0x003
             "flashing" -> 0x004
+            "blink" -> 0x006
             "rapid" -> 0x00a
             else -> 0x002
         }
@@ -243,100 +244,53 @@ object HardwareController {
         return execHardwareWrite("led_control", cmd)
     }
 
-    fun setShoulderLedEffect(effectName: String, color: Int): Boolean {
-        if (effectName.startsWith("split:")) {
-            val command = ShoulderLedSplit.command(effectName) ?: return false
-            return execHardwareWrite("led_control", command)
-        }
-        val colorCode = when (color) {
-            1 -> 1  // red
-            3 -> 3  // orange
-            4 -> 4  // yellow
-            5 -> 5  // green
-            6 -> 6  // cyan
-            7 -> 7  // blue
-            8 -> 8  // purple
-            9 -> 9  // pink
-            else -> 5
-        }
+    private val lastZoneCommands = mutableMapOf<String, String>()
 
-        val effectValue = when (effectName.lowercase()) {
-            "steady" -> "0x200200${Integer.toHexString(colorCode)}"
-            "breathe" -> "0x200300${Integer.toHexString(colorCode)}"
-            "flashing" -> "0x200400${Integer.toHexString(colorCode)}"
-            "rapid" -> "0x200a00${Integer.toHexString(colorCode)}"
-            else -> "0x200200${Integer.toHexString(colorCode)}"
+    @Synchronized
+    private fun applyZoneEffect(zone: LedZone, effectName: String, color: Int): Boolean {
+        val name = when (zone) { LedZone.LOGO -> "logo"; LedZone.FAN -> "fan"; LedZone.SHOULDER -> "triggers" }
+        val base = LedBrightness.effect(effectName)
+        val normalizedEffect = if (zone == LedZone.FAN) FanLedPalette.normalizeEffect(base) else base
+        val normalizedColor = if (zone == LedZone.FAN) FanLedPalette.normalizeColor(base, color) else color
+        val selection = if (effectName.startsWith("dim:")) {
+            if (LedBrightness.decode(effectName) == null) return false
+            LedBrightness.encode(LedBrightness.level(effectName), normalizedEffect)
+        } else normalizedEffect
+        val replay = LedBrightness.command(name, selection, normalizedColor)
+        if (replay == null && (LedBrightness.level(selection) != 255 || base.startsWith("split:"))) return false
+        val stock = "echo ${buildUnifiedLedEffectValue(zone, normalizedEffect, normalizedColor)} > $LED_EFFECT; echo 1 > $LED_CFG"
+        val command = (if (zone.enableFanFirst) "echo 1 > $FAN_ENABLE;\n" else "") + (replay ?: stock)
+        val previous = lastZoneCommands[name]
+        val success = execHardwareWrite("led_control", command)
+        if (success) lastZoneCommands[name] = command
+        else if (previous != null) {
+            recentHardwareWrites.remove("led_control")
+            execHardwareWrite("led_control", previous)
         }
-
-        val command =
-            "echo 1 > $FAN_ENABLE; echo $effectValue > $LED_EFFECT; echo 1 > $LED_CFG"
-        return execHardwareWrite("led_control", command)
+        return success
     }
 
-    fun setLogoLedEffect(effectName: String, color: Int): Boolean {
-        return setUnifiedLedEffect(LedZone.LOGO, effectName, color)
-    }
+    fun setShoulderLedEffect(effectName: String, color: Int): Boolean = applyZoneEffect(LedZone.SHOULDER, effectName, color)
+    fun setLogoLedEffect(effectName: String, color: Int): Boolean = applyZoneEffect(LedZone.LOGO, effectName, color)
+    fun setFanLedEffect(effectName: String, color: Int): Boolean = applyZoneEffect(LedZone.FAN, effectName, color)
 
-    fun setFanLedEffect(effectName: String, color: Int): Boolean {
-        return setUnifiedLedEffect(
-            LedZone.FAN,
-            FanLedPalette.normalizeEffect(effectName),
-            FanLedPalette.normalizeColor(effectName, color)
-        )
-    }
-
+    @Synchronized
     fun setRgbCycleFrame(
         effectName: String,
         logoColor: Int?,
         shoulderColor: Int?,
         fanColor: Int?,
         rootSession: RootShell.Session? = null,
-        shoulderBottomColor: Int? = null
+        shoulderBottomColor: Int? = null,
+        logoBrightness: Int = 255,
+        shoulderBrightness: Int = 255,
+        fanBrightness: Int = 255
     ): Boolean {
-        if (
-            logoColor == null &&
-            shoulderColor == null &&
-            fanColor == null
-        ) {
-            return true
-        }
-
-        val splitCommand = if (shoulderColor != null && shoulderBottomColor != null) {
-            ShoulderLedSplit.command(ShoulderLedSplit.encode(effectName,
-                ShoulderLedSplit.presetRgb(shoulderColor), ShoulderLedSplit.presetRgb(shoulderBottomColor)))
-                ?: return false
-        } else null
-
-        val commands = buildString {
-            if (shoulderColor != null || fanColor != null) {
-                append("echo 1 > $FAN_ENABLE; ")
-            }
-            if (logoColor != null) {
-                append(
-                    "echo ${buildUnifiedLedEffectValue(LedZone.LOGO, effectName, logoColor)} > $LED_EFFECT; "
-                )
-                append("echo 1 > $LED_CFG; ")
-            }
-            if (shoulderColor != null && splitCommand == null) {
-                append(
-                    "echo ${buildUnifiedLedEffectValue(LedZone.SHOULDER, effectName, shoulderColor)} > $LED_EFFECT; "
-                )
-                append("echo 1 > $LED_CFG; ")
-            }
-            if (fanColor != null) {
-                append(
-                    "echo ${buildUnifiedLedEffectValue(LedZone.FAN, effectName, fanColor)} > $LED_EFFECT; "
-                )
-                append("echo 1 > $LED_CFG; ")
-            }
-            if (splitCommand != null) { append("\n"); append(splitCommand) }
-        }
-
-        return execHardwareWrite(
-            "led_control",
-            commands,
-            rootSession
-        )
+        val commands = LedBrightness.cycleCommand(effectName, logoColor, shoulderColor, fanColor,
+            shoulderBottomColor, logoBrightness, shoulderBrightness, fanBrightness) ?: return false
+        if (commands.isEmpty()) return true
+        val enable = if (shoulderColor != null || fanColor != null) "echo 1 > $FAN_ENABLE &&\n" else ""
+        return execHardwareWrite("led_control", enable + commands, rootSession)
     }
 
     fun turnOffAllLeds(

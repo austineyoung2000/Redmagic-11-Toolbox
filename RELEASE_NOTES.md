@@ -1,3 +1,35 @@
+# Redmagic 11 Toolbox 2.5.5
+
+Version 2.5.5 brings adjustable LED brightness to the lighting controls and profiles throughout the app, building on the independent split-trigger colors introduced in 2.5.4.
+
+## Adjustable brightness throughout lighting
+
+- Set brightness anywhere from **32 to 255**. 255 is full intensity; 32 is the lowest tested slider level. Off remains controlled by the enable switch.
+- LED Zones, Game Mode, Charging Mode, incoming calls, and connected calls retain brightness when changing preset colors or effects.
+- Fan supports Steady, Breathe, Flashing, Blink, and Rapid for single colors and all eight multicolor palettes. Blink retains the circular chase observed in device testing.
+- Logo and triggers support Steady, Breathe, Flashing, and Rapid. Independent trigger colors share one zone brightness.
+- RGB Studio stores separate fan, logo, and trigger intensity even when cycle timing is synchronized. Apply to All transfers those intensities to normal lighting.
+- Master Profile capture/apply and JSON export/import preserve brightness. Older RGB Studio backups default to 255; imported RGB Studio intensity is bounded to the supported slider range.
+
+## Save, Cancel, and restoration
+
+Normal-zone Cancel restores the original color/palette, effect, enabled state, and brightness. Mode editors stage edits until Save. Charging fan previews no longer persist preferences before Save, and preview restoration respects charging ownership. Full-brightness restoration replays complete validated programs rather than relying on a duplicate stock selector reload.
+
+## How brightness was discovered
+
+The sysfs brightness readout of 128 prompted inspection of the supplied `zte_led` driver. Its brightness worker treats zero/nonzero as task control rather than scaling by the value. Comparing vendor effect programs instead exposed repeated RGB payloads. Scaling only those bytes made 32 visibly dimmer, first on triggers and then logo/fan. Follow-up tests established animated fan palettes, remaining logo effects, and the circular fan Blink animation. The implementation validates exact template hashes and keeps routing/timing/current-limit controls unchanged.
+
+See [LED brightness reverse engineering](docs/LED_BRIGHTNESS_REVERSE_ENGINEERING.md) and [owner test history](docs/LED_BRIGHTNESS_TEST.md). Automated tests exercise RGB-only changes across inspected programs, independent RGB cycle intensity, full-output replay, malformed/tampered inputs, and profile selection persistence. Owner reports confirmed the LED Zones and expanded profile APKs before merge; they are not an exhaustive certification of every color combination or ROM.
+
+## Installation
+
+- Version **2.5.5**, Android `versionCode` **11**.
+- Supported device: rooted REDMAGIC 11 Pro / NX809J with matching vendor LED programs and driver interfaces.
+- Application ID and signing configuration remain unchanged; install the signed APK over the current Toolbox installation to retain settings.
+- LED brightness and split-trigger lighting use the LED controller directly and do not require Trigger Bridge.
+
+---
+
 # Redmagic 11 Toolbox 2.5.4
 
 Version 2.5.4 adds independent top and bottom shoulder-trigger LED colors across the app's lighting modes. Choose any combination from Red, Orange, Yellow, Green, Cyan, Blue, Purple, and Pink, with one shared lighting effect.

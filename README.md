@@ -1,7 +1,7 @@
 # Redmagic 11 Toolbox
 
 [![Android CI](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml/badge.svg?branch=sixteen)](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml)
-![Version](https://img.shields.io/badge/version-2.5.4-red)
+![Version](https://img.shields.io/badge/version-2.5.5-red)
 ![Android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)
 ![Device](https://img.shields.io/badge/device-RedMagic%2011%20Pro-red)
 ![Root](https://img.shields.io/badge/root-required-orange)
@@ -19,7 +19,7 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | Item | Configuration |
 |---|---|
 | Application ID | `com.elitedarkkaiser.redmagic` |
-| Version | `2.5.4` (`versionCode 10`) |
+| Version | `2.5.5` (`versionCode 11`) |
 | Development branch | `sixteen` |
 | Minimum Android | Android 9 / API 28 |
 | Target and compile SDK | API 35 |
@@ -28,6 +28,24 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 | UI | Material Components |
 | Root | Required for hardware controls; native TGK itself is non-root |
 | Supported device | RedMagic 11 Pro / NX809J |
+
+## What's new in 2.5.5
+
+Version 2.5.5 adds adjustable **32–255 LED brightness** across LED Zones, gaming, charging, incoming/connected calls, RGB Studio, and Master Profiles. Changing a preset color or effect preserves the selected brightness. Colors remain preset-only; brightness has its own slider.
+
+| Zone | Effects with brightness | Color support |
+| --- | --- | --- |
+| Fan | Steady, Breathe, Flashing, Blink, Rapid | Eight single colors and all eight multicolor palettes |
+| Logo | Steady, Breathe, Flashing, Rapid | Eight preset colors |
+| Triggers | Steady, Breathe, Flashing, Rapid | Matching or independent top/bottom preset colors; shared zone brightness |
+
+- Fan **Blink** preserves the vendor circular chase, illuminating LEDs independently in order.
+- RGB Studio saves independent fan, logo, and trigger brightness, even with synchronized cycle timing. Apply to All transfers each value to its corresponding normal zone.
+- Master Profiles and JSON export/import retain normal, mode, and RGB Studio brightness. Older RGB Studio backups default to 255.
+- Normal-zone Cancel restores the previous complete lighting selection. Mode editors keep staged changes unsaved until Save; charging fan previews no longer persist preferences early.
+- Brightness scales validated vendor program RGB payloads. It does not use the driver brightness node as a dimmer, change current limits, or modify vendor firmware.
+
+Owner device testing confirmed the expanded LED Zones build and reported the later profile/RGB Studio build working. See the [brightness reverse-engineering report](docs/LED_BRIGHTNESS_REVERSE_ENGINEERING.md), [test history](docs/LED_BRIGHTNESS_TEST.md), and [release notes](RELEASE_NOTES.md).
 
 ## What's new in 2.5.4
 
@@ -39,7 +57,7 @@ Version 2.5.4 adds independent top and bottom trigger LED preset colors with a s
 - Retain split selections through Master Profiles, portable backups, and mode restoration.
 - Use Steady, Breathe, Flashing, or Rapid with preset-only controls; no custom hex inputs or RGB sliders.
 
-The feature uses the reverse-engineered AW22xxx vendor effect programs and validates their checksums and RGB byte locations before applying a split selection. It does not rewrite vendor firmware or increase LED current limits. Steady, Breathe, and Flashing split output was confirmed during device/community testing; Rapid still needs physical split-output confirmation. See the [test and reverse-engineering report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md).
+The feature uses the reverse-engineered AW22xxx vendor effect programs and validates their checksums and RGB byte locations before applying a split selection. It does not rewrite vendor firmware or increase LED current limits. Steady, Breathe, and Flashing split output was confirmed during device/community testing; later owner APK testing reported all four trigger effects working. See the [test and reverse-engineering report](docs/TRIGGER_LED_REVERSE_ENGINEERING.md).
 
 ## What's new in 2.5.3
 
@@ -151,7 +169,7 @@ The complete native TGK investigation—including firmware classes, Binder trans
 
 Stock Game Space package roles, privileged gesture-monitor behavior, overlay-window evidence, AutoLaunch recovery policy, failed prototypes, and the Toolbox's compatible implementation are documented in the living [`docs/GAME_SPACE_REVERSE_ENGINEERING.md`](docs/GAME_SPACE_REVERSE_ENGINEERING.md) report. New verified Game Space findings should be added there as the investigation continues.
 
-The sections below document the complete 2.5.4 behavior and current architecture.
+The sections below document the complete 2.5.5 behavior and current architecture.
 
 ## Compatibility
 
@@ -721,3 +739,8 @@ Use the application at your own risk.
 ## Trigger LED investigation
 
 See [Trigger LED reverse engineering and split-color tests](docs/TRIGGER_LED_REVERSE_ENGINEERING.md) for the observed driver interface, vendor program mappings, physical test results, implementation checks, and remaining validation.
+
+
+### Lighting brightness implementation
+
+The brightness feature was developed and owner-tested on `test/led-brightness`, then merged into `sixteen` for 2.5.5. It covers LED Zones, gaming, charging, incoming/connected calls, RGB Studio, and Master Profiles. See the [reverse-engineering report](docs/LED_BRIGHTNESS_REVERSE_ENGINEERING.md) for the discovery, driver findings, payload mappings, safeguards, and physical evidence.

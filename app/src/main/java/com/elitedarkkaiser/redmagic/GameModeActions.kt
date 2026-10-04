@@ -173,28 +173,28 @@ internal object GameModeActions {
     ) {
         updateSelectableButton(
             steadyBtn,
-            selectedEffect == "steady",
+            LedBrightness.effect(selectedEffect) == "steady",
             roundedFill,
             selectedColor,
             unselectedColor
         )
         updateSelectableButton(
             breatheBtn,
-            selectedEffect == "breathe",
+            LedBrightness.effect(selectedEffect) == "breathe",
             roundedFill,
             selectedColor,
             unselectedColor
         )
         updateSelectableButton(
             flashingBtn,
-            selectedEffect == "flashing",
+            LedBrightness.effect(selectedEffect) == "flashing",
             roundedFill,
             selectedColor,
             unselectedColor
         )
         updateSelectableButton(
             rapidBtn,
-            selectedEffect == "rapid",
+            LedBrightness.effect(selectedEffect) == "rapid",
             roundedFill,
             selectedColor,
             unselectedColor
@@ -219,8 +219,8 @@ internal object GameModeActions {
         refreshEffectButtons: () -> Unit
     ) {
         onColorChanged(id)
-        if (currentEffect.startsWith("preset:")) {
-            onEffectChanged("steady")
+        if (LedBrightness.effect(currentEffect).startsWith("preset:")) {
+            onEffectChanged(LedBrightness.withEffect(currentEffect, "steady"))
         }
         refreshColorDots()
         refreshEffectButtons()
@@ -271,28 +271,28 @@ internal object GameModeActions {
     ) {
         updateSelectableButton(
             steadyBtn,
-            selectedEffect == "steady",
+            LedBrightness.effect(selectedEffect) == "steady",
             roundedFill,
             selectedColor,
             unselectedColor
         )
         updateSelectableButton(
             breatheBtn,
-            selectedEffect == "breathe",
+            LedBrightness.effect(selectedEffect) == "breathe",
             roundedFill,
             selectedColor,
             unselectedColor
         )
         updateSelectableButton(
             flashingBtn,
-            selectedEffect == "flashing",
+            LedBrightness.effect(selectedEffect) == "flashing",
             roundedFill,
             selectedColor,
             unselectedColor
         )
         updateSelectableButton(
             rapidBtn,
-            selectedEffect == "rapid",
+            LedBrightness.effect(selectedEffect) == "rapid",
             roundedFill,
             selectedColor,
             unselectedColor

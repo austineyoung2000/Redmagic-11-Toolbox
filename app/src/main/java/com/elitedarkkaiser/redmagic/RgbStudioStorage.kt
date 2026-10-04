@@ -47,6 +47,10 @@ object RgbStudioStorage {
         return sanitize(
             RgbStudioState(
                 enabled = prefs.getBoolean(ENABLED, false),
+                logoBrightness = prefs.getInt("rgb_studio_logo_brightness", 255),
+                shoulderBrightness = prefs.getInt("rgb_studio_shoulder_brightness", 255),
+                fanBrightness = prefs.getInt("rgb_studio_fan_brightness", 255),
+
                 syncZones = prefs.getBoolean(SYNC_ZONES, true),
                 effect = prefs.getString(EFFECT, "steady") ?: "steady",
                 colors = colors,
@@ -81,6 +85,10 @@ object RgbStudioStorage {
             Context.MODE_PRIVATE
         ).edit()
             .putBoolean(ENABLED, safe.enabled)
+            .putInt("rgb_studio_logo_brightness", safe.logoBrightness)
+            .putInt("rgb_studio_shoulder_brightness", safe.shoulderBrightness)
+            .putInt("rgb_studio_fan_brightness", safe.fanBrightness)
+
             .putBoolean(SYNC_ZONES, safe.syncZones)
             .putString(EFFECT, safe.effect)
             .putString(COLORS, safe.colors.joinToString(","))
@@ -124,6 +132,10 @@ object RgbStudioStorage {
             .ifEmpty { RgbStudioState.DEFAULT_COLORS }
 
         return state.copy(
+            logoBrightness = state.logoBrightness.coerceIn(32, 255),
+            shoulderBrightness = state.shoulderBrightness.coerceIn(32, 255),
+            fanBrightness = state.fanBrightness.coerceIn(32, 255),
+
             topTriggerColors = state.topTriggerColors.filter { it in allowedColors }.distinct().ifEmpty { colors },
             bottomTriggerColors = state.bottomTriggerColors.filter { it in allowedColors }.distinct().ifEmpty { colors },
             effect = state.effect.takeIf { it in allowedEffects } ?: "steady",

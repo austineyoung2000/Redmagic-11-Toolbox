@@ -18,7 +18,7 @@ internal class MainLightingTabActions(
 
     fun showRgbStudioDialog(
         onUpdated: () -> Unit,
-        onAllLedStateApplied: (String, Int) -> Unit
+        onAllLedStateApplied: (RgbStudioState, Int) -> Unit
     ) {
         RgbStudioDialog.show(
             activity = activity,
@@ -41,10 +41,10 @@ internal class MainLightingTabActions(
                     }
                     onUpdated()
                 },
-                onApplyToAll = { effect, color ->
+                onApplyToAll = { state ->
                     applyEffectToAllZones(
-                        effect,
-                        color,
+                        state,
+                        state.colors.first(),
                         onAllLedStateApplied,
                         onUpdated
                     )
@@ -171,9 +171,9 @@ internal class MainLightingTabActions(
     }
 
     private fun applyEffectToAllZones(
-        effect: String,
+        selection: RgbStudioState,
         color: Int,
-        onAllLedStateApplied: (String, Int) -> Unit,
+        onAllLedStateApplied: (RgbStudioState, Int) -> Unit,
         onUpdated: () -> Unit
     ) {
         RgbStudioStorage.setEnabled(activity, false)
@@ -182,19 +182,21 @@ internal class MainLightingTabActions(
             restoreNormalLeds = false
         )
 
-        onAllLedStateApplied(effect, color)
+        onAllLedStateApplied(selection, color)
 
-        val state = LedState(true, effect, color)
-        saveFanLedStateStorage(activity, state)
-        saveLogoLedStateStorage(activity, state)
-        saveShoulderLedStateStorage(activity, state)
+        saveFanLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.fanBrightness, selection.effect), color))
+        saveLogoLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.logoBrightness, selection.effect), color))
+        saveShoulderLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.shoulderBrightness, selection.effect), color))
 
         runBackground {
             HardwareController.setRgbCycleFrame(
-                effectName = effect,
+                effectName = selection.effect,
                 logoColor = color,
                 shoulderColor = color,
-                fanColor = color
+                fanColor = color,
+                logoBrightness = selection.logoBrightness,
+                shoulderBrightness = selection.shoulderBrightness,
+                fanBrightness = selection.fanBrightness
             )
             HardwareServiceActions.startFanLed(activity)
         }

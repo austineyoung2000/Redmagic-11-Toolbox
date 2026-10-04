@@ -179,19 +179,19 @@ internal object ChargingLedProfileDialog {
         fun refreshButtons() {
             updateEffectButton(
                 steadyBtn,
-                effect == "steady"
+                LedBrightness.effect(effect) == "steady"
             )
             updateEffectButton(
                 breatheBtn,
-                effect == "breathe"
+                LedBrightness.effect(effect) == "breathe"
             )
             updateEffectButton(
                 flashingBtn,
-                effect == "flashing"
+                LedBrightness.effect(effect) == "flashing"
             )
             updateEffectButton(
                 rapidBtn,
-                effect == "rapid"
+                LedBrightness.effect(effect) == "rapid"
             )
 
             if (colorRowsReady) {
@@ -211,20 +211,20 @@ internal object ChargingLedProfileDialog {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        steadyBtn = chip("Steady", effect == "steady") {
-            effect = "steady"
+        steadyBtn = chip("Steady", LedBrightness.effect(effect) == "steady") {
+            effect = LedBrightness.withEffect(effect, "steady")
             refreshButtons()
         }
-        breatheBtn = chip("Breathe", effect == "breathe") {
-            effect = "breathe"
+        breatheBtn = chip("Breathe", LedBrightness.effect(effect) == "breathe") {
+            effect = LedBrightness.withEffect(effect, "breathe")
             refreshButtons()
         }
-        flashingBtn = chip("Flash", effect == "flashing") {
-            effect = "flashing"
+        flashingBtn = chip("Flash", LedBrightness.effect(effect) == "flashing") {
+            effect = LedBrightness.withEffect(effect, "flashing")
             refreshButtons()
         }
-        rapidBtn = chip("Rapid", effect == "rapid") {
-            effect = "rapid"
+        rapidBtn = chip("Rapid", LedBrightness.effect(effect) == "rapid") {
+            effect = LedBrightness.withEffect(effect, "rapid")
             refreshButtons()
         }
 
@@ -397,10 +397,12 @@ internal object ChargingLedProfileDialog {
             container.addView(presetBubbleRow1)
             container.addView(presetBubbleRow2)
         }
+        LedBrightnessUi(activity, container, if (showFanPresets) "fan" else "logo", { effect }, { color },
+            { effect = it }, {}, deps.textSecondary, deps.accent, deps.dp)
         container.addView(buttonRow)
 
         val dialog = MaterialAlertDialogBuilder(activity)
-            .setView(container)
+            .setView(android.widget.ScrollView(activity).apply { addView(container) })
             .setCancelable(true)
             .create()
 

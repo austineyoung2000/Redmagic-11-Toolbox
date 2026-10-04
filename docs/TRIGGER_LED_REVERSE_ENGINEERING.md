@@ -4,7 +4,7 @@ This records the investigation behind the independent top/bottom trigger colors 
 
 ## Result and scope
 
-The shoulder triggers can use independent RGB colors while sharing a lighting effect. The investigation confirmed split colors with Steady, Breathe, and Flashing effects. A community participant confirmed blue on the top trigger and purple on the bottom trigger with breathing. Rapid is implemented from the corresponding vendor program layout and tested for byte preservation, but its physical behavior still needs confirmation.
+The shoulder triggers can use independent RGB colors while sharing a lighting effect. The investigation confirmed split colors with Steady, Breathe, and Flashing effects. A community participant confirmed blue on the top trigger and purple on the bottom trigger with breathing. Rapid was initially implemented from the vendor layout and tested for byte preservation; subsequent owner APK testing on 2026-10-04 reported all trigger effects and preset colors working.
 
 ## Observed hardware and software
 
@@ -61,9 +61,9 @@ Offsets below are **zero-based file-byte offsets of the red value byte**, not re
 | Steady | `aw_touch2_7.bin` | 228 | 183, 215 | First 1 top; last 1 bottom |
 | Breathe | `aw_touch3_7.bin` | 396 | 183, 211, 239, 267, 299, 327, 355, 383 | First 4 top; last 4 bottom |
 | Flashing | `aw_touch4_7.bin` | 284 | 183, 211, 243, 271 | First 2 top; last 2 bottom |
-| Rapid | `aw_toucha_7.bin` | 332 | 151, 179, 207, 235, 263, 291 | First 3 top; last 3 bottom; physical mapping pending |
+| Rapid | `aw_toucha_7.bin` | 332 | 151, 179, 207, 235, 263, 291 | First 3 top; last 3 bottom; subsequent owner APK confirmation |
 
-Top/bottom grouping for Steady, Breathe, and Flashing is supported by the physical split-color tests. Rapid's grouping is inferred from its layout and remains a device-test requirement.
+Top/bottom grouping for Steady, Breathe, and Flashing is supported by the physical split-color tests. Rapid's grouping was inferred from its layout; subsequent owner APK testing reported all trigger effects working.
 
 Exact supported template SHA-256 values:
 
@@ -85,7 +85,7 @@ These offsets and hashes apply to the captured programs. A different ROM's progr
 | Split colors with breathing | Owner confirmed it worked | Breathing can retain distinct trigger colors |
 | Split colors with flashing | Owner confirmed it worked | Flashing can retain distinct trigger colors |
 | Blue top / purple bottom, breathing | Owner reported successful community test | Both requested colors work together with breathing |
-| Rapid | No explicit physical confirmation captured | Requires device confirmation |
+| Rapid | Later owner APK report: all trigger effects/colors working | Owner-reported confirmation |
 
 The original intermediate shell commands were not all retained in this repository, so this document does not invent a verbatim transcript. The retained implementation and four binary fixtures provide a reproducible program transformation. The standalone community test did not require the app to be installed; it used root access and the phone's vendor files/interfaces.
 
@@ -135,4 +135,8 @@ Game Mode, Charging Mode, and both ringing/connected Call Lighting profiles use 
 
 The new color dialog also passed a Kotlin 2.0.21 compile check against Android 35 and Material libraries. Local Gradle dependency downloads were blocked, but GitHub Actions subsequently passed the complete unit-test and signed release APK build after the test harness was adjusted to use Android-compatible file APIs. The successful run is [Android CI 1085](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/runs/37169567638). These JVM checks do not emulate the LED controller or prove physical output.
 
-Before release, verify the built app on hardware: both trigger orientations, preset color combinations, each effect, Save/Cancel, disable/re-enable, restart/restoration, and transitions to other lighting profiles. Rapid requires an explicit community/device result.
+Before release, verify the built app on hardware: both trigger orientations, preset color combinations, each effect, Save/Cancel, disable/re-enable, restart/restoration, and transitions to other lighting profiles. Later owner APK testing reported all trigger effects working.
+
+## Brightness extension in 2.5.5
+
+The same validated RGB payload mappings now support a shared 32–255 intensity for matching/split triggers. Original preset colors remain stored, avoiding cumulative scaling. See [LED brightness reverse engineering](LED_BRIGHTNESS_REVERSE_ENGINEERING.md).

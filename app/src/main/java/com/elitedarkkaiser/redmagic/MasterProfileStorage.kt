@@ -528,6 +528,10 @@ object MasterProfileStorage {
     private fun RgbStudioState.toJson() = JSONObject().apply {
         put("enabled", enabled); put("syncZones", syncZones); put("effect", effect)
         put("splitTriggers", splitTriggers)
+        put("logoBrightness", logoBrightness)
+        put("shoulderBrightness", shoulderBrightness)
+        put("fanBrightness", fanBrightness)
+
         put("topTriggerColors", JSONArray(topTriggerColors)); put("bottomTriggerColors", JSONArray(bottomTriggerColors))
         put("colors", JSONArray(colors)); put("logoSpeedMs", logoSpeedMs)
         put("shoulderSpeedMs", shoulderSpeedMs); put("fanSpeedMs", fanSpeedMs)
@@ -538,6 +542,10 @@ object MasterProfileStorage {
         enabled = optBoolean("enabled", false), syncZones = optBoolean("syncZones", true),
         effect = optString("effect", "steady"),
         splitTriggers = optBoolean("splitTriggers", false),
+        logoBrightness = optInt("logoBrightness", 255).coerceIn(32, 255),
+        shoulderBrightness = optInt("shoulderBrightness", 255).coerceIn(32, 255),
+        fanBrightness = optInt("fanBrightness", 255).coerceIn(32, 255),
+
         topTriggerColors = (optJSONArray("topTriggerColors") ?: optJSONArray("colors") ?: JSONArray()).toIntList().ifEmpty { RgbStudioState.DEFAULT_COLORS },
         bottomTriggerColors = (optJSONArray("bottomTriggerColors") ?: optJSONArray("colors") ?: JSONArray()).toIntList().ifEmpty { RgbStudioState.DEFAULT_COLORS },
         colors = (optJSONArray("colors") ?: JSONArray()).toIntList().ifEmpty { RgbStudioState.DEFAULT_COLORS },

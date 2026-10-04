@@ -80,7 +80,7 @@ fun gameModeProfileSummaryStorage(context: Context): String {
     val p = getSavedGameModeProfileStorage(context)
     val fanText = if (p.fanEnabled) "Fan ${p.fanLevel}" else "Fan Off"
     val pumpText = if (p.pumpEnabled) "Pump ${p.pumpProfile.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}" else "Pump Off"
-    val ledText = if (p.fanLedEnabled) "Fan LED ${p.fanLedEffect}" else "Fan LED Off"
+    val ledText = if (p.fanLedEnabled) "Fan LED ${LedBrightness.effect(p.fanLedEffect)}" else "Fan LED Off"
     return "$fanText • $pumpText • $ledText"
 }
 
