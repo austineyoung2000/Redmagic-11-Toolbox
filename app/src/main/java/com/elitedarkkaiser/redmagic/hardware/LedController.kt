@@ -31,7 +31,7 @@ object LedController {
     }
 
     fun setShoulderEffect(effect: String, color: Int): Boolean {
-        return HardwareController.setShoulderLedEffect(normalizeEffect(effect), color)
+        return HardwareController.setShoulderLedEffect(effect, color)
     }
 
     fun setFanStockPreset(effectValue: String): Boolean {

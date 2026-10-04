@@ -696,3 +696,7 @@ This project is independent and is not affiliated with, endorsed by, or maintain
 Root access and direct hardware control can cause unexpected behavior, instability, increased heat, battery drain, or hardware stress when used incorrectly. You are responsible for reviewing and testing the software on your device.
 
 Use the application at your own risk.
+
+## Trigger LED investigation
+
+See [Trigger LED reverse engineering and split-color tests](docs/TRIGGER_LED_REVERSE_ENGINEERING.md) for the observed driver interface, vendor program mappings, physical test results, implementation checks, and remaining validation.

@@ -244,6 +244,10 @@ object HardwareController {
     }
 
     fun setShoulderLedEffect(effectName: String, color: Int): Boolean {
+        if (effectName.startsWith("split:")) {
+            val command = ShoulderLedSplit.command(effectName) ?: return false
+            return execHardwareWrite("led_control", command)
+        }
         val colorCode = when (color) {
             1 -> 1  // red
             3 -> 3  // orange
