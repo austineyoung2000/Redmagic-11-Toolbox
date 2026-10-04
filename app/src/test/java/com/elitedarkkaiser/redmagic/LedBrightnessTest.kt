@@ -63,9 +63,11 @@ class LedBrightnessTest {
         withDevice(originalCase) { dir, original ->
             val previewCase = originalCase.copy(color=0x102, file="aw_fan2_102")
             Files.write(dir.resolve("firmware/${previewCase.file}.bin"), fixture(previewCase))
-            assertEquals(0, execute(command(previewCase, 128, dir), dir).first)
+            val preview = execute(command(previewCase, 128, dir), dir)
+            assertEquals(preview.second, 0, preview.first)
             dir.resolve("device/reg").toFile().writeText("")
-            assertEquals(0, execute(command(originalCase, 32, dir), dir).first)
+            val restored = execute(command(originalCase, 32, dir), dir)
+            assertEquals(restored.second, 0, restored.first)
             val expected = original.clone()
             for (offset in originalCase.offsets) for (delta in listOf(0,4,8)) {
                 expected[offset+delta] = (((original[offset+delta].toInt() and 255)*32+127)/255).toByte()
@@ -106,7 +108,7 @@ class LedBrightnessTest {
             .replace("/sys/class/leds/aw22xxx_led", dir.resolve("device").toString())
             .replace("/vendor/firmware", dir.resolve("firmware").toString())
             .replace("/data/local/tmp", dir.resolve("temp").toString())
-            .replace("exec 9>", "exec 9>>")
+            .replace("exec 9>\"", "exec 9>>\"")
     private fun replayed(dir: java.nio.file.Path): ByteArray = dir.resolve("device/reg").toFile().readText()
         .trim().split(Regex("\\s+")).map { it.toInt(16).toByte() }.toByteArray()
     private fun execute(command: String, dir: java.nio.file.Path): Pair<Int,String> {
