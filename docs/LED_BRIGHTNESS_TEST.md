@@ -18,7 +18,9 @@ Brightness scales only mapped RGB payload bytes using `(component * level + 127)
 
 The normal effect field carries `dim:<32..255>:<existing effect>`, including nested split selections such as `dim:128:split:breathe:FF0000:0000FF`. Original colors are retained, so repeated brightness changes never compound scaling. Steady fan palettes scale every inspected color block.
 
-Supported mappings in this test build: trigger Steady/Breathe/Flashing/Rapid (existing validated split templates), logo Steady/Breathe, fan single-color Steady, and all eight steady fan palettes. Trigger Flashing/Rapid dimming and steady palettes other than 102 are structurally validated but still require physical dimming confirmation. Fan breathing/flashing/rapid and logo flashing/rapid dimming remain disabled pending inspection. At 255 their existing stock effects remain usable.
+Supported mappings: triggers Steady/Breathe/Flashing/Rapid; logo Steady/Breathe/Flashing/Rapid; fan Steady/Breathe/Flashing/Blink/Rapid, for single colors and all eight palettes. Logo Blink has no supplied vendor template and is not exposed. Fan Blink uses vendor type 6: the owner observed a circular chase, lighting LEDs independently in order. RGB scaling preserves this routing and timing.
+
+All 32 animated fan palette templates were inspected and hash-validated. Each effect has its own mapping; offsets must not be inferred by adding a uniform stride across palette boundaries. Physical tests cover palette 102 across all effects; other animated palettes have structural verification and need APK testing.
 
 Hardware writes are serialized. On an application failure, the controller attempts to replay that zone’s last successful complete command in the current app process, bypassing duplicate suppression. Recovery is best effort and cannot guarantee restoration after an I2C failure or process termination. Updates across zones remain sequential; no exact simultaneous-start guarantee is made.
 
@@ -28,10 +30,12 @@ Hardware writes are serialized. On an application failure, the controller attemp
 - Steady yellow at 255, 128, 32: visible dimming on fan, and logo/triggers together.
 - Dim yellow Breathe on logo/triggers: both worked and appeared synchronized; exact phase timing was not measured.
 - Fan palette 102 (green/cyan/blue/purple), Steady full → low → full: owner confirmed working.
-- Palette 101 Breathe: owner could not judge dimming reliably; inconclusive.
+- Follow-up standalone test: fan solid blue Breathe, then palette 102 Breathe and solid blue/palette 102 Flashing/Blink/Rapid, plus logo blue Flashing/Rapid, at 255 → 128 → 32 → 255: owner confirmed all worked on 2026-10-04.
+- First signed APK: owner confirmed trigger brightness on all effects/colors, logo Steady/Breathe on all colors, fan steady solid and one palette; saved brightness survived color changes and app reopening; Cancel restored the original selection after adjustments.
+- Earlier palette 101 Breathe observation was inconclusive; the follow-up uses palette 102.
 - Early standalone scripts restored the test palette or only its selector, not the original complete profile. Reapplying the original app selection restored normal output. This is why app Cancel/restore replays the full desired program.
 
-The hex fixtures reproduce the supplied dumps and match their recorded hashes. Unit tests execute generated scripts against simulated sysfs files, assert only RGB bytes change, exercise every inspected steady palette, and restore a different original palette at its saved brightness. These do not emulate physical hardware.
+The hex fixtures reproduce the supplied dumps and match their recorded hashes. Unit tests execute generated scripts against simulated sysfs files, assert only RGB bytes change, exercise every inspected steady and animated palette, and restore a different original palette at its saved brightness. These do not emulate physical hardware.
 
 ## Owner APK acceptance test
 
@@ -40,7 +44,7 @@ The hex fixtures reproduce the supplied dumps and match their recorded hashes. U
 3. Preview a different color, palette, effect, and brightness, then Cancel/Back/outside-dismiss. The original full profile must return.
 4. Save, close/reopen the app, disable/re-enable, and return from a lighting mode. The saved normal brightness must return.
 5. Check 255 restores full output, especially fan palette 102 after dimming another palette.
-6. Unsupported dimming effects should show full brightness and an unavailable slider; existing effects should still work.
+6. Check every fan effect with single colors and all eight palettes, including the Blink circular chase. Check logo Flashing/Rapid as well as Steady/Breathe.
 7. Check that the slider is present only in LED Zones and no other profile editor.
 
 Do not merge based solely on CI success. Merge only after the owner confirms the APK behavior.

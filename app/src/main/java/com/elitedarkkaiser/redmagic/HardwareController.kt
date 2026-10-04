@@ -217,6 +217,7 @@ object HardwareController {
             "steady" -> 0x002
             "breathe" -> 0x003
             "flashing" -> 0x004
+            "blink" -> 0x006
             "rapid" -> 0x00a
             else -> 0x002
         }

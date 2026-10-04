@@ -157,6 +157,16 @@ internal object FanLedDialogUi {
         effectsRow.addView(deps.space(deps.dp(8)))
         effectsRow.addView(rapidBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
 
+        val blinkBtn = deps.filterChip("Blink", visibleEffect() == "blink") {
+            changeEffect("blink")
+            applyPreviewIfEnabled()
+            dialogRefresh?.invoke()
+        }
+        val blinkRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(blinkBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        }
+
         val colorLabel = TextView(activity).apply {
             text = "Color"
             textSize = 12f
@@ -266,6 +276,7 @@ internal object FanLedDialogUi {
         container.addView(enableCheck)
         container.addView(effectLabel)
         container.addView(effectsRow)
+        if (brightnessControls) container.addView(blinkRow)
 
         fun presetBubble(
             c1: String,
@@ -401,6 +412,7 @@ internal object FanLedDialogUi {
         }
 
         fun repaint() {
+            updateEffectButton(blinkBtn, visibleEffect() == "blink")
             updateEffectButton(
                 steadyBtn,
                 visibleEffect() == "steady"

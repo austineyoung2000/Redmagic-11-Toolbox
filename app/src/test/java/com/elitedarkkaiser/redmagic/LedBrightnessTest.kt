@@ -24,8 +24,8 @@ class LedBrightnessTest {
         }
         assertEquals(0x102, FanLedPalette.normalizeColor("dim:32:preset:0x3002102", 1))
         assertEquals("dim:32:steady", FanLedPalette.normalizeEffect("dim:32:preset:0x3002102"))
-        assertFalse(LedBrightness.supported("fan", "breathe", 0x102))
-        assertNull(LedBrightness.command("fan", "dim:32:breathe", 0x102))
+        assertFalse(LedBrightness.supported("logo", "blink", 7))
+        assertNull(LedBrightness.command("logo", "dim:32:blink", 7))
     }
 
     @Test fun scalingPreservesZeroChannelsAndMixedColorRatios() {
@@ -42,7 +42,14 @@ class LedBrightnessTest {
             Case("logo", "steady", 7, "aw_cfg2_7", listOf(183,215)),
             Case("logo", "breathe", 7, "aw_cfg3_7", listOf(183,211,239,267,299,327,355,383)),
             Case("fan", "steady", 7, "aw_fan2_7", listOf(159))
-        ) + (0x101..0x108).map { Case("fan", "steady", it, "aw_fan2_${it.toString(16)}", listOf(255,287,319,351)) }
+        ) + (0x101..0x108).map { Case("fan", "steady", it, "aw_fan2_${it.toString(16)}", listOf(255,287,319,351)) } + listOf(
+            Case("fan", "breathe", 7, "aw_fan3_7", listOf(159,187,215,243)),
+            Case("fan", "flashing", 7, "aw_fan4_7", listOf(159,187)),
+            Case("fan", "blink", 7, "aw_fan6_7", listOf(255,283,311,339,367,399,427,455,483,511,543,571,599,627,655,687,715,743,771,799)),
+            Case("fan", "rapid", 7, "aw_fana_7", listOf(195,223)),
+            Case("logo", "flashing", 7, "aw_cfg4_7", listOf(183,211,243,271)),
+            Case("logo", "rapid", 7, "aw_cfga_7", listOf(183,211,239,267,295,323,351,383,411,439,467,495,523,551))
+        ) + (0x101..0x108).map { Case("fan", "breathe", it, "aw_fan3_${it.toString(16)}", listOf(255,283,311,339,371,399,427,455,487,515,543,571,603,631,659,687)) } + (0x101..0x108).map { Case("fan", "flashing", it, "aw_fan4_${it.toString(16)}", listOf(255,283,315,343,375,403,435,463)) } + (0x101..0x108).map { Case("fan", "blink", it, "aw_fan6_${it.toString(16)}", listOf(255,283,311,339,367,399,427,455,483,511,543,571,599,627,655,687,715,743,771,799)) } + (0x101..0x108).map { Case("fan", "rapid", it, "aw_fana_${it.toString(16)}", listOf(291,319,351,379,411,439,471,499)) }
         for (case in cases) withDevice(case) { dir, original ->
             for (level in listOf(32,128,255)) {
                 dir.resolve("device/reg").toFile().writeText("")
@@ -53,6 +60,10 @@ class LedBrightnessTest {
                     expected[offset+delta] = (((original[offset+delta].toInt() and 255)*level+127)/255).toByte()
                 }
                 assertArrayEquals("${case.file}: preserve routing and timing at $level", expected, replayed(dir))
+                val type = when (case.effect) { "breathe" -> "003"; "flashing" -> "004"; "blink" -> "006"; "rapid" -> "00a"; else -> "002" }
+                val lamp = if (case.zone == "logo") "1" else "3"
+                val color = if (case.color >= 0x101) case.color.toString(16) else "007"
+                assertEquals("0x$lamp$type$color\n", dir.resolve("device/effect").toFile().readText())
                 assertEquals(0, dir.resolve("temp").toFile().listFiles()!!.size)
             }
         }

@@ -78,6 +78,7 @@ object LedController {
         return when (effect.lowercase()) {
             EFFECT_BREATHE -> EFFECT_BREATHE
             EFFECT_FLASHING -> EFFECT_FLASHING
+            "blink" -> "blink"
             EFFECT_RAPID -> EFFECT_RAPID
             else -> EFFECT_STEADY
         }
