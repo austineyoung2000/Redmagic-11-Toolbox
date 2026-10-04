@@ -56,9 +56,7 @@ internal class MainLightingZoneDialogs(
             },
             applyEffect = { effect, color ->
                 disableRgbStudioForManualControl()
-                runBackground {
-                    HardwareController.setShoulderLedEffect(effect, color)
-                }
+                applyShoulderSelection(effect, color)
             },
             disableLed = {
                 disableRgbStudioForManualControl()
@@ -342,14 +340,23 @@ internal class MainLightingZoneDialogs(
     private fun applyShoulderPreviewIfEnabled() {
         if (!previewEnabled()) return
 
+        if (state.shoulderEnabled) {
+            applyShoulderSelection(state.shoulderEffect, state.shoulderColor)
+        } else {
+            runBackground { HardwareController.setShoulderLedEnabled(false) }
+        }
+    }
+
+    private fun applyShoulderSelection(effect: String, color: Int) {
         runBackground {
-            if (state.shoulderEnabled) {
-                HardwareController.setShoulderLedEffect(
-                    state.shoulderEffect,
-                    state.shoulderColor
-                )
-            } else {
-                HardwareController.setShoulderLedEnabled(false)
+            if (!HardwareController.setShoulderLedEffect(effect, color)) {
+                activity.runOnUiThread {
+                    android.widget.Toast.makeText(
+                        activity,
+                        "Trigger lighting could not be applied. Check root access and ROM compatibility.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
