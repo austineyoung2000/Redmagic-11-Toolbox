@@ -245,7 +245,9 @@ internal object GameModeUi {
         lateinit var colorRow: LinearLayout
         lateinit var colorRow2: LinearLayout
 
+        val presetViews = mutableListOf<View>()
         fun refreshLedColorDots() {
+            presetViews.forEach { it.invalidate() }
             colorRow.getChildAt(0).background = deps.colorDotDrawable("#FF0000", gmFanLedColor == 1)
             colorRow.getChildAt(2).background = deps.colorDotDrawable("#FF8C00", gmFanLedColor == 3)
             colorRow.getChildAt(4).background = deps.colorDotDrawable("#FFD600", gmFanLedColor == 4)
@@ -302,31 +304,7 @@ internal object GameModeUi {
         lateinit var preset8: View
 
         fun refreshPresetBubbles() {
-            fun presetRing(selected: Boolean): GradientDrawable {
-                return GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.TRANSPARENT)
-                    setStroke(deps.dp(3), if (selected) Color.WHITE else Color.TRANSPARENT)
-                }
-            }
-
-            preset1.alpha = 1f
-            preset2.alpha = 1f
-            preset3.alpha = 1f
-            preset4.alpha = 1f
-            preset5.alpha = 1f
-            preset6.alpha = 1f
-            preset7.alpha = 1f
-            preset8.alpha = 1f
-
-            preset1.background = presetRing(gmFanLedColor == 0x101)
-            preset2.background = presetRing(gmFanLedColor == 0x102)
-            preset3.background = presetRing(gmFanLedColor == 0x103)
-            preset4.background = presetRing(gmFanLedColor == 0x104)
-            preset5.background = presetRing(gmFanLedColor == 0x105)
-            preset6.background = presetRing(gmFanLedColor == 0x106)
-            preset7.background = presetRing(gmFanLedColor == 0x107)
-            preset8.background = presetRing(gmFanLedColor == 0x108)
+            presetViews.forEach { it.invalidate() }
         }
 
             fun gmPresetBubble(hex1: String, hex2: String, hex3: String, hex4: String, value: String): View {
@@ -340,6 +318,7 @@ internal object GameModeUi {
             init {
                 val size = deps.dp(42)
                 layoutParams = LinearLayout.LayoutParams(size, size)
+                presetViews.add(this)
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
