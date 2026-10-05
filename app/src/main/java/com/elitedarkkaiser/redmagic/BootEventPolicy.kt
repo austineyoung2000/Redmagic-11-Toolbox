@@ -1,6 +1,7 @@
 package com.elitedarkkaiser.redmagic
 
 internal enum class BootEvent {
+    ROOT_STARTUP,
     BOOT_COMPLETED,
     USER_UNLOCKED
 }
