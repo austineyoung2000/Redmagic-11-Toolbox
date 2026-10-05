@@ -6,6 +6,18 @@ import org.junit.Test
 
 class BootEventPolicyTest {
     @Test
+    fun moduleFallbackStartsOnceWithoutInventingUnlockAutomation() {
+        val first = BootEventPolicy.decide(BootEvent.ROOT_STARTUP, false, true, true)
+        assertTrue(first.startCoreServices)
+        assertTrue(first.startTriggers)
+        assertFalse(first.runUnlockAutomation)
+        val duplicate = BootEventPolicy.decide(BootEvent.ROOT_STARTUP, true, true, true)
+        assertFalse(duplicate.startCoreServices)
+        assertFalse(duplicate.resetManualTriggerPause)
+        assertFalse(duplicate.needsAsyncWork)
+    }
+
+    @Test
     fun firstBootEventStartsCoreServicesAndConfiguredTriggers() {
         val decision = BootEventPolicy.decide(
             event = BootEvent.BOOT_COMPLETED,
