@@ -60,6 +60,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- DUMP is held by root/system/shell, never ordinary third-party apps. -->
+        <receiver
+            android:name=".RootBootReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+
         <receiver
             android:name=".CoolingWidgetProvider"
             android:exported="false"
