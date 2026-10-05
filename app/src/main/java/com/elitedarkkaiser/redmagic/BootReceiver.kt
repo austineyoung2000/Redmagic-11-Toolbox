@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
-class BootReceiver : BroadcastReceiver() {
+open class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             if (DeviceCompatibility.isSupportedDevice()) {
@@ -14,6 +14,7 @@ class BootReceiver : BroadcastReceiver() {
         }
 
         val event = when (intent?.action) {
+            ROOT_BOOT_ACTION -> BootEvent.ROOT_STARTUP
             Intent.ACTION_BOOT_COMPLETED ->
                 BootEvent.BOOT_COMPLETED
             Intent.ACTION_USER_UNLOCKED ->
@@ -78,6 +79,10 @@ class BootReceiver : BroadcastReceiver() {
             },
             "RedMagicBootStartup"
         ).start()
+    }
+
+    companion object {
+        const val ROOT_BOOT_ACTION = "com.elitedarkkaiser.redmagic.ROOT_BOOT_STARTUP"
     }
 
     private fun startCoreServices(context: Context) {
