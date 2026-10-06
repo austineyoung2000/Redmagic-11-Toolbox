@@ -86,6 +86,12 @@ open class BootReceiver : BroadcastReceiver() {
     }
 
     private fun startCoreServices(context: Context) {
+        if (isAutoFanEnabledStorage(context)) {
+            HardwareServiceActions.startAutoFan(context)
+        }
+        if (savedPumpStateStorage(context).autoEnabled) {
+            HardwareServiceActions.startAutoPump(context)
+        }
         HardwareServiceActions.startChargingMode(context)
 
         if (CallLightingState.isEnabled(context)) {
