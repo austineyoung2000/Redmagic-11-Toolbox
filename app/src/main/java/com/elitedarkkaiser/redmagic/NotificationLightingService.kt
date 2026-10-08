@@ -63,8 +63,8 @@ class NotificationLightingService : NotificationListenerService() {
                 ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
                     HardwareController.turnOffAllLeds()
                     val effect = LedBrightness.encode(p.brightness,p.effect)
-                    if (p.logo) HardwareController.setLogoLedEffect(effect,p.color)
-                    if (p.triggers) HardwareController.setShoulderLedEffect(effect,p.color)
+                    if (p.logo) HardwareController.setLogoLedEffect(p.logoState?.effect ?: effect,p.logoState?.color ?: p.color)
+                    if (p.triggers) HardwareController.setShoulderLedEffect(p.triggerState?.effect ?: effect,p.triggerState?.color ?: p.color)
                     if (p.fan) HardwareController.setFanLedEffect(effect,p.color)
                     if (HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this,"notification-lighting")) {
                         // LED commands may have re-enabled fan power since the
