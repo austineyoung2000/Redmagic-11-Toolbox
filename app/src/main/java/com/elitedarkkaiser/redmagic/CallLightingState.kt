@@ -115,7 +115,7 @@ internal object CallLightingState {
         val wasEnabled = prefs.getBoolean(PRE_CALL_FAN_ENABLED_KEY, false)
         val level = prefs.getInt(PRE_CALL_FAN_LEVEL_KEY, 0)
 
-        if (wasEnabled) {
+        if (wasEnabled && !HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(context, "call-fan-restoration")) {
             HardwareController.setFanLevel(level)
         } else {
             HardwareController.enableFan(false)
