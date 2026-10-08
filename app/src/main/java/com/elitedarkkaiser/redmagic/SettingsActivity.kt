@@ -137,6 +137,13 @@ class SettingsActivity : AppCompatActivity() {
             addView(header)
             addView(temperaturePanel)
             addView(appearancePanel)
+            addView(panel().apply {
+                addView(text("DIAGNOSTICS", 12f, secondary = true, bold = true))
+                addView(MaterialButton(this@SettingsActivity).apply {
+                    text = "Boot diagnostics"
+                    setOnClickListener { BootDiagnosticsDialog.show(this@SettingsActivity) }
+                })
+            })
         }
 
         val scroll = ScrollView(this).apply {
