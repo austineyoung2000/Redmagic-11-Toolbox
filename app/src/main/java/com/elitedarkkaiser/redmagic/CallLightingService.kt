@@ -252,16 +252,7 @@ class CallLightingService : Service() {
                 enforceFanPauseIfNeeded()
             }
 
-            TelephonyManager.CALL_STATE_OFFHOOK -> {
-                beginCallOwnership()
-
-                if (LedOwnership.canCallApply(this)) {
-                    applyConnectedProfile()
-                }
-
-                enforceFanPauseIfNeeded()
-            }
-
+            TelephonyManager.CALL_STATE_OFFHOOK,
             TelephonyManager.CALL_STATE_IDLE -> {
                 handler.removeCallbacks(
                     fanPauseRunnable
@@ -281,6 +272,7 @@ class CallLightingService : Service() {
 
 
     private fun beginCallOwnership() {
+        NotificationLightingState.expiresAt = 0L
         val wasAlreadyActive =
             CallLightingState.isActive(this)
 
