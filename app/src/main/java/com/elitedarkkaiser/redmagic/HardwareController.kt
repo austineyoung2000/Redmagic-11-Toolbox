@@ -48,6 +48,12 @@ object HardwareController {
         val succeeded =
             rootSession?.exec(command) ?: RootShell.exec(command)
         if (succeeded) {
+            // Fan/trigger LED programs also write the fan-enable node.
+            // A cached fan-off write is no longer valid after that side effect.
+            if (resource == "led_control" && command.contains(FAN_ENABLE)) {
+                recentHardwareWrites.remove("fan_control")
+                DashboardSnapshot.invalidateHardwareCache()
+            }
             if (
                 resource == "fan_control" ||
                 resource == "pump_control"
