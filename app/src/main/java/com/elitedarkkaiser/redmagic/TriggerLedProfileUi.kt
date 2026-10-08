@@ -27,8 +27,12 @@ internal object TriggerLedProfileUi {
     )
 
     fun create(activity: Activity, title: String, enableLabel: String, initial: LedState,
-        deps: Deps, onChanged: (LedState) -> Unit): LinearLayout {
-        val selection = TriggerLedProfileSelection(initial)
+        deps: Deps, onChanged: (LedState) -> Unit): LinearLayout =
+        create(activity, title, enableLabel, initial, deps, false, onChanged)
+
+    fun create(activity: Activity, title: String, enableLabel: String, initial: LedState,
+        deps: Deps, splitOnly: Boolean, onChanged: (LedState) -> Unit): LinearLayout {
+        val selection = TriggerLedProfileSelection(initial).apply { if (splitOnly) split = true }
         val panel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         fun label(text: String) = TextView(activity).apply {
             this.text = text
@@ -36,8 +40,8 @@ internal object TriggerLedProfileUi {
             setTextColor(deps.textSecondary)
             setPadding(0, deps.dp(12), 0, deps.dp(6))
         }
-        panel.addView(label(title))
-        panel.addView(MaterialCheckBox(activity).apply {
+        if (!splitOnly) panel.addView(label(title))
+        if (!splitOnly) panel.addView(MaterialCheckBox(activity).apply {
             text = enableLabel
             isChecked = selection.enabled
             setTextColor(deps.textPrimary)
@@ -55,7 +59,7 @@ internal object TriggerLedProfileUi {
             splitPanel.visibility = if (selection.split) View.VISIBLE else View.GONE
             refreshDots.forEach { it() }
         }
-        panel.addView(MaterialCheckBox(activity).apply {
+        if (!splitOnly) panel.addView(MaterialCheckBox(activity).apply {
             text = "Separate top and bottom colors"
             isChecked = selection.split
             setTextColor(deps.textPrimary)

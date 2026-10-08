@@ -32,7 +32,10 @@ internal object NotificationLightingState {
     }
     private fun readLed(j: JSONObject, key: String): com.elitedarkkaiser.redmagic.state.LedState? {
         val v = j.optJSONObject(key) ?: return null
-        return com.elitedarkkaiser.redmagic.state.LedState(v.optBoolean("enabled"),v.getString("effect"),v.getInt("color"))
+        // An invalid optional override must not discard the common profile.
+        return runCatching {
+            com.elitedarkkaiser.redmagic.state.LedState(v.optBoolean("enabled"),v.getString("effect"),v.getInt("color"))
+        }.getOrNull()
     }
     fun packages(c: Context) = prefs(c).all.keys.filter { it.startsWith("app:") }.map { it.removePrefix("app:") }.sorted()
     fun remove(c: Context, pkg: String) { prefs(c).edit().remove("app:$pkg").apply() }

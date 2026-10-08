@@ -18,12 +18,14 @@ class NotificationLightingService : NotificationListenerService() {
     private lateinit var worker: Handler
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentKey: String? = null
+    @Volatile private var connectedAtMillis = 0L
     private val seen = LinkedHashSet<String>()
     private val finish = Runnable { endWindow() }
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             worker.post {
                 if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_POWER_CONNECTED ||
+                    intent?.action == ACTION_SETTINGS_CHANGED ||
                     !NotificationLightingState.enabled(this@NotificationLightingService)) endWindow()
             }
         }
@@ -38,7 +40,7 @@ class NotificationLightingService : NotificationListenerService() {
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName == packageName || sbn.isOngoing ||
+        if (sbn.postTime <= connectedAtMillis || sbn.packageName == packageName || sbn.isOngoing ||
             sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         worker.post {
             // Updates to the same notification do not extend its lighting window.
@@ -95,7 +97,12 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onListenerConnected() {
         super.onListenerConnected()
+        // Replayed notifications belong to the old session, not a new alert.
+        connectedAtMillis = System.currentTimeMillis()
+        val existingKeys = runCatching { activeNotifications.orEmpty().map { it.key } }.getOrDefault(emptyList())
         worker.post {
+            seen.clear()
+            seen.addAll(existingKeys.takeLast(256))
             // Rebinding after process death must clear any orphaned LED window.
             if (currentKey == null) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-listener-connected")
         }
