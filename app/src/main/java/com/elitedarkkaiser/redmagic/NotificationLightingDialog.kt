@@ -3,7 +3,7 @@ package com.elitedarkkaiser.redmagic
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
+import com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory
 import android.provider.Settings
 import android.widget.*
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -29,15 +29,17 @@ object NotificationLightingDialog {
         val colors=listOf(1 to 0xffff0000.toInt(),3 to 0xffff8800.toInt(),4 to 0xffffd700.toInt(),5 to 0xff00dd77.toInt(),6 to 0xff00ddee.toInt(),7 to 0xff1765ff.toInt(),8 to 0xffaa22ee.toInt(),9 to 0xffff66bb.toInt())
         val names=listOf("Red","Orange","Yellow","Green","Cyan","Blue","Purple","Pink")
         var selectedColor=7
-        val dots=mutableListOf<Button>()
-        fun refreshDots() { dots.forEachIndexed { index, button -> button.background=GradientDrawable().apply {
-            shape=GradientDrawable.OVAL; setColor(colors[index].second)
-            if(selectedColor==colors[index].first) setStroke((3*activity.resources.displayMetrics.density).toInt(),Color.WHITE)
-        } } }
+        val palette = LedControlViewFactory(activity)
+        val dots=mutableListOf<android.view.View>()
+        fun refreshDots() { dots.forEachIndexed { index, dot ->
+            dot.background=palette.colorDotDrawable(String.format("#%06X", colors[index].second and 0xffffff), selectedColor==colors[index].first)
+        } }
         colors.chunked(4).forEachIndexed { rowIndex,rowColors -> content.addView(LinearLayout(activity).apply {
-            rowColors.forEachIndexed { col,pair -> addView(Button(activity).apply {
-                contentDescription=names[rowIndex*4+col]; text=""; minWidth=0; minimumWidth=0; minHeight=0; minimumHeight=0
-                dots.add(this); setOnClickListener { selectedColor=pair.first; refreshDots() }
+            rowColors.forEachIndexed { col,pair -> addView(palette.colorDot(String.format("#%06X", pair.second and 0xffffff), selectedColor==pair.first) {
+                selectedColor=pair.first; refreshDots()
+            }.apply {
+                contentDescription=names[rowIndex*4+col]
+                dots.add(this)
             },LinearLayout.LayoutParams((44*activity.resources.displayMetrics.density).toInt(),(44*activity.resources.displayMetrics.density).toInt()).apply { setMargins(6,6,6,6) }) }
         }) }
         val duration=Spinner(activity).apply { adapter=ArrayAdapter(activity,android.R.layout.simple_spinner_dropdown_item,listOf("3 seconds","5 seconds","10 seconds","15 seconds","30 seconds")) }
