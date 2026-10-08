@@ -25,7 +25,10 @@ open class BootReceiver : BroadcastReceiver() {
         if (!DeviceCompatibility.isSupportedDevice()) return
 
         val appContext = context.applicationContext
-        GameplayRuntimeService.ensureRunning(appContext)
+        BootDiagnostics.record(appContext, "Received $event")
+        BootDiagnostics.request(appContext, "Gameplay runtime") {
+            GameplayRuntimeService.ensureRunning(appContext)
+        }
         val triggersAutoStart =
             readTriggerPrefsSnapshot(appContext).triggersAutoStart
         val hasUnlockAutomation =
@@ -41,6 +44,7 @@ open class BootReceiver : BroadcastReceiver() {
             hasUnlockAutomation = hasUnlockAutomation
         )
 
+        BootDiagnostics.record(appContext, "Decision: core=${decision.startCoreServices}, triggers=${decision.startTriggers}, unlockAutomation=${decision.runUnlockAutomation}")
         if (decision.resetManualTriggerPause) {
             setTriggersDisabledUntilRestartStorage(
                 appContext,
@@ -70,8 +74,10 @@ open class BootReceiver : BroadcastReceiver() {
                     }
 
                     if (decision.startTriggers) {
-                        HardwareServiceActions
-                            .startTriggersIfAutoStartEnabled(appContext)
+                        BootDiagnostics.request(appContext, "Trigger auto-start") {
+                            val started = HardwareServiceActions.startTriggersIfAutoStartEnabled(appContext)
+                            BootDiagnostics.record(appContext, "Trigger auto-start result: $started")
+                        }
                     }
                 } finally {
                     pendingResult.finish()
@@ -87,21 +93,21 @@ open class BootReceiver : BroadcastReceiver() {
 
     private fun startCoreServices(context: Context) {
         if (isAutoFanEnabledStorage(context)) {
-            HardwareServiceActions.startAutoFan(context)
+            BootDiagnostics.request(context, "Auto fan") { HardwareServiceActions.startAutoFan(context) }
         }
         if (savedPumpStateStorage(context).autoEnabled) {
-            HardwareServiceActions.startAutoPump(context)
+            BootDiagnostics.request(context, "Auto pump") { HardwareServiceActions.startAutoPump(context) }
         }
-        HardwareServiceActions.startChargingMode(context)
+        BootDiagnostics.request(context, "Charging mode") { HardwareServiceActions.startChargingMode(context) }
 
         if (CallLightingState.isEnabled(context)) {
-            HardwareServiceActions.startCallLighting(context)
+            BootDiagnostics.request(context, "Call lighting") { HardwareServiceActions.startCallLighting(context) }
         }
         if (RgbStudioStorage.isEnabled(context)) {
-            HardwareServiceActions.startRgbCycle(context)
+            BootDiagnostics.request(context, "RGB Studio") { HardwareServiceActions.startRgbCycle(context) }
         }
         if (SliderDualAppStorage.read(context).enabled) {
-            HardwareServiceActions.startSliderDualApp(context)
+            BootDiagnostics.request(context, "Slider") { HardwareServiceActions.startSliderDualApp(context) }
         }
     }
 }
