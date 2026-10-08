@@ -785,3 +785,6 @@ Normal, game, and call lighting shut down when the screen turns off. Their queue
 Test normal lighting, a selected game, and RGB Studio separately while unplugged. Lock with AOD enabled and disabled; LEDs must turn off immediately and stay off during AOD clock updates and notification pulses. Unlock and verify saved colors, effects, split zones, and brightness resume. Repeat several lock/wake cycles. Plugged-in charging lighting remains the explicit exception. Notification RGB is not implemented in this step.
 
 Device AOD validation is pending for this change.
+
+### Boot diagnostics
+Settings → Boot diagnostics opens a scrollable report with Refresh, Copy report, and Close. It records the boot event and startup decision, per-service startup requests or exceptions, configured automatic features, current visible app services, screen/charging state, and the root helper's latest log. Startup requests are explicitly distinguished from proof of running; service presence is not proof that cooling hardware is enabled. Older boot records and helper logs are labeled. Diagnostics are local and read on demand. Install this build and reboot to populate startup events.
