@@ -248,7 +248,7 @@ The Home dashboard reports which feature currently owns the shared LED hardware:
 
 It also shows whether cooling is controlled by Game Mode, Auto Fan, Auto Pump, an active call fan pause, or manual saved controls. The last applied Master Profile is shown separately as the base configuration so a temporary higher-priority LED owner is not confused with the profile that supplied the underlying settings.
 
-The inspector uses the app's existing ownership and preference state. It performs no additional root commands, sensor reads, polling loops, or hardware writes. Its priority display follows the real LED arbitration order: Charging, Call Lighting, Game Mode, RGB Studio, then Normal.
+The inspector uses the app's existing ownership and preference state. It performs no additional root commands, sensor reads, polling loops, or hardware writes. Its priority display follows the real LED arbitration order: incoming ringing call, charging, timed notification, Game Mode, RGB Studio, then Normal.
 
 ### Home-screen cooling widget
 
@@ -498,17 +498,18 @@ Charging Mode applies dedicated fan, logo, and shoulder LED profiles while power
 
 ## Call Lighting
 
-Call Lighting supports separate profiles for ringing and connected calls. Each profile has its own top/bottom trigger color combination and shared effect. An optional fan-pause feature saves the previous fan state, stops automatic fan control, turns the fan off during the call, then restores the previous state when the call ends.
+Call Lighting applies while an incoming call is ringing, including while charging or locked. Its profile retains split trigger colors and shared effects. Answering or dismissing releases lighting ownership and restores the next valid mode. Connected-call selections from older builds remain stored but are not applied. Optional fan pause lasts while ringing and respects screen-off cooling safety during restoration.
 
 ## LED priority
 
 The ownership system prevents lower-priority modes from overwriting higher-priority lighting:
 
-1. Charging Mode
-2. Call Lighting
-3. Game Mode
-4. RGB Studio
-5. Normal saved LEDs
+1. Incoming ringing call
+2. Plugged-in charging
+3. Timed screen-off notification
+4. Selected foreground game
+5. RGB Studio
+6. Normal saved LEDs
 
 When a mode ends, the next valid owner is restored. Normal and Game Mode LED writes are blocked while the screen is off.
 
