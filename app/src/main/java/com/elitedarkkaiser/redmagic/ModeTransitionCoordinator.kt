@@ -68,6 +68,16 @@ object ModeTransitionCoordinator {
 
             block()
 
+            // A profile can take several root writes. Recheck after completion
+            // in case the screen turned off while those writes were running.
+            if (owner != LedOwner.CHARGING &&
+                !LedScreenPolicy.isScreenInteractive(context)) {
+                HardwareController.turnOffAllLeds()
+                lastOwner = null
+                lastSignature = null
+                return@synchronized false
+            }
+
             lastOwner = owner
             lastSignature = signature
 
