@@ -283,11 +283,7 @@ class RgbCycleService : Service() {
             return false
         }
 
-        val offAt = screenOffAt ?: SystemClock.elapsedRealtime().also {
-            screenOffAt = it
-        }
-        val timeoutMs = state.screenOffTimeoutMinutes * 60_000L
-        return SystemClock.elapsedRealtime() - offAt >= timeoutMs
+        return true
     }
 
     private fun resetDeadlines() {

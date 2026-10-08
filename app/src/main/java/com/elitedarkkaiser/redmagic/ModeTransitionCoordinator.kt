@@ -46,7 +46,7 @@ object ModeTransitionCoordinator {
 
             // Screen state is checked inside the profile lock so a queued
             // normal/game/call write cannot relight hardware after shutdown.
-            if (owner in setOf(LedOwner.NORMAL, LedOwner.GAME_MODE, LedOwner.CALL) &&
+            if (owner in setOf(LedOwner.NORMAL, LedOwner.GAME_MODE, LedOwner.CALL, LedOwner.RGB_CYCLE) &&
                 !LedScreenPolicy.isScreenInteractive(context)) {
                 HardwareController.turnOffAllLeds()
                 lastOwner = null
@@ -67,6 +67,16 @@ object ModeTransitionCoordinator {
             }
 
             block()
+
+            // A profile can take several root writes. Recheck after completion
+            // in case the screen turned off while those writes were running.
+            if (owner != LedOwner.CHARGING &&
+                !LedScreenPolicy.isScreenInteractive(context)) {
+                HardwareController.turnOffAllLeds()
+                lastOwner = null
+                lastSignature = null
+                return@synchronized false
+            }
 
             lastOwner = owner
             lastSignature = signature
@@ -112,14 +122,8 @@ object ModeTransitionCoordinator {
             )
 
             if (!LedScreenPolicy.isScreenInteractive(context)) {
-                if (RgbStudioStorage.isEnabled(context) &&
-                    LedOwnership.current(context) == LedOwner.RGB_CYCLE) {
-                    // RGB Studio owns its configured screen-off timeout.
-                    HardwareServiceActions.startRgbCycle(context)
-                } else {
-                    // Do not gate shutdown on stale call/game ownership.
-                    HardwareController.turnOffAllLeds()
-                }
+                // Shutdown bypasses stale ownership, including RGB Studio.
+                HardwareController.turnOffAllLeds()
                 return
             }
 
