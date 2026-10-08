@@ -51,6 +51,7 @@ class NotificationLightingService : NotificationListenerService() {
             if (!(p.logo || p.triggers || p.fan)) return@post
             val now = SystemClock.elapsedRealtime()
             if (!NotificationLightingState.isActive()) {
+                if (currentKey != null) endWindow()
                 NotificationLightingState.expiresAt = now + p.seconds * 1000L
                 wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
                     PowerManager.PARTIAL_WAKE_LOCK,"Redmagic:NotificationLighting").apply {
@@ -65,7 +66,12 @@ class NotificationLightingService : NotificationListenerService() {
                     if (p.logo) HardwareController.setLogoLedEffect(effect,p.color)
                     if (p.triggers) HardwareController.setShoulderLedEffect(effect,p.color)
                     if (p.fan) HardwareController.setFanLedEffect(effect,p.color)
-                    HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this,"notification-lighting")
+                    if (HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this,"notification-lighting")) {
+                        // LED commands may have re-enabled fan power since the
+                        // shared policy last shut it down. Enforce it again.
+                        HardwareController.enableFan(false)
+                        HardwareController.enablePump(false)
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NotificationLighting", "Notification profile failed", e)
@@ -86,6 +92,13 @@ class NotificationLightingService : NotificationListenerService() {
         try { if (hadWindow) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended") }
         catch (e: Exception) { android.util.Log.e("NotificationLighting", "Restoration failed", e) }
         finally { wakeLock?.let { if (it.isHeld) it.release() }; wakeLock = null }
+    }
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        worker.post {
+            // Rebinding after process death must clear any orphaned LED window.
+            if (currentKey == null) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-listener-connected")
+        }
     }
     override fun onListenerDisconnected() { worker.post { endWindow() } }
     override fun onDestroy() {
