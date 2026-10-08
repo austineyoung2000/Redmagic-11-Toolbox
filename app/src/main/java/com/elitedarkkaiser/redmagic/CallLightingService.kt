@@ -1,6 +1,8 @@
 package com.elitedarkkaiser.redmagic
 
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -57,6 +59,19 @@ class CallLightingService : Service() {
         }
     }
 
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent?) {
+            handler.post {
+                if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                    ModeTransitionCoordinator.restoreEffectiveOwner(
+                        this@CallLightingService, "call-screen-off")
+                } else {
+                    scheduleCallState(currentCallState(), force = true)
+                }
+            }
+        }
+    }
+
     private val phoneListener = object : PhoneStateListener() {
         override fun onCallStateChanged(state: Int, phoneNumber: String?) {
             scheduleCallState(state)
@@ -78,6 +93,11 @@ class CallLightingService : Service() {
             getSystemService(Context.TELEPHONY_SERVICE)
                 as? TelephonyManager
         registerCallStateListener()
+        registerReceiver(screenReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        })
     }
 
     override fun onStartCommand(
@@ -94,6 +114,7 @@ class CallLightingService : Service() {
 
     override fun onDestroy() {
         unregisterCallStateListener()
+        runCatching { unregisterReceiver(screenReceiver) }
 
         if (::handler.isInitialized) {
             handler.removeCallbacksAndMessages(null)
