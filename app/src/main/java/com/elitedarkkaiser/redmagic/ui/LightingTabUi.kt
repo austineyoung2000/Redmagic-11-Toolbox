@@ -94,7 +94,7 @@ object LightingTabUi {
             }
 
             addView(chargingRow)
-            addView(deps.infoRow("Priority", deps.subtleLabel("Charging Mode > Game Mode > Normal LEDs")))
+            addView(deps.infoRow("Priority", deps.subtleLabel("Incoming Call > Charging > Game Mode > Normal LEDs")))
             addView(deps.singleRow(deps.actionButton("CHARGING FAN LED", false) {
                 deps.showChargingFanLedDialog()
             }))
@@ -128,9 +128,16 @@ object LightingTabUi {
 
         container.addView(zonesCard)
         container.addView(rgbStudioCard)
+        container.addView(deps.sectionPanel().apply {
+            addView(deps.sectionHeader("✉", "SCREEN-OFF NOTIFICATIONS"))
+            addView(deps.bodyText("Choose a color and a limited lighting window for each app. Incoming calls and charging take priority."))
+            addView(deps.singleRow(deps.actionButton("NOTIFICATION LIGHTING", false) {
+                com.elitedarkkaiser.redmagic.NotificationLightingDialog.show(activity)
+            }))
+        })
         val callLightingCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("☎", "CALL LIGHTING"))
-            addView(deps.bodyText("Applies only during incoming calls and connected calls. Priority: Charging Mode > Call Lighting > Game Mode > Normal LEDs."))
+            addView(deps.bodyText("Applies while an incoming call is ringing; answering or dismissing restores the previous lighting. Priority: Incoming Call > Charging > Notification > Game Mode > Normal LEDs."))
 
             val callSwitch = MaterialSwitch(activity).apply {
                 isChecked = deps.getCallLightingEnabled()
@@ -171,11 +178,8 @@ object LightingTabUi {
 
             addView(callRow)
             addView(pauseFanRow)
-            addView(deps.bodyText("Temporarily turns the fan off while a call is ringing or connected, then restores the previous fan state after the call."))
-            addView(deps.row(
-                deps.actionButton("INCOMING CALL PROFILE", false) { deps.showIncomingCallProfileDialog() },
-                deps.actionButton("CONNECTED CALL PROFILE", false) { deps.showConnectedCallProfileDialog() }
-            ))
+            addView(deps.bodyText("Temporarily turns the fan off while an incoming call rings, then restores it when answered or dismissed."))
+            addView(deps.singleRow(deps.actionButton("INCOMING CALL PROFILE", false) { deps.showIncomingCallProfileDialog() }))
         }
 
         if (

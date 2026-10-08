@@ -8,18 +8,19 @@ enum class LedOwner {
     GAME_MODE,
     CALL,
     CHARGING,
+    NOTIFICATION,
     RGB_CYCLE
 }
 
 object LedOwnership {
     fun current(context: Context): LedOwner {
-        return when {
-            ChargingLedState.isActive(context) -> LedOwner.CHARGING
-            CallLightingState.isActive(context) -> LedOwner.CALL
-            isGameModeLedOverrideActiveStorage(context) -> LedOwner.GAME_MODE
-            RgbStudioStorage.isEnabled(context) -> LedOwner.RGB_CYCLE
-            else -> LedOwner.NORMAL
-        }
+        return LightingPriorityPolicy.select(
+            incomingCall = CallLightingState.isEnabled(context) && CallLightingState.isActive(context),
+            charging = ChargingLedState.isEnabled(context) && ChargingLedState.isChargingNow(context),
+            notification = NotificationLightingState.isActive(),
+            game = isGameModeLedOverrideActiveStorage(context),
+            rgbStudio = RgbStudioStorage.isEnabled(context)
+        )
     }
 
     fun canNormalApply(context: Context): Boolean {
@@ -32,7 +33,6 @@ object LedOwnership {
     }
 
     fun canCallApply(context: Context): Boolean {
-        val owner = current(context)
-        return owner != LedOwner.CHARGING
+        return current(context) == LedOwner.CALL
     }
 }

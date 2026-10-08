@@ -46,7 +46,7 @@ object ModeTransitionCoordinator {
 
             // Screen state is checked inside the profile lock so a queued
             // normal/game/call write cannot relight hardware after shutdown.
-            if (owner in setOf(LedOwner.NORMAL, LedOwner.GAME_MODE, LedOwner.CALL, LedOwner.RGB_CYCLE) &&
+            if (owner in setOf(LedOwner.NORMAL, LedOwner.GAME_MODE, LedOwner.RGB_CYCLE) &&
                 !LedScreenPolicy.isScreenInteractive(context)) {
                 HardwareController.turnOffAllLeds()
                 lastOwner = null
@@ -70,7 +70,7 @@ object ModeTransitionCoordinator {
 
             // A profile can take several root writes. Recheck after completion
             // in case the screen turned off while those writes were running.
-            if (owner != LedOwner.CHARGING &&
+            if (owner !in setOf(LedOwner.CHARGING, LedOwner.CALL, LedOwner.NOTIFICATION) &&
                 !LedScreenPolicy.isScreenInteractive(context)) {
                 HardwareController.turnOffAllLeds()
                 lastOwner = null
@@ -101,6 +101,13 @@ object ModeTransitionCoordinator {
             lastOwner = null
             lastSignature = null
 
+            if (CallLightingState.isEnabled(context) && CallLightingState.isActive(context)) {
+                HardwareServiceActions.startCallLighting(context)
+                return
+            }
+            if (NotificationLightingState.isActive() &&
+                !(ChargingLedState.isEnabled(context) && ChargingLedState.isChargingNow(context))) return
+
             if (
                 ChargingLedState.isEnabled(context) &&
                 ChargingLedState.isChargingNow(context)
@@ -124,18 +131,6 @@ object ModeTransitionCoordinator {
             if (!LedScreenPolicy.isScreenInteractive(context)) {
                 // Shutdown bypasses stale ownership, including RGB Studio.
                 HardwareController.turnOffAllLeds()
-                return
-            }
-
-            if (
-                CallLightingState.isEnabled(context) &&
-                (
-                    CallLightingState.isActive(context) ||
-                    isCallInProgress(context)
-                )
-            ) {
-                HardwareServiceActions
-                    .startCallLighting(context)
                 return
             }
 
@@ -219,6 +214,8 @@ object ModeTransitionCoordinator {
 
             LedOwner.GAME_MODE ->
                 effective == LedOwner.GAME_MODE
+
+            LedOwner.NOTIFICATION -> effective == LedOwner.NOTIFICATION
 
             LedOwner.RGB_CYCLE ->
                 effective == LedOwner.RGB_CYCLE

@@ -248,7 +248,7 @@ The Home dashboard reports which feature currently owns the shared LED hardware:
 
 It also shows whether cooling is controlled by Game Mode, Auto Fan, Auto Pump, an active call fan pause, or manual saved controls. The last applied Master Profile is shown separately as the base configuration so a temporary higher-priority LED owner is not confused with the profile that supplied the underlying settings.
 
-The inspector uses the app's existing ownership and preference state. It performs no additional root commands, sensor reads, polling loops, or hardware writes. Its priority display follows the real LED arbitration order: Charging, Call Lighting, Game Mode, RGB Studio, then Normal.
+The inspector uses the app's existing ownership and preference state. It performs no additional root commands, sensor reads, polling loops, or hardware writes. Its priority display follows the real LED arbitration order: incoming ringing call, charging, timed notification, Game Mode, RGB Studio, then Normal.
 
 ### Home-screen cooling widget
 
@@ -498,17 +498,18 @@ Charging Mode applies dedicated fan, logo, and shoulder LED profiles while power
 
 ## Call Lighting
 
-Call Lighting supports separate profiles for ringing and connected calls. Each profile has its own top/bottom trigger color combination and shared effect. An optional fan-pause feature saves the previous fan state, stops automatic fan control, turns the fan off during the call, then restores the previous state when the call ends.
+Call Lighting applies while an incoming call is ringing, including while charging or locked. Its profile retains split trigger colors and shared effects. Answering or dismissing releases lighting ownership and restores the next valid mode. Connected-call selections from older builds remain stored but are not applied. Optional fan pause lasts while ringing and respects screen-off cooling safety during restoration.
 
 ## LED priority
 
 The ownership system prevents lower-priority modes from overwriting higher-priority lighting:
 
-1. Charging Mode
-2. Call Lighting
-3. Game Mode
-4. RGB Studio
-5. Normal saved LEDs
+1. Incoming ringing call
+2. Plugged-in charging
+3. Timed screen-off notification
+4. Selected foreground game
+5. RGB Studio
+6. Normal saved LEDs
 
 When a mode ends, the next valid owner is restored. Normal and Game Mode LED writes are blocked while the screen is off.
 
@@ -577,7 +578,9 @@ A temporary manual trigger disable is cleared by a full restart.
 | Boot Completed | Restore user-enabled services after restart |
 | Usage Access | Detect selected foreground games |
 | Accessibility Service | Receive foreground-app events and support triggers |
-| Phone State | Apply ringing and connected-call lighting |
+| Phone State | Apply incoming ringing-call lighting |
+| Notification access (optional) | Route configured app notifications to timed screen-off lighting |
+| Partial wake lock | Keep the bounded notification expiry timer running without waking the display |
 | Display-over-other-apps app-op | Support trigger setup where required |
 
 ## Privacy and integrity
@@ -613,7 +616,7 @@ The public repository contains the application source, Gradle configuration, and
 - Fan, pump, and general write deduplication
 - Background-priority worker threads
 - Screen-off cooling and lighting policies
-- Configurable RGB screen-off timeout
+- Immediate ordinary RGB shutdown on screen-off
 - Worker cleanup when services stop
 
 ## First launch
@@ -779,7 +782,7 @@ The module makes up to five broadcast attempts and records the latest result in 
 
 ### Screen-off lighting behavior
 
-Normal, game, and call lighting shut down when the screen turns off. Their queued profile writes are rejected while the screen remains off, and shutdown does not depend on clearing stale ownership flags first. Charging lighting remains available while charging. RGB Studio pauses immediately on screen-off, regardless of an older saved timeout. AOD/doze does not count as an awake screen; both interactive power state and the default display being ON are required for ordinary lighting. Saved colors, effects, and brightness are preserved for restoration on wake.
+Normal, game, and RGB Studio lighting shut down when the screen turns off. Incoming ringing calls and configured timed notification windows are explicit exceptions. Their queued profile writes are rejected while the screen remains off, and shutdown does not depend on clearing stale ownership flags first. Charging lighting remains available while charging. RGB Studio pauses immediately on screen-off, regardless of an older saved timeout. AOD/doze does not count as an awake screen; both interactive power state and the default display being ON are required for ordinary lighting. Saved colors, effects, and brightness are preserved for restoration on wake.
 
 ### Step 1 validation: screen-off and AOD
 Test normal lighting, a selected game, and RGB Studio separately while unplugged. Lock with AOD enabled and disabled; LEDs must turn off immediately and stay off during AOD clock updates and notification pulses. Unlock and verify saved colors, effects, split zones, and brightness resume. Repeat several lock/wake cycles. Plugged-in charging lighting remains the explicit exception. Notification RGB is not implemented in this step.
@@ -788,3 +791,20 @@ Device AOD validation is pending for this change.
 
 ### Boot diagnostics
 Settings → Boot diagnostics opens a scrollable report with Refresh, Copy report, and Close. It records the boot event and startup decision, per-service startup requests or exceptions, configured automatic features, current visible app services, screen/charging state, and the root helper's latest log. Startup requests are explicitly distinguished from proof of running; service presence is not proof that cooling hardware is enabled. Older boot records and helper logs are labeled. Diagnostics are local and read on demand. Install this build and reboot to populate startup events.
+
+### Lighting priority and screen-off notifications (step 3)
+Incoming ringing calls → plugged-in charging → timed screen-off notifications → selected foreground game → RGB Studio/normal LEDs. Answering or dismissing a call releases lighting ownership; connected-call profiles no longer apply. Charging ownership uses the plugged-in battery state, including charge separation/full battery. Ordinary lighting remains off during lock/AOD.
+
+Lighting → Notification lighting allows opt-in notification access and a saved profile per launchable app: fixed palette color, effect, brightness, selected zones, and a 3–30 second duration. Logo also includes the GAME MODE bar. Fan/trigger lighting may enable fan power; the existing cooling screen policy is applied afterward. Notification contents are not read, stored, or uploaded. App/package and notification keys are used for routing/deduplication. Updates to a notification do not extend its window; bursts share the current deadline. Charging and calls preempt notifications. Removal, wake, disabling, disconnect, and expiry restore the next eligible owner. A bounded partial wake lock keeps the timer runnable without lighting the display.
+
+Device validation: test Facebook blue/YouTube red or other installed apps, expiry while locked/AOD, repeated updates, notification removal, enable/disable, calls while plugged in, answer/dismiss, unplug, and return from a selected game. Confirm saved split zones/effects/brightness restore. These changes require device validation before merge.
+
+### Notification profile management and split zones
+
+Lighting → Notification lighting lists configured apps with direct Edit actions. Add app opens the app picker; Edit is locked to that app and loads its saved profile. Remove is nested inside Edit and requires confirmation; cancelling keeps the editor open. The app list and editor share one dialog; logo/bar and trigger controls expand inline, with no nested zone popups. Save returns to the list. Back discards unsaved edits; only deletion opens a confirmation. Check Separate logo / GAME MODE bar or Separate top / bottom triggers to reveal the respective controls in the same editor. Uncheck to collapse them and return that zone to the common color, effect and brightness. Notification access displays its current granted status and refreshes after returning from Android settings. Existing notification profiles remain compatible.
+
+The per-app editor includes logo/GAME MODE bar and top/bottom trigger editors using the same fixed color circles as other lighting modes. Logo and bar have separate colors, enable states and brightness with a shared effect. Triggers support separate top/bottom colors with a shared effect and brightness. Save the nested settings, then Save the app profile. The default color/effect/brightness applies to zones without a saved zone override and to the fan. Notification expiry and call/charging interruption still use the same bounded ownership window.
+
+Device validation: save Facebook, reopen the manager, verify Facebook is listed and Edit restores its settings; save split colors, reopen and verify persistence; receive a notification while locked and unplugged, verify both physical areas and expiry; remove the app and confirm it no longer receives notification lighting.
+
+Notification listener reconnection marks existing alerts as seen and ignores notification posts dated at or before reconnection, preventing old alerts from replaying lighting. Editing/removing profiles ends the current window and restores eligible lighting. Process death still relies on listener reconnection for hardware cleanup; there is no independent hardware deadline failsafe. These recovery paths remain pending phone validation.

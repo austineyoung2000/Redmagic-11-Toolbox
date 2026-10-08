@@ -9,7 +9,6 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.LayerDrawable
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -84,8 +83,14 @@ class LedControlViewFactory(
             }
 
             init {
-                val size = dp(42)
+                val size = dp(44)
                 layoutParams = LinearLayout.LayoutParams(size, size)
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                        outline.setOval(0, 0, view.width, view.height)
+                    }
+                }
+                elevation = dp(2).toFloat()
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { onClick() }
@@ -94,7 +99,7 @@ class LedControlViewFactory(
             override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
 
-                val pad = dp(3).toFloat()
+                val pad = dp(1).toFloat()
                 val rect = RectF(
                     pad,
                     pad,
@@ -150,9 +155,6 @@ class LedControlViewFactory(
                 canvas.restoreToCount(saveCount)
 
                 if (selected()) {
-                    ringPaint.strokeWidth = dp(5).toFloat()
-                    ringPaint.color = Color.DKGRAY
-                    canvas.drawOval(rect, ringPaint)
                     ringPaint.strokeWidth = dp(3).toFloat()
                     ringPaint.color = Color.WHITE
                     canvas.drawOval(rect, ringPaint)
@@ -167,9 +169,11 @@ class LedControlViewFactory(
         onClick: () -> Unit
     ): View {
         return View(activity).apply {
-            val size = dp(42)
+            val size = dp(44)
             layoutParams = LinearLayout.LayoutParams(size, size)
             background = colorDotDrawable(hex, selected)
+            elevation = dp(2).toFloat()
+            isFocusable = true
             setOnClickListener { onClick() }
         }
     }
@@ -183,14 +187,7 @@ class LedControlViewFactory(
             setColor(Color.parseColor(hex))
             setStroke(dp(3), if (selected) Color.WHITE else Color.TRANSPARENT)
         }
-        if (!selected) return fill
-        val outline = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.DKGRAY)
-        }
-        return LayerDrawable(arrayOf(outline, fill)).apply {
-            setLayerInset(1, dp(1), dp(1), dp(1), dp(1))
-        }
+        return fill
     }
 
     private fun dp(value: Int): Int {

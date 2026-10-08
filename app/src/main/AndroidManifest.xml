@@ -29,6 +29,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -78,6 +79,12 @@
                 android:resource="@xml/cooling_widget_info" />
         </receiver>
 
+        <service android:name=".NotificationLightingService"
+            android:label="Redmagic notification lighting"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        </service>
         <service
             android:name=".TriggerAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

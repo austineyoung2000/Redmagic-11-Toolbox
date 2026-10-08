@@ -10,6 +10,7 @@ object ActiveModeInspector {
             ?.name
 
         val ownerLabel = when (owner) {
+            LedOwner.NOTIFICATION -> "Notification Lighting"
             LedOwner.CHARGING -> "Charging Mode"
             LedOwner.CALL -> "Call Lighting"
             LedOwner.GAME_MODE -> "Game Mode"
@@ -19,10 +20,11 @@ object ActiveModeInspector {
         }
 
         val ownerDetail = when (owner) {
+            LedOwner.NOTIFICATION -> "A timed screen-off notification window owns the LEDs."
             LedOwner.CHARGING ->
-                "Charging Mode has highest-priority LED control."
+                "Charging Mode controls LEDs unless an incoming call is ringing."
             LedOwner.CALL ->
-                "Call Lighting currently controls the LEDs."
+                "An incoming ringing call currently controls the LEDs."
             LedOwner.GAME_MODE ->
                 "A selected foreground app is using its Game Mode profile."
             LedOwner.RGB_CYCLE ->
@@ -65,7 +67,7 @@ object ActiveModeInspector {
             append('\n')
             append(baseProfile)
             append('\n')
-            append("Priority: Charging > Call > Game Mode > RGB Studio > Normal")
+            append("Priority: Incoming Call > Charging > Notification > Game Mode > RGB Studio > Normal")
         }
     }
 }

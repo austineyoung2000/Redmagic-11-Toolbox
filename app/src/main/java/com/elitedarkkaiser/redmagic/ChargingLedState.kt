@@ -108,10 +108,8 @@ internal object ChargingLedState {
     }
 
     fun isChargingNow(context: Context): Boolean {
-        val bm = context.getSystemService(BatteryManager::class.java)
-        val status = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS) ?: -1
-        return status == BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == BatteryManager.BATTERY_STATUS_FULL
+        val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        return (battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
     }
 
     fun applyChargingProfile(
