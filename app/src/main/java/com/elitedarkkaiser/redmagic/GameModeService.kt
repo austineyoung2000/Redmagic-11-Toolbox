@@ -220,6 +220,11 @@ class GameModeService : Service() {
     }
 
     private fun applySavedProfileNow() {
+        if (!LedScreenPolicy.isScreenInteractive(this)) {
+            HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this, "saved-game-profile-screen-off")
+            ModeTransitionCoordinator.restoreEffectiveOwner(this, "saved-game-profile-screen-off")
+            return
+        }
         val profile =
             getSavedGameModeProfileStorage(this)
 
@@ -578,6 +583,9 @@ class GameModeService : Service() {
         applyOnce("now")
     }
     private fun restoreNormalProfile() {
+        val coolingBlocked = HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(
+            this, "game-profile-restoration"
+        )
         val prefs = getSharedPreferences(
             "redmagic_hw_controls_prefs",
             Context.MODE_PRIVATE
@@ -610,13 +618,13 @@ class GameModeService : Service() {
                 enabled = fanEnabled,
                 level = fanLevel
             )
-        } else if (fanEnabled) {
+        } else if (fanEnabled && !coolingBlocked) {
             HardwareController.setFanLevel(fanLevel)
         } else {
             HardwareController.enableFan(false)
         }
 
-        if (pumpEnabled) {
+        if (pumpEnabled && !coolingBlocked) {
             HardwareController.setPumpProfile(
                 pumpProfile
             )
