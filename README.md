@@ -779,4 +779,9 @@ The module makes up to five broadcast attempts and records the latest result in 
 
 ### Screen-off lighting behavior
 
-Normal, game, and call lighting shut down when the screen turns off. Their queued profile writes are rejected while the screen remains off, and shutdown does not depend on clearing stale ownership flags first. Charging lighting remains available while charging. RGB Studio retains its configured screen-off timeout. Saved colors, effects, and brightness are preserved for restoration on wake.
+Normal, game, and call lighting shut down when the screen turns off. Their queued profile writes are rejected while the screen remains off, and shutdown does not depend on clearing stale ownership flags first. Charging lighting remains available while charging. RGB Studio pauses immediately on screen-off, regardless of an older saved timeout. AOD/doze does not count as an awake screen; both interactive power state and the default display being ON are required for ordinary lighting. Saved colors, effects, and brightness are preserved for restoration on wake.
+
+### Step 1 validation: screen-off and AOD
+Test normal lighting, a selected game, and RGB Studio separately while unplugged. Lock with AOD enabled and disabled; LEDs must turn off immediately and stay off during AOD clock updates and notification pulses. Unlock and verify saved colors, effects, split zones, and brightness resume. Repeat several lock/wake cycles. Plugged-in charging lighting remains the explicit exception. Notification RGB is not implemented in this step.
+
+Device AOD validation is pending for this change.
