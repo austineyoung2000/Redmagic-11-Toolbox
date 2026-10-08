@@ -66,7 +66,6 @@ object RgbStudioDialog {
         val topColors = initial.topTriggerColors.toMutableList()
         val bottomColors = initial.bottomTriggerColors.toMutableList()
         var refreshApplyButton: (() -> Unit)? = null
-        var timeoutMinutes = initial.screenOffTimeoutMinutes
 
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -315,57 +314,11 @@ object RgbStudioDialog {
         }
         refreshSpeedVisibility()
 
-        content.addView(label("Screen-off timeout"))
         content.addView(TextView(activity).apply {
-            text = "The cycle pauses after this time with the screen off. Charging, calls, and Game Mode keep their existing priority."
+            text = "RGB Studio pauses immediately when the screen turns off, including Always-on Display, and resumes when the screen wakes."
             textSize = 12f
             setTextColor(AppTheme.textSecondary)
-            setPadding(0, 0, 0, deps.dp(7))
         })
-
-        val timeoutRows = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        val timeoutButtons = linkedMapOf<Int, Button>()
-        val timeoutOptions = listOf(
-            0 to "Immediate",
-            1 to "1 min",
-            5 to "5 min",
-            15 to "15 min",
-            30 to "30 min"
-        )
-        timeoutOptions.chunked(3).forEach { options ->
-            val row = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                if (timeoutRows.childCount > 0) {
-                    setPadding(0, deps.dp(6), 0, 0)
-                }
-            }
-            options.forEach { (minutes, title) ->
-                val button = deps.filterChip(
-                    title,
-                    timeoutMinutes == minutes
-                ) {
-                    timeoutMinutes = minutes
-                    timeoutButtons.forEach { (value, candidate) ->
-                        deps.updateSelectableButton(
-                            candidate,
-                            value == timeoutMinutes
-                        )
-                    }
-                }
-                timeoutButtons[minutes] = button
-                if (row.childCount > 0) {
-                    row.addView(View(activity), LinearLayout.LayoutParams(deps.dp(6), 1))
-                }
-                row.addView(
-                    button,
-                    LinearLayout.LayoutParams(0, deps.dp(42), 1f)
-                )
-            }
-            timeoutRows.addView(row)
-        }
-        content.addView(timeoutRows)
 
         fun buildState(forceEnabled: Boolean? = null): RgbStudioState {
             val logoMs = (logoSpeed.value * 1000f).toLong()
@@ -400,7 +353,7 @@ object RgbStudioDialog {
                 logoSpeedMs = logoMs,
                 shoulderSpeedMs = shoulderMs,
                 fanSpeedMs = fanMs,
-                screenOffTimeoutMinutes = timeoutMinutes
+                screenOffTimeoutMinutes = 0
             )
         }
 
