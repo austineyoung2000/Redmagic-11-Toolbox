@@ -44,6 +44,16 @@ object ModeTransitionCoordinator {
                 return@synchronized false
             }
 
+            // Screen state is checked inside the profile lock so a queued
+            // normal/game/call write cannot relight hardware after shutdown.
+            if (owner in setOf(LedOwner.NORMAL, LedOwner.GAME_MODE, LedOwner.CALL) &&
+                !LedScreenPolicy.isScreenInteractive(context)) {
+                HardwareController.turnOffAllLeds()
+                lastOwner = null
+                lastSignature = null
+                return@synchronized false
+            }
+
             if (
                 !force &&
                 lastOwner == owner &&
@@ -101,6 +111,18 @@ object ModeTransitionCoordinator {
                 false
             )
 
+            if (!LedScreenPolicy.isScreenInteractive(context)) {
+                if (RgbStudioStorage.isEnabled(context) &&
+                    LedOwnership.current(context) == LedOwner.RGB_CYCLE) {
+                    // RGB Studio owns its configured screen-off timeout.
+                    HardwareServiceActions.startRgbCycle(context)
+                } else {
+                    // Do not gate shutdown on stale call/game ownership.
+                    HardwareController.turnOffAllLeds()
+                }
+                return
+            }
+
             if (
                 CallLightingState.isEnabled(context) &&
                 (
@@ -138,23 +160,6 @@ object ModeTransitionCoordinator {
                     .startServiceSilentlyIfPermitted(
                         context
                     )
-                return
-            }
-
-            if (
-                !LedScreenPolicy
-                    .isScreenInteractive(context)
-            ) {
-                applyLedProfile(
-                    context = context,
-                    owner = LedOwner.NONE,
-                    signature =
-                        "screen-off:$reason",
-                    force = true
-                ) {
-                    HardwareController
-                        .turnOffAllLeds()
-                }
                 return
             }
 
