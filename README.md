@@ -798,3 +798,11 @@ Incoming ringing calls → plugged-in charging → timed screen-off notification
 Lighting → Notification lighting allows opt-in notification access and a saved profile per launchable app: fixed palette color, effect, brightness, selected zones, and a 3–30 second duration. Logo also includes the GAME MODE bar. Fan/trigger lighting may enable fan power; the existing cooling screen policy is applied afterward. Notification contents are not read, stored, or uploaded. App/package and notification keys are used for routing/deduplication. Updates to a notification do not extend its window; bursts share the current deadline. Charging and calls preempt notifications. Removal, wake, disabling, disconnect, and expiry restore the next eligible owner. A bounded partial wake lock keeps the timer runnable without lighting the display.
 
 Device validation: test Facebook blue/YouTube red or other installed apps, expiry while locked/AOD, repeated updates, notification removal, enable/disable, calls while plugged in, answer/dismiss, unplug, and return from a selected game. Confirm saved split zones/effects/brightness restore. These changes require device validation before merge.
+
+### Notification profile management and split zones
+
+Lighting → Notification lighting lists configured apps with Edit and Remove actions. Add app opens the app picker; Edit loads that app's saved profile. Removing an app requires confirmation. Existing notification profiles remain compatible.
+
+The per-app editor includes logo/GAME MODE bar and top/bottom trigger editors using the same fixed color circles as other lighting modes. Logo and bar have separate colors, enable states and brightness with a shared effect. Triggers support separate top/bottom colors with a shared effect and brightness. Save the nested settings, then Save the app profile. The default color/effect/brightness applies to zones without a saved zone override and to the fan. Notification expiry and call/charging interruption still use the same bounded ownership window.
+
+Device validation: save Facebook, reopen the manager, verify Facebook is listed and Edit restores its settings; save split colors, reopen and verify persistence; receive a notification while locked and unplugged, verify both physical areas and expiry; remove the app and confirm it no longer receives notification lighting.
