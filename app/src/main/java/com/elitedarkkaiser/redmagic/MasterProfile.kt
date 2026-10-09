@@ -38,5 +38,6 @@ data class MasterProfile(
     val chargeSeparationEnabled: Boolean? = null,
     val refreshRateProfilesJson: String? = null,
     val touchTuningProfilesJson: String? = null,
-    val performanceModeProfilesJson: String? = null
+    val performanceModeProfilesJson: String? = null,
+    val supplementalSettingsJson: String? = null
 )

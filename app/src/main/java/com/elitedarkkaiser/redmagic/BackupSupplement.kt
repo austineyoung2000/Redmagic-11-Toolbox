@@ -72,12 +72,14 @@ internal object BackupSupplement {
         return Parsed(notifications.getBoolean("enabled"),apps,positions)
     }
 
-    fun restore(context: Context, data: Parsed) {
+    fun restore(context: Context, data: Parsed, replaceAll: Boolean = false) {
         val notifications = context.getSharedPreferences(NOTIFICATIONS, Context.MODE_PRIVATE).edit()
+        if (replaceAll) notifications.clear()
         data.enabled?.let { notifications.putBoolean("enabled", it) }
         data.apps.forEach { (pkg, raw) -> notifications.putString("app:$pkg", raw) }
         check(notifications.commit()) { "Unable to restore notification settings" }
         val positions = context.getSharedPreferences(POSITIONS, Context.MODE_PRIVATE).edit()
+        if (replaceAll) positions.clear()
         data.positions.forEach { (key, value) -> positions.putFloat(key,value) }
         check(positions.commit()) { "Unable to restore edit positions" }
         context.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(context.packageName))

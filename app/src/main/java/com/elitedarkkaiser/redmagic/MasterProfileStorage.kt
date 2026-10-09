@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object MasterProfileStorage {
-    const val CURRENT_SCHEMA_VERSION = 11
+    const val CURRENT_SCHEMA_VERSION = 12
     private const val PREFS = "master_profiles"
     private const val KEY = "profiles"
     private const val LAST_APPLIED_KEY = "last_applied_profile"
@@ -92,7 +92,6 @@ object MasterProfileStorage {
                 "Current device settings"
             ).toJson())
             put("savedProfiles", saved)
-            put("supplement", BackupSupplement.export(context))
             put(
                 "automationRules",
                 AutomationRulesStorage.toJson(context)
@@ -123,6 +122,7 @@ object MasterProfileStorage {
         val supplement = if (root.has("supplement")) BackupSupplement.parse(root.getJSONObject("supplement")) else null
         val rules = if (root.has("automationRules")) root.getJSONObject("automationRules") else null
         (imported + listOfNotNull(current)).forEach { profile ->
+            profile.supplementalSettingsJson?.let { BackupSupplement.parse(JSONObject(it)) }
             profile.nativeTgkProfilesJson?.let(NativeTgkStorage::validateBackupJson)
             profile.refreshRateProfilesJson?.let(RefreshRateStorage::validateBackupJson)
             profile.touchTuningProfilesJson?.let(TouchTuningStorage::validateBackupJson)
@@ -143,6 +143,9 @@ object MasterProfileStorage {
         supplement?.let { BackupSupplement.restore(context, it) }
         return ImportResult(imported.size, current != null)
     }
+
+    internal fun encodeProfile(profile: MasterProfile): String = profile.toJson().toString()
+    internal fun decodeProfile(raw: String): MasterProfile = JSONObject(raw).toMasterProfile()
 
     private fun MasterProfile.toJson() = JSONObject().apply {
         put("schemaVersion", schemaVersion)
@@ -188,6 +191,7 @@ object MasterProfileStorage {
         touchTuningProfilesJson?.let {
             put("touchTuningProfiles", JSONObject(it))
         }
+        supplementalSettingsJson?.let { put("supplementalSettings", JSONObject(it)) }
         performanceModeProfilesJson?.let {
             put("performanceModeProfiles", JSONObject(it))
         }
@@ -288,6 +292,9 @@ object MasterProfileStorage {
             } else {
                 null
             },
+            supplementalSettingsJson = if (version >= 12 && has("supplementalSettings")) {
+                getJSONObject("supplementalSettings").also { BackupSupplement.parse(it) }.toString()
+            } else null,
             performanceModeProfilesJson = if (version >= 11) {
                 optJSONObject("performanceModeProfiles")?.toString()
             } else {

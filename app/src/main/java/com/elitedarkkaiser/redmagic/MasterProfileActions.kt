@@ -1,6 +1,7 @@
 package com.elitedarkkaiser.redmagic
 
 import android.content.Context
+import org.json.JSONObject
 import com.elitedarkkaiser.redmagic.state.LedState
 
 object MasterProfileActions {
@@ -101,6 +102,7 @@ object MasterProfileActions {
                     context = context,
                     allowEmpty = true
                 ),
+            supplementalSettingsJson = BackupSupplement.export(context).toString(),
             performanceModeProfilesJson =
                 PerformanceModeStorage.createExportJson(
                     context = context,
@@ -110,6 +112,9 @@ object MasterProfileActions {
     }
 
     fun applyProfile(context: Context, profile: MasterProfile) {
+        val supplementalSettings = if (profile.schemaVersion >= 12) profile.supplementalSettingsJson?.let {
+            BackupSupplement.parse(JSONObject(it))
+        } else null
         val hardware = profile.hardware
         saveFanLedStateStorage(context, LedState(hardware.fanLedEnabled, hardware.fanLedEffect, hardware.fanLedColor))
         saveLogoLedStateStorage(context, LedState(hardware.logoLedEnabled, hardware.logoLedEffect, hardware.logoLedColor))
@@ -248,6 +253,7 @@ object MasterProfileActions {
         saveCallLed(context, CallLightingState.CONNECTED_SHOULDER_ENABLED_KEY,
             CallLightingState.CONNECTED_SHOULDER_EFFECT_KEY, CallLightingState.CONNECTED_SHOULDER_COLOR_KEY, profile.connectedCallShoulderLed)
 
+        supplementalSettings?.let { BackupSupplement.restore(context, it, replaceAll = true) }
         applyHardwareAndServices(context, profile)
     }
 

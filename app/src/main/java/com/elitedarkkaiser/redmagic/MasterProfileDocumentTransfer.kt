@@ -55,7 +55,7 @@ object MasterProfileDocumentTransfer {
         val uri = data?.data ?: return true
         if (requestCode == IMPORT_REQUEST) {
             MaterialAlertDialogBuilder(activity).setTitle("Restore settings and profiles?")
-                .setMessage("Restore the backup's current settings and apply them to the device. Saved profiles with matching names and notification apps with matching packages will be replaced; other entries remain. Android permissions must be granted separately.")
+                .setMessage("Restore the backup's current settings and apply them to the device. Current settings and their per-app collections will be replaced. Saved Master Profiles with matching names will be replaced; other Master Profiles remain. Android permissions must be granted separately.")
                 .setNegativeButton("Cancel",null)
                 .setPositiveButton("Restore") { _,_ -> submitTransfer(activity,requestCode,uri,runBackground) }.show()
         } else submitTransfer(activity,requestCode,uri,runBackground)
