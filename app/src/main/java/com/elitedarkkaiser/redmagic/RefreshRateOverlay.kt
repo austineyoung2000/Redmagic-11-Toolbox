@@ -26,10 +26,7 @@ object RefreshRateOverlay {
     private var overlayView: TextView? = null
     private var appContext: Context? = null
     private var foregroundPackage: String? = null
-    private var lastLayoutLandscape: Boolean? = null
 
-    // Snapshot producers update their own caches. One visible-only ticker
-    // renders them, avoiding a main-thread task for every vendor FPS callback.
     private val updateRunnable = object : Runnable {
         override fun run() {
             runCatching {
@@ -87,6 +84,18 @@ object RefreshRateOverlay {
         mainHandler.post { hideOnMainThread() }
     }
 
+    fun refresh() {
+        mainHandler.post {
+            runCatching {
+                if (overlayView != null) {
+                    updateText()
+                }
+            }.onFailure {
+                Log.e(TAG, "Contained performance overlay refresh failure", it)
+            }
+        }
+    }
+
     private fun hideOnMainThread() {
         mainHandler.removeCallbacks(updateRunnable)
         val view = overlayView
@@ -95,7 +104,6 @@ object RefreshRateOverlay {
         windowManager = null
         appContext = null
         foregroundPackage = null
-        lastLayoutLandscape = null
         VendorFpsMonitor.stop()
         PerformanceOverlayTelemetry.stop()
         if (view != null && manager != null) {
@@ -145,12 +153,14 @@ object RefreshRateOverlay {
             Configuration.ORIENTATION_LANDSCAPE
 
         overlayView?.apply {
-            val nextText = readings.joinToString(if (landscape) "  •  " else "\n")
-            if (text.toString() != nextText) text = nextText
-            if (lastLayoutLandscape != landscape) {
-                setSingleLine(landscape)
-                ellipsize = if (landscape) TextUtils.TruncateAt.END else null
-                lastLayoutLandscape = landscape
+            text = readings.joinToString(
+                if (landscape) "  •  " else "\n"
+            )
+            setSingleLine(landscape)
+            ellipsize = if (landscape) {
+                TextUtils.TruncateAt.END
+            } else {
+                null
             }
         }
     }

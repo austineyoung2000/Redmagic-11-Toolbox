@@ -156,6 +156,7 @@ object VendorFpsMonitor {
             packageName = packageName,
             receivedAtMs = SystemClock.elapsedRealtime()
         )
+        RefreshRateOverlay.refresh()
     }
 
     private fun ensureRegistered(force: Boolean) {

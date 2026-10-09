@@ -1,65 +1,45 @@
 # Runtime efficiency audit — step 4
 
-Baseline: production `b824998d9a542403762667104f74ff7477a9fce7` after step 3.
-This is a source audit and first test-branch patch. No device CPU, battery,
-thermal or root-command measurements have been taken. Step 5 is not started.
+Baseline: production b824998d9a542403762667104f74ff7477a9fce7.
 
-## Changes in this patch
+## Failed phone test and rollback
 
-- GameplayRuntimeService previously queried recent UsageEvents every 750 ms
-  when its root monitor was absent, including when no profile needed monitoring.
-  It now skips that query if no native trigger/editor, refresh-rate or performance
-  profile needs foreground monitoring. Accessibility configuration checks and
-  recovery remain active. Root startup failure still permits the UsageEvents
-  fallback for enabled profiles.
-- The performance overlay previously rendered on the one-second ticker AND
-  every accepted FPS callback, temperature sample, fan RPM sample and performance
-  dispatch. Snapshot producers now update their caches; one visible-only ticker
-  renders the latest values. Attachment still updates immediately. Subsequent
-  readings/profile labels appear on the next tick, normally within one second
-  plus main-thread scheduling delay. FPS callback collection remains live.
-- Unchanged text and orientation no longer reassign TextView properties on every
-  tick. Hide resets layout state, removes the ticker and stops telemetry/FPS.
+The first test patch (187f2df) gated foreground fallback queries and removed
+callback-driven performance-overlay redraws. CI tests and signed assembly
+passed, but the owner reported disappearing overlays during phone testing.
+The exact overlay, trigger state, process status and failure timing have not
+yet been established. This is not a confirmed root-cause diagnosis.
 
-## Source inventory and retained safeguards
+Both optimizations are withdrawn. GameplayRuntimeService, RefreshRateOverlay,
+PerformanceOverlayTelemetry and VendorFpsMonitor are restored byte-for-byte
+to the production baseline. No runtime optimization remains in this PR.
+Production was never changed; the PR remains draft and must not be merged as
+a successful efficiency fix. Step 4 is paused for diagnostics; step 5 has not
+started. CI cannot establish device overlay endurance.
 
-| Area | Existing cadence/lifecycle | Audit decision |
-| --- | --- | --- |
-| Authoritative foreground root stream | 1-second active / 3-second idle; no stream without eligible profiles; stopped on screen-off | Retain detection cadence to protect trigger exit and profile restoration |
-| Runtime controller | 750 ms, accessibility configuration checked every 5 seconds | Gate unused UsageEvents fallback; retain controller/recovery |
-| Gameplay watchdog | 2-second binder/configuration checks | Retain cross-process recovery |
-| Native TGK health | 10-second health-check limit | Retain verified trigger recovery |
-| Game Mode | Foreground event polling while a selected game is active; paused on screen-off | No cadence change in this patch |
-| Temperature | Shared non-root monitor: 3 seconds foreground, 5 seconds hot background, 15 seconds cool interactive background, 30 seconds cool screen-off | Retain thermal safety; worker stops after last subscriber closes |
-| Auto fan / pump | Subscribe to shared temperature monitor; hardware writes follow changed level/profile | Retain hysteresis and cooling policy |
-| Fan RPM overlay telemetry | 30 seconds, direct sysfs read then root fallback if necessary; only while overlay is attached | Retain sampling and lifecycle |
-| Vendor FPS | Binder callbacks, service retry limited to 30 seconds during display reads | Retain collector; remove callback-driven rendering |
-| Normal LEDs | Event-driven reapply, including delayed wake restoration | Retain ownership/transition caches and screen policy |
-| RGB Studio | Frames require scheduled hardware writes while eligible; pauses for screen-off | Retain configured visual timing |
-| Notification lighting | Bounded 3–30 second timer and partial wake lock; event-driven listener | Retain expiry, cooling and higher-priority owners |
+## Retained source findings
 
-HardwareController deduplicates recent writes and ModeTransitionCoordinator
-skips unchanged complete profiles. Do not add permanent LED write caching:
-external vendor changes, fan-power side effects and explicit restoration need
-reapplication. Notification process-death cleanup still relies on listener
-reconnection; the wake lock does not provide an independent hardware failsafe.
+- Runtime foreground fallback can query UsageEvents at the 750 ms controller
+  interval when no root stream is present. Eligibility changes need to account
+  for every foreground consumer and recovery path before testing again.
+- Performance overlay has both a one-second ticker and callback-driven redraws.
+  Any throttling requires device evidence and must preserve lifecycle recovery.
+- Active root foreground cadence is one second; idle cadence is three seconds.
+- Watchdog binder/configuration checks run every two seconds. The healthy root
+  supervisor path uses pidof every two seconds and reserves Binder/settings/
+  launch traffic for recovery. Preserve these reliability mechanisms.
+- Temperature sampling is shared and non-root: 3 seconds foreground, 5 seconds
+  hot background, 15 seconds cool interactive background, 30 seconds cool
+  screen-off. Auto cooling subscribers and worker shutdown need continued review.
+- Fan RPM overlay telemetry reads every 30 seconds while attached, using direct
+  sysfs access before root fallback. Vendor FPS uses Binder callbacks.
 
-## Validation and remaining work
+## Required device evidence
 
-Run Android CI unit tests plus signed release assembly on the test branch.
-Phone validation remains required:
-
-1. With no eligible gameplay profiles, leave accessibility enabled: overlays
-   stay absent and no foreground root stream should be active.
-2. Enable a selected game's triggers, refresh-rate and performance profile;
-   enter/exit repeatedly, confirming detection and restoration still work.
-3. Verify FPS, temperature, display Hz, mode and fan RPM update on the visible
-   overlay; rotate, hide/show, lock/unlock and reopen after runtime recovery.
-4. Repeat the long COD session that previously lost overlays/triggers.
-5. Test hot screen-off cooling, cool shutdown and step-3 notification/call/
-   charging restoration. No change should weaken cooling or LED shutdown.
-
-Further audit items: measure actual device cost of the dumpsys stream and
-fallback queries; inspect supervisor and trigger-bridge loops before proposing
-changes; review restart-generation races in telemetry/temperature workers and
-hardware write invalidation. These are not claimed resolved by this patch.
+Identify whether the gameplay launcher, trigger visuals, performance overlay
+or all overlays disappeared; record time, foreground app and whether trigger
+actions continued. Capture process/foreground-service state, exit history,
+recent crash/runtime logs and supervisor status before restarting or rebooting.
+Retest the restored baseline to distinguish the withdrawn patch from an APK
+replacement/runtime-recovery problem. No CPU/battery/thermal benefit is claimed
+measured, and the reported failure is not claimed fixed by the rollback.
