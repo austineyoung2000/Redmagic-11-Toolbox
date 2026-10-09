@@ -35,7 +35,6 @@ object PerformanceOverlayTelemetry {
     private val fanRunnable = object : Runnable {
         override fun run() {
             fanRpm = readFanRpm()
-            RefreshRateOverlay.refresh()
 
             synchronized(lock) {
                 handler?.postDelayed(this, FAN_REFRESH_MS)
@@ -63,7 +62,6 @@ object PerformanceOverlayTelemetry {
                     DeviceTemperatureMonitor.SamplingMode.FOREGROUND
                 ) { value ->
                     temperatureC = value
-                    RefreshRateOverlay.refresh()
                 }
         }
     }

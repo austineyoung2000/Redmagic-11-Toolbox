@@ -110,9 +110,9 @@ class GameplayRuntimeService : Service() {
                     nativeTgkStartupCleanupComplete &&
                     isScreenInteractive()
                 ) {
-                    ensureForegroundRootMonitor()
+                    val monitoringNeeded = ensureForegroundRootMonitor()
 
-                    if (!hasFreshRootForegroundSample()) {
+                    if (monitoringNeeded && !hasFreshRootForegroundSample()) {
                         latestResumedPackage()?.let { packageName ->
                             reconcileDetectedPackage(packageName)
                         }
@@ -815,7 +815,6 @@ class GameplayRuntimeService : Service() {
                         applicationContext,
                         packageName
                     )
-                    RefreshRateOverlay.refresh()
                 }.onFailure {
                     logRuntimeFailure("performance profile dispatch", it)
                 }
@@ -900,11 +899,13 @@ class GameplayRuntimeService : Service() {
         return isAccessibilityConfigured(this)
     }
 
+    // Return whether a profile needs monitoring, even if root startup fails;
+    // callers must retain the UsageEvents fallback in that failure case.
     @Synchronized
-    private fun ensureForegroundRootMonitor() {
+    private fun ensureForegroundRootMonitor(): Boolean {
         if (!needsForegroundMonitoring()) {
             stopForegroundRootMonitor()
-            return
+            return false
         }
 
         val desiredPollSeconds = desiredForegroundPollSeconds()
@@ -912,7 +913,7 @@ class GameplayRuntimeService : Service() {
             foregroundRootProcess?.isAlive == true &&
             foregroundRootPollSeconds == desiredPollSeconds
         ) {
-            return
+            return true
         }
 
         if (foregroundRootProcess != null) {
@@ -933,7 +934,7 @@ class GameplayRuntimeService : Service() {
                 "Unable to start authoritative foreground monitor",
                 it
             )
-            return
+            return true
         }
 
         foregroundRootProcess = process
@@ -993,6 +994,7 @@ class GameplayRuntimeService : Service() {
 
         foregroundRootReader = readerThread
         readerThread.start()
+        return true
     }
 
     @Synchronized
