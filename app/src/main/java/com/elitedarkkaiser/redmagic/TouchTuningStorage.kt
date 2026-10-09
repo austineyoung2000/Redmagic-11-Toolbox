@@ -103,6 +103,24 @@ object TouchTuningStorage {
             .toString()
     }
 
+    internal fun validateBackupJson(raw: String) {
+        require(raw.length <= 1_000_000) {
+            "Touch-tuning profile data is too large"
+        }
+        val root = JSONObject(raw)
+        require(root.optString("format") == FORMAT) {
+            "Invalid touch-tuning profile data"
+        }
+        require(root.optInt("version", 0) in 1..VERSION) {
+            "Unsupported touch-tuning profile version"
+        }
+        val array = root.getJSONArray("profiles")
+        require(array.length() <= 500) { "Too many backed-up app profiles" }
+        for (index in 0 until array.length()) {
+            require(array.getJSONObject(index).toProfile() != null) { "Invalid backed-up app profile" }
+        }
+    }
+
     @Synchronized
     fun importProfilesJson(
         context: Context,

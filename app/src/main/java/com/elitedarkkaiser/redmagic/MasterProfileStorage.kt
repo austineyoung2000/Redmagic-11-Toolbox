@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object MasterProfileStorage {
-    const val CURRENT_SCHEMA_VERSION = 11
+    const val CURRENT_SCHEMA_VERSION = 12
     private const val PREFS = "master_profiles"
     private const val KEY = "profiles"
     private const val LAST_APPLIED_KEY = "last_applied_profile"
@@ -111,26 +111,41 @@ object MasterProfileStorage {
         }
 
         val imported = mutableListOf<MasterProfile>()
-        val array = root.optJSONArray("savedProfiles") ?: JSONArray()
+        val array = if (root.has("savedProfiles")) root.getJSONArray("savedProfiles") else JSONArray()
+        require(array.length() <= 500) { "Too many saved profiles" }
         for (index in 0 until array.length()) {
             imported += array.getJSONObject(index).toMasterProfile()
         }
 
+        // Decode these before any persistent writes, including older backups.
+        val current = if (root.has("currentSettings")) root.getJSONObject("currentSettings").toMasterProfile() else null
+        val supplement = if (root.has("supplement")) BackupSupplement.parse(root.getJSONObject("supplement")) else null
+        val rules = if (root.has("automationRules")) root.getJSONObject("automationRules") else null
+        (imported + listOfNotNull(current)).forEach { profile ->
+            profile.supplementalSettingsJson?.let { BackupSupplement.parse(JSONObject(it)) }
+            profile.nativeTgkProfilesJson?.let(NativeTgkStorage::validateBackupJson)
+            profile.refreshRateProfilesJson?.let(RefreshRateStorage::validateBackupJson)
+            profile.touchTuningProfilesJson?.let(TouchTuningStorage::validateBackupJson)
+            profile.performanceModeProfilesJson?.let(PerformanceModeStorage::validateBackupJson)
+        }
         val merged = loadProfiles(context).associateBy { it.name }.toMutableMap()
         imported.forEach { merged[it.name] = it }
         saveProfiles(context, merged.values.sortedBy { it.name.lowercase() })
 
-        root.optJSONObject("automationRules")?.let {
+        rules?.let {
             AutomationRulesStorage.restoreFromJson(
                 context,
                 it
             )
         }
 
-        val current = root.optJSONObject("currentSettings")?.toMasterProfile()
         current?.let { MasterProfileActions.applyProfile(context, it) }
+        supplement?.let { BackupSupplement.restore(context, it) }
         return ImportResult(imported.size, current != null)
     }
+
+    internal fun encodeProfile(profile: MasterProfile): String = profile.toJson().toString()
+    internal fun decodeProfile(raw: String): MasterProfile = JSONObject(raw).toMasterProfile()
 
     private fun MasterProfile.toJson() = JSONObject().apply {
         put("schemaVersion", schemaVersion)
@@ -176,6 +191,7 @@ object MasterProfileStorage {
         touchTuningProfilesJson?.let {
             put("touchTuningProfiles", JSONObject(it))
         }
+        supplementalSettingsJson?.let { put("supplementalSettings", JSONObject(it)) }
         performanceModeProfilesJson?.let {
             put("performanceModeProfiles", JSONObject(it))
         }
@@ -183,6 +199,7 @@ object MasterProfileStorage {
 
     private fun JSONObject.toMasterProfile(): MasterProfile {
         val version = optInt("schemaVersion", 1)
+        require(version in 1..CURRENT_SCHEMA_VERSION) { "Unsupported saved profile version" }
         val hardwareObject = getJSONObject("hardware")
         var hardware = hardwareObject.toHardwareProfile()
 
@@ -275,6 +292,9 @@ object MasterProfileStorage {
             } else {
                 null
             },
+            supplementalSettingsJson = if (version >= 12 && has("supplementalSettings")) {
+                getJSONObject("supplementalSettings").also { BackupSupplement.parse(it) }.toString()
+            } else null,
             performanceModeProfilesJson = if (version >= 11) {
                 optJSONObject("performanceModeProfiles")?.toString()
             } else {

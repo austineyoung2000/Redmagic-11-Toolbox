@@ -4,6 +4,8 @@ import android.content.res.Configuration
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.os.Bundle
+import android.content.Intent
+import java.util.concurrent.Executors
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -17,6 +19,17 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 
 class SettingsActivity : AppCompatActivity() {
+    private val backupExecutor = Executors.newSingleThreadExecutor()
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode,resultCode,data)
+        MasterProfileDocumentTransfer.handleActivityResult(this,requestCode,resultCode,data) { task ->
+            runCatching { backupExecutor.execute(task); true }.getOrDefault(false)
+        }
+    }
+    override fun onDestroy() {
+        backupExecutor.shutdown()
+        super.onDestroy()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppTheme.configure(this)
@@ -137,6 +150,18 @@ class SettingsActivity : AppCompatActivity() {
             addView(header)
             addView(temperaturePanel)
             addView(appearancePanel)
+            addView(panel().apply {
+                addView(text("BACKUP & RESTORE", 12f, secondary = true, bold = true))
+                addView(text("Save current settings, Master Profiles, notification lighting and Edit-button positions to a JSON file. Android permissions and runtime state are not included.",12f,secondary=true))
+                addView(MaterialButton(this@SettingsActivity).apply {
+                    text="Export backup"
+                    setOnClickListener { MasterProfileDocumentTransfer.requestExport(this@SettingsActivity) }
+                })
+                addView(MaterialButton(this@SettingsActivity).apply {
+                    text="Restore backup"
+                    setOnClickListener { MasterProfileDocumentTransfer.requestImport(this@SettingsActivity) }
+                })
+            })
             addView(panel().apply {
                 addView(text("DIAGNOSTICS", 12f, secondary = true, bold = true))
                 addView(MaterialButton(this@SettingsActivity).apply {

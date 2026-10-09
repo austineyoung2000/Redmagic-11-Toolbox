@@ -517,6 +517,8 @@ object NativeTgkStorage {
         )
     }
 
+    internal fun validateBackupJson(raw: String) { parseExport(raw) }
+
     private fun parseExport(raw: String): List<NativeTgkProfile> {
         require(raw.length <= MAX_IMPORT_SIZE) {
             "TGK profile file is larger than 5 MB"
