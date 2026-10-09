@@ -117,6 +117,25 @@ object PerformanceModeStorage {
             .toString()
     }
 
+    internal fun validateBackupJson(raw: String) {
+        require(raw.length <= MAX_IMPORT_SIZE) {
+            "Performance-mode profile data is too large"
+        }
+        val root = JSONObject(raw)
+        require(root.optString("format") == FORMAT) {
+            "Invalid performance-mode profile data"
+        }
+        require(root.optInt("version", 0) in 1..VERSION) {
+            "Unsupported performance-mode profile version"
+        }
+
+        val array = root.getJSONArray("profiles")
+        require(array.length() <= 500) { "Too many backed-up app profiles" }
+        for (index in 0 until array.length()) {
+            require(array.getJSONObject(index).toProfile() != null) { "Invalid backed-up app profile" }
+        }
+    }
+
     @Synchronized
     fun importProfilesJson(
         context: Context,

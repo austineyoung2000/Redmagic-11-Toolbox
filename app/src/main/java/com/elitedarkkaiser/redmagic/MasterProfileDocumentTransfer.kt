@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 object MasterProfileDocumentTransfer {
     private const val EXPORT_REQUEST = 8201
@@ -52,6 +53,16 @@ object MasterProfileDocumentTransfer {
         }
 
         val uri = data?.data ?: return true
+        if (requestCode == IMPORT_REQUEST) {
+            MaterialAlertDialogBuilder(activity).setTitle("Restore settings and profiles?")
+                .setMessage("Restore the backup's current settings and apply them to the device. Saved profiles with matching names and notification apps with matching packages will be replaced; other entries remain. Android permissions must be granted separately.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Restore") { _,_ -> submitTransfer(activity,requestCode,uri,runBackground) }.show()
+        } else submitTransfer(activity,requestCode,uri,runBackground)
+        return true
+    }
+
+    private fun submitTransfer(activity: Activity, requestCode: Int, uri: Uri, runBackground: (() -> Unit) -> Boolean) {
         val submitted = runBackground {
             if (requestCode == EXPORT_REQUEST) {
                 exportBackup(activity, uri)
@@ -63,11 +74,10 @@ object MasterProfileDocumentTransfer {
         if (!submitted) {
             showToast(
                 activity,
-                "Unable to start master-backup transfer"
+                "Unable to start backup transfer"
             )
         }
 
-        return true
     }
 
     private fun exportBackup(
@@ -92,7 +102,7 @@ object MasterProfileDocumentTransfer {
 
             showToast(
                 activity,
-                error?.message ?: "Master backup exported"
+                error?.message ?: "Settings and profiles exported"
             )
         }
     }
@@ -105,7 +115,7 @@ object MasterProfileDocumentTransfer {
             val raw = activity.contentResolver
                 .openInputStream(uri)
                 ?.bufferedReader()
-                ?.use { it.readText() }
+                ?.use { BackupTextReader.read(it) }
                 ?: error("Unable to read backup")
             MasterProfileStorage.importBackup(
                 activity,
