@@ -154,10 +154,8 @@ object ChargingLedActions {
                 val color = chargingFanColor
 
                 runBackground {
-                    if (
-                        ChargingLedState.isEnabled(activity) &&
-                        ChargingLedState.isChargingNow(activity)
-                    ) {
+                    ModeTransitionCoordinator.applyLedProfile(activity, LedOwner.CHARGING,
+                        "charging-fan-preview", force = true) {
                         if (enabled) HardwareController.setFanLedEffect(effect, color)
                         else HardwareController.setFanLedEnabled(false)
                     }
@@ -165,14 +163,15 @@ object ChargingLedActions {
             },
             applySelection = { effect, color ->
                 runBackground {
-                    if (LedOwnership.current(activity) == LedOwner.CHARGING) {
+                    ModeTransitionCoordinator.applyLedProfile(activity, LedOwner.CHARGING, "charging-fan-preview", force = true) {
                         HardwareController.setFanLedEffect(effect, color)
                     }
                 }
             },
             disableLed = {
                 runBackground {
-                    if (LedOwnership.current(activity) == LedOwner.CHARGING) HardwareController.setFanLedEnabled(false)
+                    ModeTransitionCoordinator.applyLedProfile(activity, LedOwner.CHARGING,
+                        "charging-fan-preview-off", force = true) { HardwareController.setFanLedEnabled(false) }
                 }
             },
             saveState = {
@@ -214,7 +213,7 @@ object ChargingLedActions {
                     chargingFanColor = palette
 
                     runBackground {
-                        if (LedOwnership.current(activity) == LedOwner.CHARGING) {
+                        ModeTransitionCoordinator.applyLedProfile(activity, LedOwner.CHARGING, "charging-fan-preview", force = true) {
                             HardwareController.setFanLedEffect(chargingFanEffect, chargingFanColor)
                         }
                     }

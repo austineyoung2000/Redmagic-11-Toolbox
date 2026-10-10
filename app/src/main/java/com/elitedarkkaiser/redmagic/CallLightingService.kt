@@ -118,6 +118,12 @@ class CallLightingService : Service() {
 
         if (::handler.isInitialized) {
             handler.removeCallbacksAndMessages(null)
+            handler.post {
+                CallLightingState.setActive(this, false)
+                restorePausedFanIfNeeded()
+                if (!CallLightingState.isEnabled(this) || !CallLightingState.isRingingNow(this))
+                    ModeTransitionCoordinator.restoreEffectiveOwner(this, "call-service-stopped")
+            }
         }
         if (::workerThread.isInitialized) {
             workerThread.quitSafely()

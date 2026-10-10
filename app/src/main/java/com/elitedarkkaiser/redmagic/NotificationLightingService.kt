@@ -25,7 +25,12 @@ class NotificationLightingService : NotificationListenerService() {
     @Volatile private var connectedAtMillis = 0L
     private val notificationSession = NotificationSessionDeduplicator()
     private val windowNotificationKeys = LinkedHashSet<String>()
-    private val finish = Runnable { endWindow("handler-expiry") }
+    private val finish = Runnable {
+        if (currentKey != null) {
+            if (NotificationLightingState.isActive()) scheduleExpiry()
+            else endWindow("handler-expiry")
+        }
+    }
     private var expiryAlarm: AlarmManager.OnAlarmListener? = null
     private fun scheduleExpiry() {
         worker.removeCallbacks(finish)
@@ -59,7 +64,11 @@ class NotificationLightingService : NotificationListenerService() {
     }
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_POWER_CONNECTED ||
+                intent?.action == ACTION_SETTINGS_CHANGED) NotificationLightingState.expiresAt = 0L
             worker.post {
+                if (intent?.action == Intent.ACTION_SCREEN_OFF)
+                    ModeTransitionCoordinator.restoreEffectiveOwner(this@NotificationLightingService, "notification-listener-screen-off")
                 if (intent?.action == Intent.ACTION_SCREEN_ON) notificationSession.reset()
                 if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_POWER_CONNECTED ||
                     intent?.action == ACTION_SETTINGS_CHANGED ||
@@ -73,7 +82,7 @@ class NotificationLightingService : NotificationListenerService() {
         thread = HandlerThread("NotificationLighting").apply { start() }
         worker = Handler(thread.looper)
         ContextCompat.registerReceiver(this, receiver, IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(ACTION_SETTINGS_CHANGED)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
@@ -91,7 +100,7 @@ class NotificationLightingService : NotificationListenerService() {
             // Ineligible callbacks must not poison deduplication for a later locked alert.
             if (!DeviceCompatibility.isSupportedDevice() || !NotificationLightingState.enabled(this) ||
                 LedScreenPolicy.isScreenInteractive(this) || ChargingLedState.isChargingNow(this) ||
-                CallLightingState.isActive(this)) return@post
+                (CallLightingState.isEnabled(this) && CallLightingState.isRingingNow(this))) return@post
             val p = NotificationLightingState.read(this,sbn.packageName) ?: return@post
             if (!(p.logo || p.triggers || p.fan)) return@post
             if (!notificationSession.accept(sbn.key, eligible = true)) {
@@ -138,7 +147,7 @@ class NotificationLightingService : NotificationListenerService() {
 
                 }
                 if (!applied || LedScreenPolicy.isScreenInteractive(this) ||
-                    ChargingLedState.isChargingNow(this) || CallLightingState.isActive(this)) {
+                    ChargingLedState.isChargingNow(this) || (CallLightingState.isEnabled(this) && CallLightingState.isRingingNow(this))) {
                     endWindow("ownership-changed-during-apply")
                     return@post
                 }

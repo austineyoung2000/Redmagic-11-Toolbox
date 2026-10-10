@@ -318,7 +318,8 @@ internal object GameModeActions {
     }
     fun applyProfileNow(
         profile: GameModeProfile,
-        applyFanLed: (String, Int) -> Unit
+        applyFanLed: (String, Int) -> Unit,
+        applyLighting: (() -> Unit) -> Unit
     ) {
         if (profile.fanEnabled) {
             HardwareController.setFanLevel(profile.fanLevel)
@@ -332,22 +333,24 @@ internal object GameModeActions {
             HardwareController.enablePump(false)
         }
 
-        if (profile.fanLedEnabled) {
-            applyFanLed(profile.fanLedEffect, profile.fanLedColor)
-        } else {
-            HardwareController.setFanLedEnabled(false)
-        }
+        applyLighting {
+            if (profile.fanLedEnabled) {
+                applyFanLed(profile.fanLedEffect, profile.fanLedColor)
+            } else {
+                HardwareController.setFanLedEnabled(false)
+            }
 
-        if (profile.logoLedEnabled) {
-            HardwareController.setLogoLedEffect(profile.logoLedEffect, profile.logoLedColor)
-        } else {
-            HardwareController.setLogoLedEnabled(false)
-        }
+            if (profile.logoLedEnabled) {
+                HardwareController.setLogoLedEffect(profile.logoLedEffect, profile.logoLedColor)
+            } else {
+                HardwareController.setLogoLedEnabled(false)
+            }
 
-        if (profile.shoulderLedEnabled) {
-            HardwareController.setShoulderLedEffect(profile.shoulderLedEffect, profile.shoulderLedColor)
-        } else {
-            HardwareController.setShoulderLedEnabled(false)
+            if (profile.shoulderLedEnabled) {
+                HardwareController.setShoulderLedEffect(profile.shoulderLedEffect, profile.shoulderLedColor)
+            } else {
+                HardwareController.setShoulderLedEnabled(false)
+            }
         }
     }
 

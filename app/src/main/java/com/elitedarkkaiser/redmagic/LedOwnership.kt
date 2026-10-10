@@ -15,11 +15,12 @@ enum class LedOwner {
 object LedOwnership {
     fun current(context: Context): LedOwner {
         return LightingPriorityPolicy.select(
-            incomingCall = CallLightingState.isEnabled(context) && CallLightingState.isActive(context),
+            incomingCall = CallLightingState.isEnabled(context) && CallLightingState.isRingingNow(context),
             charging = ChargingLedState.isEnabled(context) && ChargingLedState.isChargingNow(context),
-            notification = NotificationLightingState.isActive(),
+            notification = NotificationLightingState.isEligible(context),
             game = isGameModeLedOverrideActiveStorage(context),
-            rgbStudio = RgbStudioStorage.isEnabled(context)
+            rgbStudio = RgbStudioStorage.isEnabled(context),
+            screenInteractive = LedScreenPolicy.isScreenInteractive(context)
         )
     }
 

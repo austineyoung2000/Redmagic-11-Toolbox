@@ -26,9 +26,7 @@ object LedScreenPolicy {
             "Blocked non-charging LED write while screen is off: $reason"
         )
 
-        if (!ChargingLedState.isEnabled(context) || !ChargingLedState.isChargingNow(context)) {
-            HardwareController.turnOffAllLeds()
-        }
+        ModeTransitionCoordinator.restoreEffectiveOwner(context, reason)
 
         return true
     }

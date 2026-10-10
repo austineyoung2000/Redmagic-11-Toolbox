@@ -210,6 +210,7 @@ class GameModeService : Service() {
                      * a package. Probe UsageStats immediately so
                      * process recreation restores the right mode.
                      */
+                    gameModeApplyPendingFor = gameModeActiveFor
                     handler.removeCallbacks(pollRunnable)
                     handler.post(pollRunnable)
                 }
@@ -230,6 +231,15 @@ class GameModeService : Service() {
 
         GameModeActions.applyProfileNow(
             profile = profile,
+            applyLighting = { block ->
+                // An explicit profile application cannot claim LEDs without a
+                // selected foreground game, or interrupt a higher owner.
+                val foreground = getForegroundPackageName()
+                if (foreground != null && getSavedGamePackagesStorage(this).contains(foreground)) {
+                    ModeTransitionCoordinator.applyLedProfile(this, LedOwner.GAME_MODE,
+                        "saved-game-profile", force = true, block = block)
+                }
+            },
             applyFanLed = { effect, color ->
                 if (effect.startsWith("preset:")) {
                     HardwareController.setFanLedStockPreset(
@@ -377,6 +387,8 @@ class GameModeService : Service() {
         }
     }
 
+    private var observedForegroundPackage: String? = null
+
     private fun getForegroundPackageName(): String? {
         val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val end = System.currentTimeMillis()
@@ -399,11 +411,11 @@ class GameModeService : Service() {
             }
         }
 
-        return lastForeground
+        if (lastForeground != null) observedForegroundPackage = lastForeground
+        return observedForegroundPackage
     }
 
     private fun shouldIgnorePackage(pkg: String): Boolean {
-        if (pkg == packageName) return true
         if (pkg == "com.android.systemui") return true
         return false
     }

@@ -106,6 +106,10 @@ class RgbCycleService : Service() {
         runCatching { unregisterReceiver(screenReceiver) }
         if (::handler.isInitialized) {
             handler.removeCallbacksAndMessages(null)
+            handler.post {
+                if (!RgbStudioStorage.isEnabled(this) || !LedScreenPolicy.isScreenInteractive(this))
+                    ModeTransitionCoordinator.restoreEffectiveOwner(this, "rgb-service-stopped")
+            }
         }
         if (::workerThread.isInitialized) {
             workerThread.quitSafely()
@@ -123,14 +127,9 @@ class RgbCycleService : Service() {
             return
         }
 
-        if (LedOwnership.current(this) != LedOwner.RGB_CYCLE) {
-            scheduleNext(OWNER_RECHECK_MS)
-            return
-        }
-
         if (shouldPauseForScreenTimeout()) {
             if (!ledsOffForTimeout) {
-                ModeTransitionCoordinator
+                ledsOffForTimeout = ModeTransitionCoordinator
                     .applyLedProfile(
                         context = this,
                         owner = LedOwner.NONE,
@@ -141,8 +140,12 @@ class RgbCycleService : Service() {
                         HardwareController
                             .turnOffAllLeds()
                     }
-                ledsOffForTimeout = true
             }
+            scheduleNext(OWNER_RECHECK_MS)
+            return
+        }
+
+        if (LedOwnership.current(this) != LedOwner.RGB_CYCLE) {
             scheduleNext(OWNER_RECHECK_MS)
             return
         }

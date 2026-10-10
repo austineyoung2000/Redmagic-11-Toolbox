@@ -24,13 +24,14 @@ class FanLedRestoreWorker(
         val color = prefs.getInt("fan_led_color", 5)
 
         return try {
-            val ok = if (enabled) {
-                HardwareController.setFanLedEffect(effect, color)
-            } else {
-                HardwareController.setFanLedEnabled(false)
+            var writeFailed = false
+            ModeTransitionCoordinator.applyLedProfile(applicationContext, LedOwner.NORMAL,
+                "normal-fan-worker", force = true) {
+                writeFailed = !(if (enabled) HardwareController.setFanLedEffect(effect, color)
+                    else HardwareController.setFanLedEnabled(false))
             }
-
-            if (ok) Result.success() else Result.retry()
+            // Ownership rejection is intentional, not work to replay later.
+            if (writeFailed) Result.retry() else Result.success()
         } catch (_: Throwable) {
             Result.retry()
         }

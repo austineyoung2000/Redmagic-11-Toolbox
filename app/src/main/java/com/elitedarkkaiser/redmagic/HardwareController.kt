@@ -27,7 +27,7 @@ object HardwareController {
                 "HardwareController",
                 "Blocked $resource write on unsupported device"
             )
-            return false
+            return if (resource == "led_control") LedWriteReceipt.record(false) else false
         }
 
         val now = android.os.SystemClock.elapsedRealtime()
@@ -45,8 +45,12 @@ object HardwareController {
             return true
         }
 
-        val succeeded =
-            rootSession?.exec(command) ?: RootShell.exec(command)
+        // Legacy LED commands use semicolons: do not mistake the last cfg
+        // write succeeding for a complete profile succeeding. Existing batch
+        // scripts already manage set -e and their cleanup trap themselves.
+        val checkedCommand = if (resource == "led_control" && !command.contains("set -e"))
+            "( set -e; $command )" else command
+        val succeeded = rootSession?.exec(checkedCommand) ?: RootShell.exec(checkedCommand)
         if (succeeded) {
             // Fan/trigger LED programs also write the fan-enable node.
             // A cached fan-off write is no longer valid after that side effect.
@@ -70,7 +74,7 @@ object HardwareController {
             )
         }
 
-        return succeeded
+        return if (resource == "led_control") LedWriteReceipt.record(succeeded) else succeeded
     }
 
     private const val FAN_ENABLE =
@@ -170,7 +174,7 @@ object HardwareController {
     }
 
     fun setFanLedStockPreset(effectValue: String): Boolean {
-        val safeEffectValue = effectValue.takeIf { it in FAN_LED_STOCK_PRESETS } ?: return false
+        val safeEffectValue = effectValue.takeIf { it in FAN_LED_STOCK_PRESETS } ?: return LedWriteReceipt.record(false)
         return execHardwareWrite("led_control", "echo 1 > $FAN_ENABLE; echo $safeEffectValue > $LED_EFFECT; echo 1 > $LED_CFG")
     }
 
@@ -263,14 +267,14 @@ object HardwareController {
         val normalizedEffect = if (zone == LedZone.FAN) FanLedPalette.normalizeEffect(base) else base
         val normalizedColor = if (zone == LedZone.FAN) FanLedPalette.normalizeColor(base, color) else color
         val selection = if (effectName.startsWith("areas:")) {
-            if (zone != LedZone.LOGO || LogoBarSelection.decode(effectName) == null) return false
+            if (zone != LedZone.LOGO || LogoBarSelection.decode(effectName) == null) return LedWriteReceipt.record(false)
             effectName
         } else if (effectName.startsWith("dim:")) {
-            if (LedBrightness.decode(effectName) == null) return false
+            if (LedBrightness.decode(effectName) == null) return LedWriteReceipt.record(false)
             LedBrightness.encode(LedBrightness.level(effectName), normalizedEffect)
         } else normalizedEffect
         val replay = LedBrightness.command(name, selection, normalizedColor)
-        if (replay == null && (LedBrightness.level(selection) != 255 || base.startsWith("split:") || effectName.startsWith("areas:"))) return false
+        if (replay == null && (LedBrightness.level(selection) != 255 || base.startsWith("split:") || effectName.startsWith("areas:"))) return LedWriteReceipt.record(false)
         val stock = "echo ${buildUnifiedLedEffectValue(zone, normalizedEffect, normalizedColor)} > $LED_EFFECT; echo 1 > $LED_CFG"
         val command = (if (zone.enableFanFirst) "echo 1 > $FAN_ENABLE;\n" else "") + (replay ?: stock)
         val previous = lastZoneCommands[name]
@@ -285,7 +289,7 @@ object HardwareController {
 
     @Synchronized
     internal fun applyNotificationLeds(zones: List<NotificationLedBatch.Zone>, stopCooling: Boolean): Boolean {
-        val command = NotificationLedBatch.command(zones, stopCooling) ?: return false
+        val command = NotificationLedBatch.command(zones, stopCooling) ?: return LedWriteReceipt.record(false)
         // One serialized write also invalidates fan-power cache through the
         // existing LED side-effect handling; never use per-zone fallback writes.
         recentHardwareWrites.remove("led_control")
@@ -320,7 +324,7 @@ object HardwareController {
     ): Boolean {
         val commands = LedBrightness.cycleCommand(effectName, logoColor, shoulderColor, fanColor,
             shoulderBottomColor, logoBrightness, shoulderBrightness, fanBrightness,
-            barColor, barBrightness, logoEnabled, barEnabled) ?: return false
+            barColor, barBrightness, logoEnabled, barEnabled) ?: return LedWriteReceipt.record(false)
         if (commands.isEmpty()) return true
         val enable = if (shoulderColor != null || fanColor != null) "echo 1 > $FAN_ENABLE &&\n" else ""
         return execHardwareWrite("led_control", enable + commands, rootSession)
@@ -329,12 +333,9 @@ object HardwareController {
     fun turnOffAllLeds(
         rootSession: RootShell.Session? = null
     ): Boolean {
-        val cmd = buildString {
-            for (z in 1..3) {
-                append("echo 0x${z}000000 > $LED_EFFECT; ")
-                append("echo 1 > $LED_CFG; ")
-            }
-        }
+        // Never let a previous successful shutdown suppress a new physical clear.
+        recentHardwareWrites.remove("led_control")
+        val cmd = LedShutdownCommand.build(LED_EFFECT, LED_CFG)
         return execHardwareWrite(
             "led_control",
             cmd,

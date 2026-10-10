@@ -1,7 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
 import android.content.Context
-import android.telephony.TelephonyManager
 
 /*
  * Serializes complete LED-profile transitions across every
@@ -15,6 +14,8 @@ object ModeTransitionCoordinator {
     private const val TAG = "RedmagicModeCoordinator"
 
     private val transitionLock = Any()
+
+    private var reconcilingAfterWrite = false
 
     private var lastOwner: LedOwner? = null
     private var lastSignature: String? = null
@@ -41,6 +42,7 @@ object ModeTransitionCoordinator {
                     "Skipped $owner profile because " +
                         "effective owner is $effectiveOwner"
                 )
+                if (effectiveOwner == LedOwner.NONE) shutdownLeds("rejected-stale-profile")
                 return@synchronized false
             }
 
@@ -66,15 +68,24 @@ object ModeTransitionCoordinator {
                 return@synchronized false
             }
 
-            block()
-
-            // A profile can take several root writes. Recheck after completion
-            // in case the screen turned off while those writes were running.
-            if (owner !in setOf(LedOwner.CHARGING, LedOwner.CALL, LedOwner.NOTIFICATION) &&
-                !LedScreenPolicy.isScreenInteractive(context)) {
-                HardwareController.turnOffAllLeds()
+            val succeeded = runCatching { LedWriteReceipt.capture(block) }
+                .onFailure { android.util.Log.e(TAG, "Profile write threw owner=$owner", it) }
+                .getOrDefault(false)
+            val ownerAfterWrite = LedOwnership.current(context)
+            if (!succeeded || !ownerCanApply(owner, ownerAfterWrite)) {
                 lastOwner = null
                 lastSignature = null
+                android.util.Log.w(TAG, "Handoff incomplete requested=$owner current=$ownerAfterWrite rootWritesSucceeded=$succeeded")
+                // Never commit a stale or failed profile. Reconcile a changed owner
+                // immediately; a failed unchanged owner gets a safe LED clear.
+                if (!ownerCanApply(owner, ownerAfterWrite) && !reconcilingAfterWrite) {
+                    shutdownLeds("owner-changed-during-write")
+                    reconcilingAfterWrite = true
+                    try { restoreEffectiveOwner(context, "owner-changed-during-write") }
+                    finally { reconcilingAfterWrite = false }
+                } else {
+                    shutdownLeds("profile-write-failed")
+                }
                 return@synchronized false
             }
 
@@ -101,12 +112,10 @@ object ModeTransitionCoordinator {
             lastOwner = null
             lastSignature = null
 
-            if (CallLightingState.isEnabled(context) && CallLightingState.isActive(context)) {
+            if (CallLightingState.isEnabled(context) && CallLightingState.isRingingNow(context)) {
                 HardwareServiceActions.startCallLighting(context)
                 return
             }
-            if (NotificationLightingState.isActive() &&
-                !(ChargingLedState.isEnabled(context) && ChargingLedState.isChargingNow(context))) return
 
             if (
                 ChargingLedState.isEnabled(context) &&
@@ -123,14 +132,14 @@ object ModeTransitionCoordinator {
                 return
             }
 
-            ChargingLedState.setActive(
-                context,
-                false
-            )
+            ChargingLedState.setActive(context, false)
+            CallLightingState.setActive(context, false)
+            if (NotificationLightingState.isEligible(context)) return
+            NotificationLightingState.expiresAt = 0L
 
             if (!LedScreenPolicy.isScreenInteractive(context)) {
                 // Shutdown bypasses stale ownership, including RGB Studio.
-                HardwareController.turnOffAllLeds()
+                shutdownLeds(reason)
                 return
             }
 
@@ -182,52 +191,15 @@ object ModeTransitionCoordinator {
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun isCallInProgress(
-        context: Context
-    ): Boolean {
-        val manager =
-            context.getSystemService(
-                TelephonyManager::class.java
-            ) ?: return false
-
-        val state = runCatching {
-            manager.callState
-        }.getOrDefault(
-            TelephonyManager.CALL_STATE_IDLE
-        )
-
-        return state !=
-            TelephonyManager.CALL_STATE_IDLE
+    private fun shutdownLeds(reason: String) {
+        // Retry once, still under the transition lock, with the same proven
+        // shutdown commands. Cooling nodes are never part of this operation.
+        var succeeded = HardwareController.turnOffAllLeds()
+        if (!succeeded) succeeded = HardwareController.turnOffAllLeds()
+        if (succeeded) android.util.Log.i(TAG, "LED shutdown acknowledged reason=$reason")
+        else android.util.Log.e(TAG, "LED shutdown failed reason=$reason")
     }
 
-    private fun ownerCanApply(
-        requested: LedOwner,
-        effective: LedOwner
-    ): Boolean {
-        return when (requested) {
-            LedOwner.CHARGING ->
-                effective == LedOwner.CHARGING
-
-            LedOwner.CALL ->
-                effective == LedOwner.CALL
-
-            LedOwner.GAME_MODE ->
-                effective == LedOwner.GAME_MODE
-
-            LedOwner.NOTIFICATION -> effective == LedOwner.NOTIFICATION
-
-            LedOwner.RGB_CYCLE ->
-                effective == LedOwner.RGB_CYCLE
-
-            LedOwner.NORMAL ->
-                effective == LedOwner.NORMAL
-
-            LedOwner.NONE ->
-                effective == LedOwner.NORMAL ||
-                    effective == LedOwner.RGB_CYCLE
-
-            else -> false
-        }
-    }
+    private fun ownerCanApply(requested: LedOwner, effective: LedOwner): Boolean =
+        LightingPriorityPolicy.canApply(requested, effective)
 }

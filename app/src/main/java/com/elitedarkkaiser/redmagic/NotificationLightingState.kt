@@ -14,6 +14,9 @@ internal object NotificationLightingState {
     fun setEnabled(c: Context, value: Boolean) { prefs(c).edit().putBoolean("enabled", value).apply() }
     @Volatile var expiresAt = 0L
     fun isActive() = expiresAt > SystemClock.elapsedRealtime()
+    fun isEligible(c: Context) = LightingPriorityPolicy.notificationEligible(
+        enabled(c), expiresAt, SystemClock.elapsedRealtime(), LedScreenPolicy.isScreenInteractive(c),
+        ChargingLedState.isChargingNow(c), CallLightingState.isEnabled(c) && CallLightingState.isRingingNow(c))
     fun read(c: Context, pkg: String): Profile? = runCatching {
         val raw = prefs(c).getString("app:$pkg", null) ?: return null
         val j = JSONObject(raw)

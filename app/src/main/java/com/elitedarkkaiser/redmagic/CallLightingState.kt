@@ -38,6 +38,12 @@ internal object CallLightingState {
     const val CONNECTED_SHOULDER_EFFECT_KEY = "call_connected_shoulder_led_effect"
     const val CONNECTED_SHOULDER_COLOR_KEY = "call_connected_shoulder_led_color"
 
+    @Suppress("DEPRECATION")
+    fun isRingingNow(context: Context): Boolean = runCatching {
+        context.getSystemService(android.telephony.TelephonyManager::class.java)?.callState ==
+            android.telephony.TelephonyManager.CALL_STATE_RINGING
+    }.getOrDefault(false)
+
     fun isEnabled(context: Context): Boolean {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(ENABLED_KEY, false)
