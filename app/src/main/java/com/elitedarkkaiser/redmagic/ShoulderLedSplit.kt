@@ -44,7 +44,7 @@ internal object ShoulderLedSplit {
     fun baseEffect(value: String): String = decode(value)?.effect ?: LedBrightness.effect(value)
 
     /** Replay only an exact, validated vendor program; never modify vendor files or IMAX. */
-    fun command(value: String): String? {
+    fun command(value: String, prepareOnly: Boolean = false): String? {
         val selection = decode(value) ?: return null
         val program = programs.getValue(selection.effect)
         fun component(rgb: Int, channel: Int) = hex(rgb).substring(channel * 2, channel * 2 + 2).lowercase()
@@ -74,8 +74,10 @@ internal object ShoulderLedSplit {
             cp /vendor/firmware/aw_touch${type}_7.bin "${'$'}tmp/program"
             actual=${'$'}(sha256sum "${'$'}tmp/program" | awk '{print ${'$'}1}')
             [ "${'$'}actual" = '${program.hash}' ] || { echo 'Unsupported trigger LED program'; exit 1; }
+            ${if (prepareOnly) "" else """
             saved=${'$'}(cat "${'$'}d/effect" | awk '{print ${'$'}NF}')
             printf '%s\n' "${'$'}saved" | grep -Eq '^0x[0-9a-fA-F]{1,8}${'$'}' || exit 1
+            """.trimIndent()}
             od -An -v -tx1 "${'$'}tmp/program" > "${'$'}tmp/bytes"
             awk '
             BEGIN {
@@ -108,12 +110,14 @@ internal object ShoulderLedSplit {
             }
             END { if (bad || n!=${program.size} || changed!=${program.starts.size * 3}) exit 1 }
             ' "${'$'}tmp/bytes" > "${'$'}tmp/pairs"
+            ${if (prepareOnly) "cp \"${'$'}tmp/pairs\" \"${'$'}batch/triggers.pairs\"" else """
             started=1
             printf '$effect\n' > "${'$'}d/effect"
             while read -r reg value; do
                 printf '%s %s\n' "${'$'}reg" "${'$'}value" > "${'$'}d/reg" || exit 1
             done < "${'$'}tmp/pairs"
             success=1
+            """.trimIndent()}
             )
         """.trimIndent()
     }

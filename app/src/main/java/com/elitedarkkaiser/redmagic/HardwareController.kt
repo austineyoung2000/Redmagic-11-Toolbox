@@ -54,6 +54,10 @@ object HardwareController {
                 recentHardwareWrites.remove("fan_control")
                 DashboardSnapshot.invalidateHardwareCache()
             }
+            if (resource == "led_control" && command.contains(PUMP_ENABLE)) {
+                recentHardwareWrites.remove("pump_control")
+                DashboardSnapshot.invalidateHardwareCache()
+            }
             if (
                 resource == "fan_control" ||
                 resource == "pump_control"
@@ -277,6 +281,21 @@ object HardwareController {
             execHardwareWrite("led_control", previous)
         }
         return success
+    }
+
+    @Synchronized
+    internal fun applyNotificationLeds(zones: List<NotificationLedBatch.Zone>, stopCooling: Boolean): Boolean {
+        val command = NotificationLedBatch.command(zones, stopCooling) ?: return false
+        // One serialized write also invalidates fan-power cache through the
+        // existing LED side-effect handling; never use per-zone fallback writes.
+        recentHardwareWrites.remove("led_control")
+        return try { execHardwareWrite("led_control", command) }
+        finally {
+            // Failed batches can also change power before their cleanup runs.
+            recentHardwareWrites.remove("fan_control")
+            recentHardwareWrites.remove("pump_control")
+            DashboardSnapshot.invalidateHardwareCache()
+        }
     }
 
     fun setShoulderLedEffect(effectName: String, color: Int): Boolean = applyZoneEffect(LedZone.SHOULDER, effectName, color)

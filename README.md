@@ -831,3 +831,11 @@ su -c 'logcat -d -v time -s NotificationLighting RedmagicModeCoordinator Redmagi
 ```
 
 Top-trigger intent unlock already exists under Trigger Safety; two to four top taps require an unlock sequence, while one tap bypasses it. No trigger controls or behavior are changed by this investigation.
+
+### Coordinated notification LED batch
+
+Notification profiles now use one serialized root write for all selected zones. All exact vendor programs are hashed, checked and patched into temporary files before any hardware change; a rejected template aborts the entire batch. Each selected program is loaded through one shared register descriptor with its final activation pair withheld. The original final activation pairs are issued back-to-back only after all loads, avoiding separate per-zone on-effect firmware requests. This is one coordinated command, not a hardware atomic multi-zone operation; its visual timing still needs phone verification. Common settings, independent logo/bar colors and brightness, and split trigger colors remain supported. Other lighting editors retain their existing replay path.
+
+The same root invocation performs initial all-zone shutdown, shared fan-power enable when needed, and screen-off cooling cleanup. Failure after hardware changes shuts down the batch; unsupported requests never fall back to staggered per-zone writes. Fan/pump write caches are invalidated even after a failed batch. The screen-off temperature decision is captured immediately before application; cooling safety still disables shared power when cool, so fan/trigger illumination can still be constrained by that hardware coupling. Existing ten-second expiry and bounded burst deadlines remain unchanged. Notifications require a noninteractive display and unplugged power; charging and ringing-call priorities are preserved.
+
+Phone checks: use Messenger orange Breathe, brightness 128, all three zones and ten seconds; check whether all zones start together and stop without waking the phone. Repeat with split colors and a notification burst, then verify plugged-in notifications cannot take over. The NotificationLighting batch log records total root-application time, selected zones, success and cooling cleanup.

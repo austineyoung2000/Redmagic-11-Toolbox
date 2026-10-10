@@ -100,18 +100,19 @@ class NotificationLightingService : NotificationListenerService() {
             scheduleExpiry()
             try {
                 ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
-                    HardwareController.turnOffAllLeds()
                     val effect = LedBrightness.encode(p.brightness,p.effect)
-                    if (p.logo) logZone("logo", HardwareController.setLogoLedEffect(p.logoState?.effect ?: effect,p.logoState?.color ?: p.color))
-                    if (p.triggers) logZone("triggers", HardwareController.setShoulderLedEffect(p.triggerState?.effect ?: effect,p.triggerState?.color ?: p.color))
-                    if (p.fan) logZone("fan", HardwareController.setFanLedEffect(effect,p.color))
-                    if (HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this,"notification-lighting")) {
-                        // LED commands may have re-enabled fan power since the
-                        // shared policy last shut it down. Enforce it again.
-                        HardwareController.enableFan(false)
-                        HardwareController.enablePump(false)
-                        android.util.Log.w("NotificationLighting", "Cooling safety disabled shared fan power; fan/trigger LEDs may be unavailable")
+                    val zones = buildList {
+                        if (p.logo) add(NotificationLedBatch.Zone("logo", p.logoState?.effect ?: effect, p.logoState?.color ?: p.color))
+                        if (p.triggers) add(NotificationLedBatch.Zone("triggers", p.triggerState?.effect ?: effect, p.triggerState?.color ?: p.color))
+                        if (p.fan) add(NotificationLedBatch.Zone("fan", effect, p.color))
                     }
+                    val stopCooling = !HardwareScreenPolicy.isScreenInteractive(this) &&
+                        !HardwareScreenPolicy.coolingAllowedWhileScreenOff(HardwareScreenPolicy.currentTempF())
+                    val startedAt = SystemClock.elapsedRealtime()
+                    val success = HardwareController.applyNotificationLeds(zones, stopCooling)
+                    android.util.Log.i("NotificationLighting", "Batch zones=${zones.map { it.name }} writeSucceeded=$success elapsedMs=${SystemClock.elapsedRealtime()-startedAt} coolingStopped=$stopCooling")
+                    if (!success) throw IllegalStateException("Coordinated notification LED application failed")
+
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NotificationLighting", "Notification profile failed", e)
@@ -124,9 +125,6 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         worker.post { seen.remove(sbn.key); if (currentKey == sbn.key) endWindow() }
-    }
-    private fun logZone(zone: String, success: Boolean) {
-        android.util.Log.i("NotificationLighting", "Zone=$zone writeSucceeded=$success")
     }
     private fun endWindow(reason: String = "cancelled") {
         val hadWindow = currentKey != null

@@ -120,7 +120,7 @@ internal object LedBrightness {
     }
 
     /** Null means unsupported; callers must reject dimmed requests rather than silently use stock output. */
-    fun command(zone: String, value: String, color: Int): String? {
+    fun command(zone: String, value: String, color: Int, prepareOnly: Boolean = false): String? {
         if (value.startsWith("dim:") && decode(value) == null) return null
         val areas = LogoBarSelection.decode(value)
         if (value.startsWith("areas:") && (zone != "logo" || areas == null)) return null
@@ -132,7 +132,7 @@ internal object LedBrightness {
             val rgb = stockRgb(color)
             return ShoulderLedSplit.command(ShoulderLedSplit.encode(
                 split?.effect ?: base, scale(split?.topRgb ?: rgb, intensity),
-                scale(split?.bottomRgb ?: rgb, intensity)))
+                scale(split?.bottomRgb ?: rgb, intensity)), prepareOnly)
         }
         val palette = zone == "fan" && FanLedPalette.isPalette(color)
         val program = if (palette && base != "steady") animatedPalettes.getValue("$base:$color")
@@ -168,10 +168,12 @@ internal object LedBrightness {
                 }
                 for (i=0; i<n; i+=2) printf "%02x %02x\n", b[i], b[i+1]
             }' "${'$'}tmp/bytes" > "${'$'}tmp/pairs"
+            ${if (prepareOnly) "cp \"${'$'}tmp/pairs\" \"${'$'}batch/$zone.pairs\"" else """
             printf '$effectValue\n' > "${'$'}d/effect"
             exec 9>"${'$'}d/reg"
             while IFS= read -r pair; do printf '%s\n' "${'$'}pair" >&9 || exit 1; done < "${'$'}tmp/pairs"
             exec 9>&-
+            """.trimIndent()}
             )
         """.trimIndent()
     }
