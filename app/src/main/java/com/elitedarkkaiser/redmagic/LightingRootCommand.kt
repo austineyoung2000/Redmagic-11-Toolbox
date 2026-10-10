@@ -49,6 +49,28 @@ internal object LightingRootCommand {
                                 kill -KILL ${identity.pid} 2>/dev/null || {
                                     [ ! -e /proc/${identity.pid}/stat ] || redmagic_led_cancel_failed=1
                                 }
+                                # Signal delivery alone does not establish that a
+                                # blocked kernel writer has stopped. Verify exit,
+                                # zombie state or replacement PID identity.
+                                redmagic_led_wait=0
+                                redmagic_led_still_running=1
+                                while [ "${dollar}redmagic_led_wait" -lt 20 ]; do
+                                    if [ ! -e /proc/${identity.pid}/stat ]; then
+                                        redmagic_led_still_running=0; break
+                                    fi
+                                    if read redmagic_led_stat < /proc/${identity.pid}/stat 2>/dev/null; then
+                                        redmagic_led_fields=${dollar}{redmagic_led_stat##*) }
+                                        set -- ${dollar}redmagic_led_fields
+                                        redmagic_led_state=${dollar}1
+                                        shift 19 || exit 1
+                                        if [ "${dollar}1" != '${identity.startTicks}' ] || [ "${dollar}redmagic_led_state" = Z ]; then
+                                            redmagic_led_still_running=0; break
+                                        fi
+                                    fi
+                                    redmagic_led_wait=${dollar}((redmagic_led_wait + 1))
+                                    sleep 0.02
+                                done
+                                [ "${dollar}redmagic_led_still_running" = 0 ] || redmagic_led_cancel_failed=1
                             fi
                         else
                             [ ! -e /proc/${identity.pid}/stat ] || redmagic_led_cancel_failed=1

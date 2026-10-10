@@ -70,6 +70,25 @@ class LightingRootCommandTest {
             assertTrue(child.isAlive)
         } finally { child.destroyForcibly(); pidFile.delete() }
     }
+    @Test fun acceptedSignalWithoutWriterTerminationIsNotAcknowledged() {
+        val pidFile = Files.createTempFile("led-running", ".pid").toFile()
+        val child = ProcessBuilder("sh", "-c", "echo $$ > '${pidFile.path}'; exec sleep 10").start()
+        try {
+            val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (pidFile.length() == 0L && System.nanoTime() < end) Thread.sleep(10)
+            val pid = pidFile.readText().trim().toLong()
+            val stat = java.io.File("/proc/$pid/stat").readText()
+            val start = stat.substringAfterLast(") ").trim().split(Regex("\\s+"))[19].toLong()
+            val boot = java.io.File("/proc/sys/kernel/random/boot_id").readText().trim()
+            // Simulate a kernel accepting the signal while its writer remains
+            // alive. The cancellation receipt must reject a competing writer.
+            val cancel = ProcessBuilder("sh", "-c", "kill() { return 0; };\n" +
+                LightingRootCommand.cancel(listOf(LightingRootCommand.Identity(pid, start, boot)))).start()
+            assertTrue(cancel.waitFor(3, TimeUnit.SECONDS))
+            assertNotEquals(0, cancel.exitValue())
+            assertTrue(child.isAlive)
+        } finally { child.destroyForcibly(); pidFile.delete() }
+    }
     @Test fun pidReuseCannotKillUnrelatedProcess() {
         val stat = java.io.File("/proc/self/stat").readText()
         val pid = selfPid()
