@@ -59,10 +59,12 @@ object HardwareController {
             // a later LED write failed. Invalidate those receipts on every attempt.
             if (resource == "led_control" && command.contains(FAN_ENABLE)) {
                 recentHardwareWrites.remove("fan_control")
+                HardwareScreenPolicy.invalidateCoolingShutdownReceipt()
                 DashboardSnapshot.invalidateHardwareCache()
             }
             if (resource == "led_control" && command.contains(PUMP_ENABLE)) {
                 recentHardwareWrites.remove("pump_control")
+                HardwareScreenPolicy.invalidateCoolingShutdownReceipt()
                 DashboardSnapshot.invalidateHardwareCache()
             }
             if (succeeded) {

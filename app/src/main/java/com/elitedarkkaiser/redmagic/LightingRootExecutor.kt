@@ -18,6 +18,7 @@ internal object LightingRootExecutor {
     private var useOneShot = false
     @Volatile private var quarantined = false
     private var recovered = false
+    @Volatile private var rootVerified = false
     private class Session(val process: Process, val oneShot: Boolean = false) {
         val input = process.inputStream.bufferedReader()
         val output = process.outputStream.bufferedWriter()
@@ -37,16 +38,22 @@ internal object LightingRootExecutor {
                 if (!cancelWriter(it)) quarantined = true
             }
         }
+        if (!rootVerified && !quarantined) {
+            rootVerified = execute("id -u", requireVerifiedRoot = false).let { it.succeeded && it.output.trim() == "0" }
+            if (!rootVerified && useOneShot && !quarantined)
+                rootVerified = execute("id -u", requireVerifiedRoot = false).let { it.succeeded && it.output.trim() == "0" }
+        }
     }
 
     fun status(): String = if (quarantined) "quarantined: writer cancellation not acknowledged"
-        else "bounded LED channel; command limit=${COMMAND_LIMIT_MS}ms"
+        else "verifiedRoot=$rootVerified; bounded LED channel; command limit=${COMMAND_LIMIT_MS}ms"
 
     fun exec(command: String): Boolean = execute(command).succeeded
     fun output(command: String): String? = execute(command).takeIf { it.succeeded }?.output?.trim()
 
-    private fun execute(command: String): Result = synchronized(lock) {
+    private fun execute(command: String, requireVerifiedRoot: Boolean = true): Result = synchronized(lock) {
         val dir = directory ?: return@synchronized Result(false)
+        if (requireVerifiedRoot && !rootVerified) return@synchronized Result(false)
         if (quarantined) {
             Log.e(TAG, "LED root channel quarantined after unacknowledged writer cancellation")
             return@synchronized Result(false)

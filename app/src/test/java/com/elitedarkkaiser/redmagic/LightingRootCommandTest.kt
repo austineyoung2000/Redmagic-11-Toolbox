@@ -6,6 +6,7 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
 class LightingRootCommandTest {
+    private fun selfPid(): Long = java.io.File("/proc/self/stat").readText().substringBefore(" ").toLong()
     @Test fun identityRejectsUntrustedOrInvalidPidRecords() {
         assertNull(LightingRootCommand.identity("1 100"))
         assertNull(LightingRootCommand.identity("500 0"))
@@ -42,7 +43,7 @@ class LightingRootCommandTest {
                 Thread.sleep(10)
             }
             assertTrue("Actual nested writer must be registered", identities.size >= 2)
-            assertTrue(identities.none { it.pid == ProcessHandle.current().pid() })
+            assertTrue(identities.none { it.pid == selfPid() })
             revoked.writeText("revoked")
             val cancel = ProcessBuilder("sh", "-c", LightingRootCommand.cancel(identities)).start()
             assertTrue(cancel.waitFor(3, TimeUnit.SECONDS))
@@ -54,26 +55,30 @@ class LightingRootCommandTest {
         }
     }
     @Test fun formerBootCannotTargetNewBootProcess() {
-        val child = ProcessBuilder("sh", "-c", "sleep 10").start()
+        val pidFile = Files.createTempFile("led-child", ".pid").toFile()
+        val child = ProcessBuilder("sh", "-c", "echo $$ > '${pidFile.path}'; exec sleep 10").start()
         try {
-            val stat = java.io.File("/proc/${child.pid()}/stat").readText()
+            val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (pidFile.length() == 0L && System.nanoTime() < end) Thread.sleep(10)
+            val childPid = pidFile.readText().trim().toLong()
+            val stat = java.io.File("/proc/${childPid}/stat").readText()
             val start = stat.substringAfterLast(") ").trim().split(Regex("\\s+"))[19].toLong()
             val cancel = ProcessBuilder("sh", "-c", LightingRootCommand.cancel(listOf(
-                LightingRootCommand.Identity(child.pid(), start, "00000000-0000-0000-0000-000000000000")))).start()
+                LightingRootCommand.Identity(childPid, start, "00000000-0000-0000-0000-000000000000")))).start()
             assertTrue(cancel.waitFor(3, TimeUnit.SECONDS))
             assertEquals(0, cancel.exitValue())
             assertTrue(child.isAlive)
-        } finally { child.destroyForcibly() }
+        } finally { child.destroyForcibly(); pidFile.delete() }
     }
     @Test fun pidReuseCannotKillUnrelatedProcess() {
         val stat = java.io.File("/proc/self/stat").readText()
-        val pid = ProcessHandle.current().pid()
+        val pid = selfPid()
         val start = stat.substringAfterLast(") ").trim().split(Regex("\\s+"))[19].toLong()
         val cancel = ProcessBuilder("sh", "-c", LightingRootCommand.cancel(
             listOf(LightingRootCommand.Identity(pid, start + 1,
                 java.io.File("/proc/sys/kernel/random/boot_id").readText().trim())))).start()
         assertTrue(cancel.waitFor(3, TimeUnit.SECONDS))
         assertEquals(0, cancel.exitValue())
-        assertTrue(ProcessHandle.current().isAlive)
+        assertTrue(java.io.File("/proc/${selfPid()}").exists())
     }
 }

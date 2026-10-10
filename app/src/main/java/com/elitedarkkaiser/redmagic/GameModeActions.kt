@@ -319,18 +319,21 @@ internal object GameModeActions {
     fun applyProfileNow(
         profile: GameModeProfile,
         applyFanLed: (String, Int) -> Unit,
-        applyLighting: (() -> Unit) -> Unit
+        applyLighting: (() -> Unit) -> Unit,
+        applyCooling: (() -> Unit) -> Unit
     ) {
-        if (profile.fanEnabled) {
-            HardwareController.setFanLevel(profile.fanLevel)
-        } else {
-            HardwareController.enableFan(false)
-        }
+        applyCooling {
+            if (profile.fanEnabled) {
+                HardwareController.setFanLevel(profile.fanLevel)
+            } else {
+                HardwareController.enableFan(false)
+            }
 
-        if (profile.pumpEnabled) {
-            HardwareController.setPumpProfile(profile.pumpProfile)
-        } else {
-            HardwareController.enablePump(false)
+            if (profile.pumpEnabled) {
+                HardwareController.setPumpProfile(profile.pumpProfile)
+            } else {
+                HardwareController.enablePump(false)
+            }
         }
 
         applyLighting {
