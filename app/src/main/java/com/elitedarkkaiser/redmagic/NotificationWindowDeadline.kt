@@ -114,8 +114,13 @@ internal object NotificationWindowDeadline {
         supersede(c)
         NotificationLightingState.expiresAt = 0L
         NotificationLightingState.windowToken = null
-        ModeTransitionCoordinator.restoreEffectiveOwner(c, reason)
-        if (value != null) retryRecovery(c, value)
+        try {
+            ModeTransitionCoordinator.restoreEffectiveOwner(c, reason)
+        } finally {
+            // Android may reject a service restart or a restoration path may
+            // throw. Retain and rearm recovery even when no receipt returns.
+            if (value != null) retryRecovery(c, value)
+        }
         true
     }
 

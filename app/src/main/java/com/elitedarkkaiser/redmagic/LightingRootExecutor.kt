@@ -118,7 +118,7 @@ internal object LightingRootExecutor {
     private fun cancelWriter(registry: File): Boolean {
         val revoked = File(registry.path + ".revoked")
         if (!runCatching { revoked.writeText("revoked\n") }.isSuccess) return false
-        val lines = runCatching { registry.readLines() }.getOrDefault(emptyList()).filter { it.isNotBlank() }
+        val lines = runCatching { registry.readLines() }.getOrElse { return false }.filter { it.isNotBlank() }
         val identities = lines.mapNotNull(LightingRootCommand::identity)
         if (identities.size != lines.size) return false
         val succeeded = if (identities.isEmpty()) true else runCatching {
