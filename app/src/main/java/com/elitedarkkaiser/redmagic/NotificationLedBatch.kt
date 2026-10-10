@@ -1,42 +1,37 @@
 package com.elitedarkkaiser.redmagic
 
-/** One root invocation: prepare every zone, then replay complete validated vendor sequences. */
+/** NX809J Lights HAL sequence, submitted through one serialized root invocation. */
 internal object NotificationLedBatch {
     data class Zone(val name: String, val effect: String, val color: Int)
+    private val regions = mapOf("logo" to 1, "triggers" to 2, "fan" to 3)
+    private val effects = mapOf("steady" to 2, "breathe" to 3, "flashing" to 4, "rapid" to 10)
+    private val colors = setOf(1, 3, 4, 5, 6, 7, 8, 9)
+    private fun write(region: Int, effect: Int, color: Int): String {
+        val packed = (region shl 24) or (effect shl 12) or color
+        // Matches set_light_aw22xxx: rgb indices 0/1/2, packed effect, cfg=2.
+        return listOf(
+            "printf '0 %x\\n' $region > /sys/class/leds/aw22xxx_led/rgb",
+            "printf '1 %x\\n' $effect > /sys/class/leds/aw22xxx_led/rgb",
+            "printf '2 %x\\n' $color > /sys/class/leds/aw22xxx_led/rgb",
+            "printf '%x\\n' $packed > /sys/class/leds/aw22xxx_led/effect",
+            "printf '2\\n' > /sys/class/leds/aw22xxx_led/cfg"
+        ).joinToString("\n")
+    }
+    fun offCommand(): String = regions.values.joinToString("\n") { write(it, 0, 0) }
     fun command(zones: List<Zone>, stopCooling: Boolean): String? {
         if (zones.isEmpty() || zones.map { it.name }.distinct().size != zones.size) return null
-        val starts = mapOf("triggers" to "80", "fan" to "81", "logo" to "82")
-        val prepared = zones.map { zone ->
-            if (zone.name !in starts) return null
-            LedBrightness.command(zone.name, zone.effect, zone.color, prepareOnly = true) ?: return null
+        val writes = zones.map { zone ->
+            val region = regions[zone.name] ?: return null
+            val effect = effects[zone.effect] ?: return null
+            if (zone.color !in colors) return null
+            write(region, effect, zone.color)
         }
         val dollar = '$'
-        val off = (1..3).joinToString("\n") {
-            "printf '0x${it}000000\\n' > \"${dollar}d/effect\"; printf '1\\n' > \"${dollar}d/cfg\""
-        }
-        val preflight = zones.joinToString("\n") { zone ->
-            """
-            [ "${dollar}(tail -n 1 "${dollar}batch/${zone.name}.pairs")" = '05 ${starts.getValue(zone.name)}' ] || exit 1
-            grep -Eq '^0x[0-9a-fA-F]{7}${dollar}' "${dollar}batch/${zone.name}.effect" || exit 1
-            """.trimIndent()
-        }
-        val loads = zones.joinToString("\n") { zone ->
-            // Preserve controller protocol: the complete final write belongs
-            // to this program and must precede the next program's setup.
-            """
-            cat "${dollar}batch/${zone.name}.effect" > "${dollar}d/effect"
-            while IFS= read -r pair; do printf '%s\n' "${dollar}pair" >&9 || exit 1; done < "${dollar}batch/${zone.name}.pairs"
-            """.trimIndent()
-        }
-        val fanEnable = DeviceCompatibility.Paths.FAN_ENABLE
-        val pumpEnable = DeviceCompatibility.Paths.PUMP_ENABLE
         return """
             (
             set -e
             d=/sys/class/leds/aw22xxx_led
-            [ -w "${dollar}d/reg" ] && [ -w "${dollar}d/effect" ] && [ -w "${dollar}d/cfg" ] || exit 1
-            batch=${dollar}(mktemp -d /data/local/tmp/redmagic-notification.XXXXXX) || exit 1
-            export batch
+            [ -w "${dollar}d/rgb" ] && [ -w "${dollar}d/effect" ] && [ -w "${dollar}d/cfg" ] || exit 1
             started=0
             success=0
             cleanup() {
@@ -44,24 +39,19 @@ internal object NotificationLedBatch {
                 trap - EXIT INT TERM
                 set +e
                 if [ "${dollar}started" = 1 ] && [ "${dollar}success" != 1 ]; then
-                    $off
+                    ${offCommand()}
                 fi
                 if [ "${dollar}started" = 1 ]; then
-                    ${if (stopCooling) "printf '0\\n' > '$fanEnable' || status=1; printf '0\\n' > '$pumpEnable' || status=1" else ":"}
+                    ${if (stopCooling) "printf '0\\n' > '${DeviceCompatibility.Paths.FAN_ENABLE}' || status=1; printf '0\\n' > '${DeviceCompatibility.Paths.PUMP_ENABLE}' || status=1" else ":"}
                 fi
-                rm -rf "${dollar}batch"
                 exit "${dollar}status"
             }
             trap cleanup EXIT
             trap 'exit 130' INT TERM
-            ${prepared.joinToString("\n") { "$it || exit 1" }}
-            $preflight
             started=1
-            $off
-            ${if (zones.any { it.name == "triggers" || it.name == "fan" }) "printf '1\\n' > '$fanEnable'" else ":"}
-            exec 9>"${dollar}d/reg"
-            $loads
-            exec 9>&-
+            ${offCommand()}
+            ${if (zones.any { it.name == "fan" || it.name == "triggers" }) "printf '1\\n' > '${DeviceCompatibility.Paths.FAN_ENABLE}'" else ":"}
+            ${writes.joinToString("\n")}
             success=1
             )
         """.trimIndent()

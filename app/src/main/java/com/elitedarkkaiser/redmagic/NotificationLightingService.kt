@@ -23,6 +23,7 @@ class NotificationLightingService : NotificationListenerService() {
     private var windowTiming: NotificationWindowTiming? = null
     @Volatile private var connectedAtMillis = 0L
     private val seen = LinkedHashSet<String>()
+    private val activeNotifications = LinkedHashSet<String>()
     private val finish = Runnable { endWindow("handler-expiry") }
     private var expiryAlarm: AlarmManager.OnAlarmListener? = null
     private fun scheduleExpiry() {
@@ -98,9 +99,10 @@ class NotificationLightingService : NotificationListenerService() {
             if (!(p.logo || p.triggers || p.fan)) return@post
             val now = SystemClock.elapsedRealtime()
             // An expired-but-not-cleaned window must finish before another alert
-            // can claim ownership. A burst never extends the first deadline.
+            // can claim ownership. Each distinct notification gets its selected duration.
             if (currentKey != null && !NotificationLightingState.isActive()) endWindow("expired-before-post")
-            if (currentKey == null) {
+            run {
+                wakeLock?.let { if (it.isHeld) it.release() }
                 windowTiming = NotificationWindowTiming(now, p.seconds)
                 NotificationLightingState.expiresAt = windowTiming!!.deadline
                 wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
@@ -109,15 +111,16 @@ class NotificationLightingService : NotificationListenerService() {
                 }
             }
             val timing = checkNotNull(windowTiming)
+            activeNotifications.add(sbn.key)
             currentKey = sbn.key
             android.util.Log.i("NotificationLighting", "Apply window seconds=${p.seconds} logo=${p.logo} triggers=${p.triggers} fan=${p.fan} deadline=${NotificationLightingState.expiresAt}")
             scheduleExpiry()
             try {
                 val applied = ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
-                    val effect = LedBrightness.encode(p.brightness,p.effect)
+                    val effect = p.effect
                     val zones = buildList {
-                        if (p.logo) add(NotificationLedBatch.Zone("logo", p.logoState?.effect ?: effect, p.logoState?.color ?: p.color))
-                        if (p.triggers) add(NotificationLedBatch.Zone("triggers", p.triggerState?.effect ?: effect, p.triggerState?.color ?: p.color))
+                        if (p.logo) add(NotificationLedBatch.Zone("logo", effect, p.color))
+                        if (p.triggers) add(NotificationLedBatch.Zone("triggers", effect, p.color))
                         if (p.fan) add(NotificationLedBatch.Zone("fan", effect, p.color))
                     }
                     val stopCooling = !HardwareScreenPolicy.isScreenInteractive(this) &&
@@ -140,7 +143,7 @@ class NotificationLightingService : NotificationListenerService() {
                 }
                 if (firstApplication) {
                     NotificationLightingState.expiresAt = timing.deadline
-                    // Renew once after successful setup, never for later alerts.
+                    // Renew after each distinct alert, matching stock timeout restart.
                     // Total lock budget is bounded by setup + visible duration + cleanup.
                     wakeLock?.acquire((timing.deadline-SystemClock.elapsedRealtime()).coerceAtLeast(1L)+5000L)
                     scheduleExpiry()
@@ -157,7 +160,11 @@ class NotificationLightingService : NotificationListenerService() {
         }
     }
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        worker.post { seen.remove(sbn.key); if (currentKey == sbn.key) endWindow() }
+        worker.post {
+            seen.remove(sbn.key)
+            if (activeNotifications.remove(sbn.key) && activeNotifications.isEmpty())
+                endWindow("all-notifications-removed")
+        }
     }
     private fun endWindow(reason: String = "cancelled") {
         val hadWindow = currentKey != null
@@ -166,9 +173,19 @@ class NotificationLightingService : NotificationListenerService() {
         expiryAlarm?.let { getSystemService(AlarmManager::class.java).cancel(it) }
         expiryAlarm = null
         currentKey = null
+        activeNotifications.clear()
         windowTiming = null
         NotificationLightingState.expiresAt = 0L
-        try { if (hadWindow) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended") }
+        try {
+            if (hadWindow) {
+                if (!LedScreenPolicy.isScreenInteractive(this) &&
+                    !ChargingLedState.isChargingNow(this) && !CallLightingState.isActive(this)) {
+                    if (!HardwareController.turnOffNotificationLeds())
+                        android.util.Log.e("NotificationLighting", "Stock notification shutdown failed")
+                }
+                ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended")
+            }
+        }
         catch (e: Exception) { android.util.Log.e("NotificationLighting", "Restoration failed", e) }
         finally { wakeLock?.let { if (it.isHeld) it.release() }; wakeLock = null }
     }
