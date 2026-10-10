@@ -23,7 +23,7 @@ class NotificationLightingService : NotificationListenerService() {
     private var windowTiming: NotificationWindowTiming? = null
     @Volatile private var connectedAtMillis = 0L
     private val seen = LinkedHashSet<String>()
-    private val activeNotifications = LinkedHashSet<String>()
+    private val windowNotificationKeys = LinkedHashSet<String>()
     private val finish = Runnable { endWindow("handler-expiry") }
     private var expiryAlarm: AlarmManager.OnAlarmListener? = null
     private fun scheduleExpiry() {
@@ -111,7 +111,7 @@ class NotificationLightingService : NotificationListenerService() {
                 }
             }
             val timing = checkNotNull(windowTiming)
-            activeNotifications.add(sbn.key)
+            windowNotificationKeys.add(sbn.key)
             currentKey = sbn.key
             android.util.Log.i("NotificationLighting", "Apply window seconds=${p.seconds} logo=${p.logo} triggers=${p.triggers} fan=${p.fan} deadline=${NotificationLightingState.expiresAt}")
             scheduleExpiry()
@@ -162,7 +162,7 @@ class NotificationLightingService : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         worker.post {
             seen.remove(sbn.key)
-            if (activeNotifications.remove(sbn.key) && activeNotifications.isEmpty())
+            if (windowNotificationKeys.remove(sbn.key) && windowNotificationKeys.isEmpty())
                 endWindow("all-notifications-removed")
         }
     }
@@ -173,7 +173,7 @@ class NotificationLightingService : NotificationListenerService() {
         expiryAlarm?.let { getSystemService(AlarmManager::class.java).cancel(it) }
         expiryAlarm = null
         currentKey = null
-        activeNotifications.clear()
+        windowNotificationKeys.clear()
         windowTiming = null
         NotificationLightingState.expiresAt = 0L
         try {
