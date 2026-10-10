@@ -834,10 +834,12 @@ Top-trigger intent unlock already exists under Trigger Safety; two to four top t
 
 ### Stock NX809J notification lighting
 
-Notification LEDs use the supplied NX809J stock Lights HAL command order: three separate rgb writes (region, effect, color), then the packed effect and cfg=2. All selected zones are submitted in one serialized root command. Shutdown uses the same stock sequence with zero effect/color. Firmware patching and register replay are no longer used for notifications.
+Notification LEDs use the supplied NX809J stock Lights HAL command order: three separate rgb writes (region, effect, color), then the packed effect and cfg=2. All selected zones are submitted in one serialized root command. Startup retains the stock HAL sequence. Expiry uses the same ownership-locked turnOffAllLeds path as screen-off receivers, with zone/off effect followed by cfg=1; no separate rgb/cfg=2 shutdown is inserted. Firmware patching and register replay are no longer used for notifications.
 
 The notification editor offers common preset color/effect, zone checkboxes and 3/5/10/15/30-second duration. Notification brightness and split controls are removed; older saved profiles retain their data but those overrides are ignored by notifications until saving a stock profile. Other lighting editors retain brightness and split settings.
 
 New distinct notifications restart the selected duration; updates to an already seen notification key do not. The selected visible duration starts after successful application, with a separate bounded setup deadline. A bounded partial wake lock and elapsed-realtime listener alarm handle expiry without waking the display. Unlike stock system_server, the app does not have privileged exact-idle alarm access; listener reconnection remains process-death recovery. Charging/call ownership and screen-off cooling safety remain enforced. Hot cooling continues; LED shutdown itself never writes fan or pump power.
 
 Validation: stock command-order and rejection tests cover separate rgb writes, cfg=2 and power-free shutdown. CI and phone validation for this revision are pending. Phone checks: Messenger orange Breathe, all zones, ten seconds; immediate start and expiry while locked; duplicate update versus distinct back-to-back notification; charging/call preemption; wake restoration; hot-phone fan/pump cooling.
+
+Device feedback: stock startup was confirmed almost immediate. Ten-second shutdown failed on that revision. The follow-up removes the separate HAL off path and routes expiry solely through the proven screen-off restoration/shutdown path. Device verification of the follow-up is pending.

@@ -326,9 +326,6 @@ object HardwareController {
         return execHardwareWrite("led_control", enable + commands, rootSession)
     }
 
-    internal fun turnOffNotificationLeds(): Boolean =
-        execHardwareWrite("led_control", NotificationLedBatch.offCommand())
-
     fun turnOffAllLeds(
         rootSession: RootShell.Session? = null
     ): Boolean {

@@ -176,16 +176,9 @@ class NotificationLightingService : NotificationListenerService() {
         windowNotificationKeys.clear()
         windowTiming = null
         NotificationLightingState.expiresAt = 0L
-        try {
-            if (hadWindow) {
-                if (!LedScreenPolicy.isScreenInteractive(this) &&
-                    !ChargingLedState.isChargingNow(this) && !CallLightingState.isActive(this)) {
-                    if (!HardwareController.turnOffNotificationLeds())
-                        android.util.Log.e("NotificationLighting", "Stock notification shutdown failed")
-                }
-                ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended")
-            }
-        }
+        // The same transition used by screen-off receivers selects call/charging
+        // or invokes turnOffAllLeds under the profile lock. No separate HAL off.
+        try { if (hadWindow) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended") }
         catch (e: Exception) { android.util.Log.e("NotificationLighting", "Restoration failed", e) }
         finally { wakeLock?.let { if (it.isHeld) it.release() }; wakeLock = null }
     }
