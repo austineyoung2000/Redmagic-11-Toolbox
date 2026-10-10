@@ -20,6 +20,7 @@ class NotificationLightingService : NotificationListenerService() {
     private lateinit var worker: Handler
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentKey: String? = null
+    private var windowTiming: NotificationWindowTiming? = null
     @Volatile private var connectedAtMillis = 0L
     private val seen = LinkedHashSet<String>()
     private val finish = Runnable { endWindow("handler-expiry") }
@@ -100,17 +101,19 @@ class NotificationLightingService : NotificationListenerService() {
             // can claim ownership. A burst never extends the first deadline.
             if (currentKey != null && !NotificationLightingState.isActive()) endWindow("expired-before-post")
             if (currentKey == null) {
-                NotificationLightingState.expiresAt = now + p.seconds * 1000L
+                windowTiming = NotificationWindowTiming(now, p.seconds)
+                NotificationLightingState.expiresAt = windowTiming!!.deadline
                 wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
                     PowerManager.PARTIAL_WAKE_LOCK,"Redmagic:NotificationLighting").apply {
-                    setReferenceCounted(false); acquire(p.seconds * 1000L + 5000L)
+                    setReferenceCounted(false); acquire(NotificationWindowTiming.SETUP_LIMIT_MS + 5000L)
                 }
             }
+            val timing = checkNotNull(windowTiming)
             currentKey = sbn.key
             android.util.Log.i("NotificationLighting", "Apply window seconds=${p.seconds} logo=${p.logo} triggers=${p.triggers} fan=${p.fan} deadline=${NotificationLightingState.expiresAt}")
             scheduleExpiry()
             try {
-                ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
+                val applied = ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
                     val effect = LedBrightness.encode(p.brightness,p.effect)
                     val zones = buildList {
                         if (p.logo) add(NotificationLedBatch.Zone("logo", p.logoState?.effect ?: effect, p.logoState?.color ?: p.color))
@@ -125,12 +128,31 @@ class NotificationLightingService : NotificationListenerService() {
                     if (!success) throw IllegalStateException("Coordinated notification LED application failed")
 
                 }
+                if (!applied || LedScreenPolicy.isScreenInteractive(this) ||
+                    ChargingLedState.isChargingNow(this) || CallLightingState.isActive(this)) {
+                    endWindow("ownership-changed-during-apply")
+                    return@post
+                }
+                val firstApplication = !timing.applied
+                if (!timing.markApplied(SystemClock.elapsedRealtime())) {
+                    endWindow("application-deadline-exceeded")
+                    return@post
+                }
+                if (firstApplication) {
+                    NotificationLightingState.expiresAt = timing.deadline
+                    // Renew once after successful setup, never for later alerts.
+                    // Total lock budget is bounded by setup + visible duration + cleanup.
+                    wakeLock?.acquire((timing.deadline-SystemClock.elapsedRealtime()).coerceAtLeast(1L)+5000L)
+                    scheduleExpiry()
+                    android.util.Log.i("NotificationLighting", "Visible window started seconds=${p.seconds} deadline=${timing.deadline}")
+                }
             } catch (e: Exception) {
                 android.util.Log.e("NotificationLighting", "Notification profile failed", e)
+                endWindow("application-failed")
             } finally {
                 // Slow profile/root writes must not leave an already-expired
                 // profile lit or start a fresh full-duration timer afterward.
-                if (!NotificationLightingState.isActive()) endWindow("expired-during-apply")
+                if (currentKey != null && !NotificationLightingState.isActive()) endWindow("expired-during-apply")
             }
         }
     }
@@ -144,6 +166,7 @@ class NotificationLightingService : NotificationListenerService() {
         expiryAlarm?.let { getSystemService(AlarmManager::class.java).cancel(it) }
         expiryAlarm = null
         currentKey = null
+        windowTiming = null
         NotificationLightingState.expiresAt = 0L
         try { if (hadWindow) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended") }
         catch (e: Exception) { android.util.Log.e("NotificationLighting", "Restoration failed", e) }
