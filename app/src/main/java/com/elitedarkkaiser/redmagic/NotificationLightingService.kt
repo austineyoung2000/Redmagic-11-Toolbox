@@ -187,12 +187,25 @@ class NotificationLightingService : NotificationListenerService() {
     private fun endWindow(reason: String = "cancelled") {
         val token = windowToken
         android.util.Log.i("NotificationLighting", "End reason=$reason hadWindow=${token != null}")
+        // Keep CPU awake through the bounded physical handoff, not merely
+        // through the visible timer. Releasing before root cleanup could let
+        // screen-off suspend postpone the actual all-off writes.
+        val cleanupWake = if (token != null) {
+            (wakeLock ?: (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK, "Redmagic:NotificationHandoff")).apply {
+                setReferenceCounted(false)
+                acquire(25_000L)
+            }
+        } else null
+        if (cleanupWake != null) wakeLock = null
         releaseWindowFields()
         try {
             if (token != null && !NotificationWindowDeadline.finish(this, token, reason))
                 NotificationWindowDeadline.reconcileReleased(this, "$reason-stale-local-window")
         } catch (e: Exception) {
             android.util.Log.e("NotificationLighting", "Restoration failed", e)
+        } finally {
+            cleanupWake?.let { if (it.isHeld) it.release() }
         }
     }
     override fun onListenerConnected() {
