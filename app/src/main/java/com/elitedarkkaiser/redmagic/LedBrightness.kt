@@ -168,7 +168,7 @@ internal object LedBrightness {
                 }
                 for (i=0; i<n; i+=2) printf "%02x %02x\n", b[i], b[i+1]
             }' "${'$'}tmp/bytes" > "${'$'}tmp/pairs"
-            ${if (prepareOnly) "cp \"${'$'}tmp/pairs\" \"${'$'}batch/$zone.pairs\"" else """
+            ${if (prepareOnly) "cp \"${'$'}tmp/pairs\" \"${'$'}batch/$zone.pairs\"; printf '$effectValue\\n' > \"${'$'}batch/$zone.effect\"" else """
             printf '$effectValue\n' > "${'$'}d/effect"
             exec 9>"${'$'}d/reg"
             while IFS= read -r pair; do printf '%s\n' "${'$'}pair" >&9 || exit 1; done < "${'$'}tmp/pairs"

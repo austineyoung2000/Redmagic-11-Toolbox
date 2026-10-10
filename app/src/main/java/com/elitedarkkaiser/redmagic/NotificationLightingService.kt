@@ -65,6 +65,7 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.i("NotificationLighting", "Listener service created")
         thread = HandlerThread("NotificationLighting").apply { start() }
         worker = Handler(thread.looper)
         ContextCompat.registerReceiver(this, receiver, IntentFilter().apply {
@@ -73,11 +74,21 @@ class NotificationLightingService : NotificationListenerService() {
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.postTime <= connectedAtMillis || sbn.packageName == packageName || sbn.isOngoing ||
-            sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val ignored = when {
+            sbn.postTime <= connectedAtMillis -> "old-or-replayed"
+            sbn.packageName == packageName -> "own-app"
+            sbn.isOngoing -> "ongoing"
+            sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0 -> "group-summary"
+            else -> null
+        }
+        android.util.Log.i("NotificationLighting", "Notification callback filter=${ignored ?: "eligible"}")
+        if (ignored != null) return
         worker.post {
             // Updates to the same notification do not extend its lighting window.
-            if (!seen.add(sbn.key)) return@post
+            if (!seen.add(sbn.key)) {
+                android.util.Log.i("NotificationLighting", "Skipped duplicate notification update")
+                return@post
+            }
             if (seen.size > 256) seen.remove(seen.first())
             if (!DeviceCompatibility.isSupportedDevice() || !NotificationLightingState.enabled(this) ||
                 LedScreenPolicy.isScreenInteractive(this) || ChargingLedState.isChargingNow(this) ||
@@ -140,6 +151,7 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onListenerConnected() {
         super.onListenerConnected()
+        android.util.Log.i("NotificationLighting", "Listener connected")
         // Replayed notifications belong to the old session, not a new alert.
         connectedAtMillis = System.currentTimeMillis()
         val existingKeys = runCatching { activeNotifications.orEmpty().map { it.key } }.getOrDefault(emptyList())

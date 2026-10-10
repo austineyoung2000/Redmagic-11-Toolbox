@@ -1,6 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
-/** One root invocation: validate every program, stage every zone, then release starts together. */
+/** One root invocation: prepare every zone, then replay complete validated vendor sequences. */
 internal object NotificationLedBatch {
     data class Zone(val name: String, val effect: String, val color: Int)
     fun command(zones: List<Zone>, stopCooling: Boolean): String? {
@@ -15,17 +15,19 @@ internal object NotificationLedBatch {
             "printf '0x${it}000000\\n' > \"${dollar}d/effect\"; printf '1\\n' > \"${dollar}d/cfg\""
         }
         val preflight = zones.joinToString("\n") { zone ->
-            // Exact firmware hashes are checked by each renderer. Check the
-            // final activation pair too before separating it from the program.
             """
             [ "${dollar}(tail -n 1 "${dollar}batch/${zone.name}.pairs")" = '05 ${starts.getValue(zone.name)}' ] || exit 1
-            sed '${dollar}d' "${dollar}batch/${zone.name}.pairs" > "${dollar}batch/${zone.name}.load"
+            grep -Eq '^0x[0-9a-fA-F]{7}${dollar}' "${dollar}batch/${zone.name}.effect" || exit 1
             """.trimIndent()
         }
         val loads = zones.joinToString("\n") { zone ->
-            "while IFS= read -r pair; do printf '%s\\n' \"${dollar}pair\" >&9 || exit 1; done < \"${dollar}batch/${zone.name}.load\""
+            // Preserve controller protocol: the complete final write belongs
+            // to this program and must precede the next program's setup.
+            """
+            cat "${dollar}batch/${zone.name}.effect" > "${dollar}d/effect"
+            while IFS= read -r pair; do printf '%s\n' "${dollar}pair" >&9 || exit 1; done < "${dollar}batch/${zone.name}.pairs"
+            """.trimIndent()
         }
-        val release = zones.joinToString("\n") { zone -> "printf '05 ${starts.getValue(zone.name)}\\n' >&9 || exit 1" }
         val fanEnable = DeviceCompatibility.Paths.FAN_ENABLE
         val pumpEnable = DeviceCompatibility.Paths.PUMP_ENABLE
         return """
@@ -59,7 +61,6 @@ internal object NotificationLedBatch {
             ${if (zones.any { it.name == "triggers" || it.name == "fan" }) "printf '1\\n' > '$fanEnable'" else ":"}
             exec 9>"${dollar}d/reg"
             $loads
-            $release
             exec 9>&-
             success=1
             )

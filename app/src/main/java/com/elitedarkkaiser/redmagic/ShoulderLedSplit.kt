@@ -110,7 +110,7 @@ internal object ShoulderLedSplit {
             }
             END { if (bad || n!=${program.size} || changed!=${program.starts.size * 3}) exit 1 }
             ' "${'$'}tmp/bytes" > "${'$'}tmp/pairs"
-            ${if (prepareOnly) "cp \"${'$'}tmp/pairs\" \"${'$'}batch/triggers.pairs\"" else """
+            ${if (prepareOnly) "cp \"${'$'}tmp/pairs\" \"${'$'}batch/triggers.pairs\"; printf '$effect\\n' > \"${'$'}batch/triggers.effect\"" else """
             started=1
             printf '$effect\n' > "${'$'}d/effect"
             while read -r reg value; do

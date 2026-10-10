@@ -10,15 +10,18 @@ class NotificationLedBatchTest {
     private val zones = listOf("logo", "triggers", "fan").map {
         NotificationLedBatch.Zone(it, LedBrightness.encode(128, "breathe"), 3)
     }
-    @Test fun allProgramsLoadBeforeAnyFinalActivationAndCoolingStopsInSameCommand() = withDevice { dir ->
+    @Test fun completeVendorProtocolsReplayInOrderAndCoolingStopsInSameCommand() = withDevice { dir ->
         val result = execute(rendered(dir, true), dir)
         assertEquals(result.second, 0, result.first)
         val lines = dir.resolve("device/reg").toFile().readLines()
-        assertEquals(listOf("05 82", "05 80", "05 81"), lines.takeLast(3))
-        assertFalse(lines.dropLast(3).any { it in listOf("05 80", "05 81", "05 82") })
+        assertEquals("05 82", lines[396 / 2 - 1])
+        assertEquals("05 80", lines[396 - 1])
+        assertEquals("05 81", lines.last())
+        assertEquals(listOf("05 82", "05 80", "05 81"),
+            lines.filter { it in listOf("05 80", "05 81", "05 82") })
         assertEquals((396 + 396 + 256) / 2, lines.size)
-        // No per-zone on-effect requests: only the initial common shutdown.
-        assertEquals("0x3000000\n", dir.resolve("device/effect").toFile().readText())
+        // Effect selection is necessary controller setup, not a cfg reload.
+        assertEquals("0x3003007\n", dir.resolve("device/effect").toFile().readText())
         assertEquals("0\n", dir.resolve("fan_enable").toFile().readText())
         assertEquals("0\n", dir.resolve("pump_enable").toFile().readText())
         assertTrue(dir.resolve("temp").toFile().listFiles()!!.isEmpty())
