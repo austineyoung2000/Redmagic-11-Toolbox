@@ -6,7 +6,7 @@ import android.content.Context
  * Serializes complete LED-profile transitions across every
  * feature that can own the same physical LEDs.
  *
- * RootShell already serializes individual commands. This
+ * The dedicated lighting channel serializes individual commands. This
  * coordinator operates one level higher so complete profiles
  * cannot interleave with another mode's profile.
  */
@@ -158,11 +158,13 @@ object ModeTransitionCoordinator {
                     context
                 )
             ) {
-                GameModeActions
-                    .startServiceSilentlyIfPermitted(
-                        context
-                    )
-                return
+                if (PermissionActions.hasUsageStatsPermission(context)) {
+                    GameModeActions.startServiceSilentlyIfPermitted(context)
+                    return
+                }
+                // Revoked Usage Access cannot leave a persisted game override
+                // blocking ordinary restoration indefinitely.
+                setGameModeLedOverrideActiveStorage(context, false)
             }
 
             if (RgbStudioStorage.isEnabled(context)) {

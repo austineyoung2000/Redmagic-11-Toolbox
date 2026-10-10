@@ -15,6 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 class GameModeService : Service() {
 
     companion object {
+        // A persisted override flag is not foreground evidence after process death.
+        @Volatile private var selectedForegroundPackage: String? = null
+        internal fun hasSelectedForegroundGame(): Boolean = selectedForegroundPackage != null
+
         const val EXTRA_APPLY_SAVED_PROFILE =
             "apply_saved_game_mode_profile"
         const val EXTRA_CONTINUE_AFTER_APPLY =
@@ -49,6 +53,7 @@ class GameModeService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
+            if (action == Intent.ACTION_SCREEN_OFF) selectedForegroundPackage = null
 
             handler.post {
                 if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
@@ -102,6 +107,7 @@ class GameModeService : Service() {
             try {
                 val currentPkg = getForegroundPackageName()
                 val tracked = getSavedGamePackagesStorage(this@GameModeService)
+                selectedForegroundPackage = currentPkg?.takeIf { tracked.contains(it) }
 
                 if (!currentPkg.isNullOrBlank() && tracked.contains(currentPkg)) {
                     if (gameModeActiveFor != currentPkg) {
@@ -177,6 +183,7 @@ class GameModeService : Service() {
         startId: Int
     ): Int {
         val pkg = intent?.getStringExtra("foreground_pkg")
+        if (!pkg.isNullOrBlank()) selectedForegroundPackage = pkg.takeIf { getSavedGamePackagesStorage(this).contains(it) }
         val applySavedProfile =
             intent?.getBooleanExtra(
                 EXTRA_APPLY_SAVED_PROFILE,
@@ -246,6 +253,7 @@ class GameModeService : Service() {
                 // An explicit profile application cannot claim LEDs without a
                 // selected foreground game, or interrupt a higher owner.
                 val foreground = getForegroundPackageName()
+                selectedForegroundPackage = foreground?.takeIf { getSavedGamePackagesStorage(this).contains(it) }
                 if (foreground != null && getSavedGamePackagesStorage(this).contains(foreground)) {
                     ModeTransitionCoordinator.applyLedProfile(this, LedOwner.GAME_MODE,
                         "saved-game-profile", force = true, block = block)
@@ -293,6 +301,7 @@ class GameModeService : Service() {
         ) return
 
         val tracked = getSavedGamePackagesStorage(this)
+        selectedForegroundPackage = currentPkg.takeIf { tracked.contains(it) }
         handler.removeCallbacks(pollRunnable)
 
         if (!tracked.contains(currentPkg)) {
@@ -385,6 +394,7 @@ class GameModeService : Service() {
 
         /* Clear ownership before restoring so re-entrant cleanup cannot run
          * the same hardware restoration twice. */
+        selectedForegroundPackage = null
         gameModeActiveFor = null
         gameModeApplyPendingFor = null
 
@@ -535,7 +545,7 @@ class GameModeService : Service() {
                 shoulderLedColor
             ).joinToString("|")
 
-            ModeTransitionCoordinator.applyLedProfile(
+            val applied = ModeTransitionCoordinator.applyLedProfile(
                 context = this@GameModeService,
                 owner = LedOwner.GAME_MODE,
                 signature = ledSignature
@@ -607,7 +617,7 @@ class GameModeService : Service() {
                 )
             }
 
-            gameModeApplyPendingFor = null
+            gameModeApplyPendingFor = if (applied) null else pkg
         }
 
         applyOnce("now")

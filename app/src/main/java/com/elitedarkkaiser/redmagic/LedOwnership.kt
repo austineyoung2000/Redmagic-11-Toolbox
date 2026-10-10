@@ -18,7 +18,7 @@ object LedOwnership {
             incomingCall = CallLightingState.isEnabled(context) && CallLightingState.isRingingNow(context),
             charging = ChargingLedState.isEnabled(context) && ChargingLedState.isChargingNow(context),
             notification = NotificationLightingState.isEligible(context),
-            game = isGameModeLedOverrideActiveStorage(context),
+            game = isGameModeLedOverrideActiveStorage(context) && GameModeService.hasSelectedForegroundGame(),
             rgbStudio = RgbStudioStorage.isEnabled(context),
             screenInteractive = LedScreenPolicy.isScreenInteractive(context)
         )
