@@ -51,17 +51,17 @@ object HardwareController {
         val checkedCommand = if (resource == "led_control" && !command.contains("set -e"))
             "( set -e; $command )" else command
         val succeeded = rootSession?.exec(checkedCommand) ?: RootShell.exec(checkedCommand)
+        // Even a failed script may already have changed cooling power before
+        // a later LED write failed. Invalidate those receipts on every attempt.
+        if (resource == "led_control" && command.contains(FAN_ENABLE)) {
+            recentHardwareWrites.remove("fan_control")
+            DashboardSnapshot.invalidateHardwareCache()
+        }
+        if (resource == "led_control" && command.contains(PUMP_ENABLE)) {
+            recentHardwareWrites.remove("pump_control")
+            DashboardSnapshot.invalidateHardwareCache()
+        }
         if (succeeded) {
-            // Fan/trigger LED programs also write the fan-enable node.
-            // A cached fan-off write is no longer valid after that side effect.
-            if (resource == "led_control" && command.contains(FAN_ENABLE)) {
-                recentHardwareWrites.remove("fan_control")
-                DashboardSnapshot.invalidateHardwareCache()
-            }
-            if (resource == "led_control" && command.contains(PUMP_ENABLE)) {
-                recentHardwareWrites.remove("pump_control")
-                DashboardSnapshot.invalidateHardwareCache()
-            }
             if (
                 resource == "fan_control" ||
                 resource == "pump_control"
