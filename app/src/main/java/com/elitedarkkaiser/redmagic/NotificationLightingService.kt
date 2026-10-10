@@ -21,6 +21,7 @@ class NotificationLightingService : NotificationListenerService() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentKey: String? = null
     private var windowTiming: NotificationWindowTiming? = null
+    private var appliedZones: List<NotificationLedBatch.Zone>? = null
     @Volatile private var connectedAtMillis = 0L
     private val notificationSession = NotificationSessionDeduplicator()
     private val windowNotificationKeys = LinkedHashSet<String>()
@@ -123,12 +124,17 @@ class NotificationLightingService : NotificationListenerService() {
                         if (p.triggers) add(NotificationLedBatch.Zone("triggers", effect, p.color))
                         if (p.fan) add(NotificationLedBatch.Zone("fan", effect, p.color))
                     }
-                    val stopCooling = !HardwareScreenPolicy.isScreenInteractive(this) &&
-                        !HardwareScreenPolicy.coolingAllowedWhileScreenOff(HardwareScreenPolicy.currentTempF())
-                    val startedAt = SystemClock.elapsedRealtime()
-                    val success = HardwareController.applyNotificationLeds(zones, stopCooling)
-                    android.util.Log.i("NotificationLighting", "Batch zones=${zones.map { it.name }} writeSucceeded=$success elapsedMs=${SystemClock.elapsedRealtime()-startedAt} coolingStopped=$stopCooling")
-                    if (!success) throw IllegalStateException("Coordinated notification LED application failed")
+                    if (NotificationProfileReplayPolicy.shouldWrite(appliedZones, zones)) {
+                        val stopCooling = !HardwareScreenPolicy.isScreenInteractive(this) &&
+                            !HardwareScreenPolicy.coolingAllowedWhileScreenOff(HardwareScreenPolicy.currentTempF())
+                        val startedAt = SystemClock.elapsedRealtime()
+                        val success = HardwareController.applyNotificationLeds(zones, stopCooling)
+                        android.util.Log.i("NotificationLighting", "Batch zones=${zones.map { it.name }} writeSucceeded=$success elapsedMs=${SystemClock.elapsedRealtime()-startedAt} coolingStopped=$stopCooling")
+                        if (!success) throw IllegalStateException("Coordinated notification LED application failed")
+                        appliedZones = zones
+                    } else {
+                        android.util.Log.i("NotificationLighting", "Matching active notification output; restart timer without reprogramming LEDs")
+                    }
 
                 }
                 if (!applied || LedScreenPolicy.isScreenInteractive(this) ||
@@ -175,6 +181,7 @@ class NotificationLightingService : NotificationListenerService() {
         currentKey = null
         windowNotificationKeys.clear()
         windowTiming = null
+        appliedZones = null
         NotificationLightingState.expiresAt = 0L
         // The same transition used by screen-off receivers selects call/charging
         // or invokes turnOffAllLeds under the profile lock. No separate HAL off.

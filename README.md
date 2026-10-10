@@ -847,3 +847,7 @@ Device feedback: stock startup was confirmed almost immediate. Ten-second shutdo
 ### Repeated screen-off notification sessions
 
 Device testing confirmed immediate startup and ten-second expiry on 50dd42d. Notification-ID deduplication previously survived screen wake, so Messenger could reuse a key and be ignored until a process restart. Deduplication now resets on screen-on, and awake, charging, call-preempted or unconfigured callbacks do not consume an eligible alert. Duplicate updates remain suppressed within the same screen-off session. Listener reconnection still seeds existing keys to suppress replay. Startup, expiry commands and cooling policy are unchanged. Validate several lock/message/expiry/unlock cycles without rebooting.
+
+### Overlapping notification output
+
+Matching active notification presets now restart the selected timer without submitting another full LED batch, following stock unchanged-output suppression. The previous code forced an all-zone clear/reload for every distinct notification, including simultaneous friends using the same Messenger preset. Output identity uses the actual preset color, effect and selected zones; a different output still applies through the existing coordinator. The identity clears on expiry/wake/removal/disconnect, so a later screen-off window still executes its normal startup. Hardware start/stop command files are unchanged. Overlapping-message phone validation remains pending.
