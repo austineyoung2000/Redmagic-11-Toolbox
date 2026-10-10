@@ -41,6 +41,8 @@ internal object BootDiagnostics {
         appendLine("User unlocked: ${context.getSystemService(UserManager::class.java)?.isUserUnlocked}")
         appendLine("Screen awake: ${LedScreenPolicy.isScreenInteractive(context)}")
         appendLine("LED owner: ${LedOwnership.current(context)}")
+        appendLine("LED root safety: ${LightingRootExecutor.status()}")
+        appendLine("Notification deadline: ${NotificationWindowDeadline.status(context)}")
         appendLine("Auto fan configured: ${isAutoFanEnabledStorage(context)}")
         appendLine("Auto pump configured: ${savedPumpStateStorage(context).autoEnabled}")
         appendLine("RGB Studio configured: ${RgbStudioStorage.isEnabled(context)}")
@@ -57,6 +59,7 @@ internal object BootDiagnostics {
         if (services.isEmpty()) appendLine("No services visible to ActivityManager.")
         services.forEach { appendLine("${it.service.shortClassName}: pid=${it.pid}, started=${it.started}, foreground=${it.foreground}") }
         appendLine("\nROOT BOOT HELPER — latest attempt; may be from a previous boot")
-        appendLine(RootShell.execForOutput("if [ -f /data/adb/redmagic_trigger_bridge/toolbox-boot.log ]; then tail -n 120 /data/adb/redmagic_trigger_bridge/toolbox-boot.log; else echo 'Boot helper log not present'; fi") ?: "Root read unavailable or failed.")
+        LightingRootExecutor.initialize(context)
+        appendLine(LightingRootExecutor.output("if [ -f /data/adb/redmagic_trigger_bridge/toolbox-boot.log ]; then tail -n 120 /data/adb/redmagic_trigger_bridge/toolbox-boot.log; else echo 'Boot helper log not present'; fi") ?: "Root read unavailable or failed.")
     }
 }

@@ -5,6 +5,19 @@ import org.junit.Test
 import java.nio.file.Files
 
 class LedWriteReceiptTest {
+    @Test fun changedOwnerOrFailedWriteStopsSubsequentZoneWrites() {
+        var eligible = true
+        assertFalse(LedWriteReceipt.capture(stillEligible = { eligible }) {
+            assertTrue(LedWriteReceipt.canWrite())
+            eligible = false
+            assertFalse(LedWriteReceipt.canWrite())
+        })
+        assertFalse(LedWriteReceipt.capture {
+            LedWriteReceipt.record(false)
+            assertFalse(LedWriteReceipt.canWrite())
+        })
+    }
+
     @Test fun laterSuccessCannotHideFailedZone() {
         assertFalse(LedWriteReceipt.capture {
             LedWriteReceipt.record(false)

@@ -20,6 +20,8 @@ object ModeTransitionCoordinator {
     private var lastOwner: LedOwner? = null
     private var lastSignature: String? = null
 
+    internal fun <T> withLightingLock(block: () -> T): T = synchronized(transitionLock, block)
+
     fun applyLedProfile(
         context: Context,
         owner: LedOwner,
@@ -28,6 +30,7 @@ object ModeTransitionCoordinator {
         block: () -> Unit
     ): Boolean {
         return synchronized(transitionLock) {
+            LightingRootExecutor.initialize(context)
             val effectiveOwner =
                 LedOwnership.current(context)
 
@@ -68,7 +71,9 @@ object ModeTransitionCoordinator {
                 return@synchronized false
             }
 
-            val succeeded = runCatching { LedWriteReceipt.capture(block) }
+            if (owner != LedOwner.NOTIFICATION) NotificationWindowDeadline.supersede(context)
+            val succeeded = runCatching { LedWriteReceipt.capture(
+                stillEligible = { ownerCanApply(owner, LedOwnership.current(context)) }, block = block) }
                 .onFailure { android.util.Log.e(TAG, "Profile write threw owner=$owner", it) }
                 .getOrDefault(false)
             val ownerAfterWrite = LedOwnership.current(context)
@@ -91,6 +96,7 @@ object ModeTransitionCoordinator {
 
             lastOwner = owner
             lastSignature = signature
+            if (owner != LedOwner.NOTIFICATION) NotificationWindowDeadline.acknowledgeHandoff(context)
 
             android.util.Log.i(
                 TAG,
@@ -109,10 +115,12 @@ object ModeTransitionCoordinator {
         reason: String
     ) {
         synchronized(transitionLock) {
+            LightingRootExecutor.initialize(context)
             lastOwner = null
             lastSignature = null
 
             if (CallLightingState.isEnabled(context) && CallLightingState.isRingingNow(context)) {
+                NotificationWindowDeadline.supersede(context)
                 HardwareServiceActions.startCallLighting(context)
                 return
             }
@@ -121,6 +129,7 @@ object ModeTransitionCoordinator {
                 ChargingLedState.isEnabled(context) &&
                 ChargingLedState.isChargingNow(context)
             ) {
+                NotificationWindowDeadline.supersede(context)
                 ChargingLedState.setActive(
                     context,
                     true
@@ -135,11 +144,12 @@ object ModeTransitionCoordinator {
             ChargingLedState.setActive(context, false)
             CallLightingState.setActive(context, false)
             if (NotificationLightingState.isEligible(context)) return
+            NotificationWindowDeadline.supersede(context)
             NotificationLightingState.expiresAt = 0L
 
             if (!LedScreenPolicy.isScreenInteractive(context)) {
                 // Shutdown bypasses stale ownership, including RGB Studio.
-                shutdownLeds(reason)
+                if (shutdownLeds(reason)) NotificationWindowDeadline.acknowledgeHandoff(context)
                 return
             }
 
@@ -191,13 +201,14 @@ object ModeTransitionCoordinator {
         }
     }
 
-    private fun shutdownLeds(reason: String) {
+    private fun shutdownLeds(reason: String): Boolean {
         // Retry once, still under the transition lock, with the same proven
         // shutdown commands. Cooling nodes are never part of this operation.
         var succeeded = HardwareController.turnOffAllLeds()
         if (!succeeded) succeeded = HardwareController.turnOffAllLeds()
         if (succeeded) android.util.Log.i(TAG, "LED shutdown acknowledged reason=$reason")
         else android.util.Log.e(TAG, "LED shutdown failed reason=$reason")
+        return succeeded
     }
 
     private fun ownerCanApply(requested: LedOwner, effective: LedOwner): Boolean =

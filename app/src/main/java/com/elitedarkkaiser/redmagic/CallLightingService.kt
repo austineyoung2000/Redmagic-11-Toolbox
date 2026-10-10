@@ -27,6 +27,9 @@ class CallLightingService : Service() {
 
     private lateinit var workerThread: HandlerThread
     private lateinit var handler: Handler
+    private lateinit var coolingThread: HandlerThread
+    private lateinit var coolingHandler: Handler
+    @Volatile private var stopping = false
 
     private val callStateLock = Any()
     private var pendingCallState =
@@ -50,7 +53,7 @@ class CallLightingService : Service() {
 
     private val fanPauseRunnable = Runnable {
         if (
-            CallLightingState.isActive(this) &&
+            !stopping && CallLightingState.isRingingNow(this) &&
             CallLightingState.shouldPauseFanDuringCalls(this)
         ) {
             HardwareServiceActions.stopAutoFan(this)
@@ -88,6 +91,8 @@ class CallLightingService : Service() {
             start()
         }
         handler = Handler(workerThread.looper)
+        coolingThread = HandlerThread("RedMagicCallCooling").apply { start() }
+        coolingHandler = Handler(coolingThread.looper)
 
         telephonyManager =
             getSystemService(Context.TELEPHONY_SERVICE)
@@ -113,6 +118,7 @@ class CallLightingService : Service() {
     }
 
     override fun onDestroy() {
+        stopping = true
         unregisterCallStateListener()
         runCatching { unregisterReceiver(screenReceiver) }
 
@@ -120,7 +126,6 @@ class CallLightingService : Service() {
             handler.removeCallbacksAndMessages(null)
             handler.post {
                 CallLightingState.setActive(this, false)
-                restorePausedFanIfNeeded()
                 if (!CallLightingState.isEnabled(this) || !CallLightingState.isRingingNow(this))
                     ModeTransitionCoordinator.restoreEffectiveOwner(this, "call-service-stopped")
             }
@@ -129,6 +134,11 @@ class CallLightingService : Service() {
             workerThread.quitSafely()
         }
 
+        if (::coolingHandler.isInitialized) {
+            coolingHandler.removeCallbacksAndMessages(null)
+            coolingHandler.post { restorePausedFanIfNeeded() }
+            coolingThread.quitSafely()
+        }
         super.onDestroy()
     }
 
@@ -241,61 +251,66 @@ class CallLightingService : Service() {
                     this,
                     false
                 )
-                restorePausedFanIfNeeded()
                 restorePreviousLedOwner()
+                coolingHandler.post { restorePausedFanIfNeeded() }
             }
             return
         }
 
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
-                beginCallOwnership()
-
-                if (LedOwnership.canCallApply(this)) {
-                    applyIncomingProfile()
+                NotificationLightingState.expiresAt = 0L
+                val wasAlreadyActive = CallLightingState.isActive(this)
+                CallLightingState.setActive(this, true)
+                val coolingSnapshotReady = if (!wasAlreadyActive && CallLightingState.shouldPauseFanDuringCalls(this))
+                    savePreCallCoolingSnapshot() else true
+                if (LedOwnership.canCallApply(this)) applyIncomingProfile()
+                coolingHandler.post {
+                    if (!stopping && CallLightingState.isRingingNow(this)) {
+                        beginCallCooling(wasAlreadyActive, coolingSnapshotReady)
+                        if (wasAlreadyActive || coolingSnapshotReady) enforceFanPauseIfNeeded()
+                    }
                 }
-
-                enforceFanPauseIfNeeded()
             }
 
             TelephonyManager.CALL_STATE_OFFHOOK,
             TelephonyManager.CALL_STATE_IDLE -> {
-                handler.removeCallbacks(
-                    fanPauseRunnable
-                )
+                coolingHandler.removeCallbacks(fanPauseRunnable)
 
                 if (CallLightingState.isActive(this)) {
                     CallLightingState.setActive(
                         this,
                         false
                     )
-                    restorePausedFanIfNeeded()
                     restorePreviousLedOwner()
+                    coolingHandler.post { restorePausedFanIfNeeded() }
                 }
             }
         }
     }
 
 
-    private fun beginCallOwnership() {
-        NotificationLightingState.expiresAt = 0L
-        val wasAlreadyActive =
-            CallLightingState.isActive(this)
+    private fun savePreCallCoolingSnapshot(): Boolean = ModeTransitionCoordinator.withLightingLock {
+        LightingRootExecutor.initialize(this)
+        val output = LightingRootExecutor.output(
+            "enabled=${'$'}(cat '${DeviceCompatibility.Paths.FAN_ENABLE}') || exit 1; " +
+            "level=${'$'}(cat '${DeviceCompatibility.Paths.FAN_LEVEL}') || exit 1; " +
+            "printf '%s %s\n' \"${'$'}enabled\" \"${'$'}level\"") ?: return@withLightingLock false
+        val values = output.trim().split(Regex("\\s+"))
+        val enabled = values.getOrNull(0)?.toIntOrNull()?.takeIf { it in 0..1 } ?: return@withLightingLock false
+        val level = values.getOrNull(1)?.toIntOrNull()?.takeIf { it in 0..5 } ?: return@withLightingLock false
+        if (stopping || !CallLightingState.isRingingNow(this)) return@withLightingLock false
+        CallLightingState.savePreCallFanState(this, enabled == 1, level)
+        true
+    }
 
+    private fun beginCallCooling(wasAlreadyActive: Boolean, snapshotReady: Boolean) {
         if (
-            !wasAlreadyActive &&
+            !wasAlreadyActive && snapshotReady &&
             CallLightingState
                 .shouldPauseFanDuringCalls(this)
         ) {
-            CallLightingState.savePreCallFanState(
-                context = this,
-                enabled =
-                    HardwareController
-                        .isFanEnabled(),
-                level =
-                    HardwareController
-                        .readFanLevel() ?: 0
-            )
+            if (stopping || !CallLightingState.isRingingNow(this)) return
 
             CallLightingState.setFanPausedForCall(
                 this,
@@ -308,10 +323,6 @@ class CallLightingService : Service() {
             HardwareController.enableFan(false)
         }
 
-        CallLightingState.setActive(
-            this,
-            true
-        )
     }
 
     private fun restorePausedFanIfNeeded() {
@@ -336,14 +347,14 @@ class CallLightingService : Service() {
     }
 
     private fun enforceFanPauseIfNeeded() {
-        if (CallLightingState.shouldPauseFanDuringCalls(this)) {
-            handler.removeCallbacks(fanPauseRunnable)
+        if (!stopping && CallLightingState.isRingingNow(this) && CallLightingState.shouldPauseFanDuringCalls(this)) {
+            coolingHandler.removeCallbacks(fanPauseRunnable)
 
             HardwareServiceActions.stopAutoFan(this)
             HardwareController.setFanLevel(0)
             HardwareController.enableFan(false)
 
-            handler.postDelayed(fanPauseRunnable, 750L)
+            coolingHandler.postDelayed(fanPauseRunnable, 750L)
         }
     }
 

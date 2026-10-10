@@ -16,65 +16,70 @@ object HardwareController {
 
     private const val DUPLICATE_WRITE_SKIP_MS = 2_000L
 
-    @Synchronized
+    private val resourceLocks = ConcurrentHashMap<String, Any>()
+
     private fun execHardwareWrite(
         resource: String,
         command: String,
         rootSession: RootShell.Session? = null
     ): Boolean {
-        if (!DeviceCompatibility.isSupportedDevice()) {
-            android.util.Log.e(
-                "HardwareController",
-                "Blocked $resource write on unsupported device"
-            )
-            return if (resource == "led_control") LedWriteReceipt.record(false) else false
-        }
+        return synchronized(resourceLocks.getOrPut(resource) { Any() }) {
+            if (resource == "led_control" && !LedWriteReceipt.canWrite()) return false
+            if (!DeviceCompatibility.isSupportedDevice()) {
+                android.util.Log.e(
+                    "HardwareController",
+                    "Blocked $resource write on unsupported device"
+                )
+                return if (resource == "led_control") LedWriteReceipt.record(false) else false
+            }
 
-        val now = android.os.SystemClock.elapsedRealtime()
-        val previous = recentHardwareWrites[resource]
+            val now = android.os.SystemClock.elapsedRealtime()
+            val previous = recentHardwareWrites[resource]
 
-        if (
-            previous != null &&
-            previous.command == command &&
-            (now - previous.completedAtMs) < DUPLICATE_WRITE_SKIP_MS
-        ) {
-            android.util.Log.d(
-                "HardwareController",
-                "skip duplicate write resource=$resource"
-            )
-            return true
-        }
-
-        // Legacy LED commands use semicolons: do not mistake the last cfg
-        // write succeeding for a complete profile succeeding. Existing batch
-        // scripts already manage set -e and their cleanup trap themselves.
-        val checkedCommand = if (resource == "led_control" && !command.contains("set -e"))
-            "( set -e; $command )" else command
-        val succeeded = rootSession?.exec(checkedCommand) ?: RootShell.exec(checkedCommand)
-        // Even a failed script may already have changed cooling power before
-        // a later LED write failed. Invalidate those receipts on every attempt.
-        if (resource == "led_control" && command.contains(FAN_ENABLE)) {
-            recentHardwareWrites.remove("fan_control")
-            DashboardSnapshot.invalidateHardwareCache()
-        }
-        if (resource == "led_control" && command.contains(PUMP_ENABLE)) {
-            recentHardwareWrites.remove("pump_control")
-            DashboardSnapshot.invalidateHardwareCache()
-        }
-        if (succeeded) {
             if (
-                resource == "fan_control" ||
-                resource == "pump_control"
+                previous != null &&
+                previous.command == command &&
+                (now - previous.completedAtMs) < DUPLICATE_WRITE_SKIP_MS
             ) {
+                android.util.Log.d(
+                    "HardwareController",
+                    "skip duplicate write resource=$resource"
+                )
+                return true
+            }
+
+            // Legacy LED commands use semicolons: do not mistake the last cfg
+            // write succeeding for a complete profile succeeding. Existing batch
+            // scripts already manage set -e and their cleanup trap themselves.
+            val checkedCommand = if (resource == "led_control" && !command.contains("set -e"))
+                "(\nset -e\n$command\n)" else command
+            val succeeded = if (resource == "led_control") LightingRootExecutor.exec(checkedCommand)
+                else rootSession?.exec(checkedCommand) ?: RootShell.exec(checkedCommand)
+            // Even a failed script may already have changed cooling power before
+            // a later LED write failed. Invalidate those receipts on every attempt.
+            if (resource == "led_control" && command.contains(FAN_ENABLE)) {
+                recentHardwareWrites.remove("fan_control")
                 DashboardSnapshot.invalidateHardwareCache()
             }
-            recentHardwareWrites[resource] = RecentHardwareWrite(
-                command = command,
-                completedAtMs = android.os.SystemClock.elapsedRealtime()
-            )
-        }
+            if (resource == "led_control" && command.contains(PUMP_ENABLE)) {
+                recentHardwareWrites.remove("pump_control")
+                DashboardSnapshot.invalidateHardwareCache()
+            }
+            if (succeeded) {
+                if (
+                    resource == "fan_control" ||
+                    resource == "pump_control"
+                ) {
+                    DashboardSnapshot.invalidateHardwareCache()
+                }
+                recentHardwareWrites[resource] = RecentHardwareWrite(
+                    command = command,
+                    completedAtMs = android.os.SystemClock.elapsedRealtime()
+                )
+            }
 
-        return if (resource == "led_control") LedWriteReceipt.record(succeeded) else succeeded
+            if (resource == "led_control") LedWriteReceipt.record(succeeded) else succeeded
+        }
     }
 
     private const val FAN_ENABLE =

@@ -29,7 +29,17 @@ Fan/pump cooling is separate. LED shutdown writes only the three LED regions and
 
 Automated checks cover all priority combinations with screen-on/off, stale deadlines, wake/plug/ringing exclusion, changed-owner rejection, root result aggregation, nested receipts and a real shell simulation that attempts all three shutdown regions despite cfg failures. GitHub Actions performs the complete Android unit suite and signed release build; final result belongs in PR #12.
 
-Root command acknowledgement is not optical verification. A driver/root command that never returns still blocks the shared root queue and cleanup. Abrupt process death does not run onDestroy; notification listener reconnection clears orphaned lighting, but there is no independent process-death hardware deadline. Sustained distinct notifications intentionally restart the user-selected timer; expiry is measured after the last accepted distinct alert. These limits are not claimed fixed or device-tested by this audit.
+The follow-up replaces the app-local listener alarm with a persisted, identity-fenced `PendingIntent` exact-idle alarm. Its receiver can restart the app after an ordinary process kill. Root grants and verifies exact-alarm access; an alert does not claim ownership or program LEDs unless both alarm scheduling and the window record succeed. Setup and visible deadlines have separate identities even within the same window, so a late setup callback cannot truncate the visible duration.
+
+Logical release does not discard recovery early. The window/alarm remains until the replacement profile or all-off writes are acknowledged; otherwise up to three bounded recovery alarms reconcile the *current* owner. Old window/deadline/boot callbacks do nothing. This record is recovery metadata, not authority to relight an expired notification.
+
+LED commands use a dedicated persistent root channel with a five-second command limit and bounded PID-verified cancellation. Each generated subshell registers its actual PID, kernel start time and boot identity before touching nodes. Timed-out and former-process writers are revoked and canceled; reused PIDs and former-boot records cannot be targeted. A late authorization sees revocation and exits before hardware writes. An unacknowledged cancellation quarantines the LED channel rather than allowing competing writers. Noninteractive root implementations can use bounded `su -c` on the next operation; partial programs are never automatically replayed. RootShell, gameplay overlays/watchdog and Trigger Bridge remain unchanged.
+
+Per-resource controller locks and generation-based telemetry invalidation prevent lighting from waiting on a hung cooling/dashboard shared-root read. Profile receipts reject subsequent zone writes after an earlier failure or ownership change. Call fan-pause/restoration runs separately from LED handoffs, with a bounded read of the same NX809J fan nodes preserving the pre-call cooling snapshot. Existing fan/pump values and temperature policy are unchanged.
+
+Settings boot diagnostics now include exact-alarm access, recovery-record/logical-active state, and LED root quarantine status. Its root boot-log read uses the bounded channel too. Runtime deadline/PID records are not included in profile backups.
+
+Root acknowledgement is not optical verification. Android force-stop/disable/uninstall can cancel alarms or block receiver delivery; a reboot clears system alarms and boot fencing rejects older callbacks. An unresponsive kernel/driver or unavailable root cancellation cannot be repaired reliably by app code and is reported as a failure, not a completed handoff. These conditions remain explicit limits. Ordinary process kill and stalled *shell* recovery are implemented but still need NX809J phone verification. Sustained distinct alerts intentionally restart the selected timer. Source/host-shell checks are not claimed as device tests.
 
 ## Phone checks
 
@@ -39,5 +49,6 @@ Root command acknowledgement is not optical verification. A driver/root command 
 4. Charging at full/separation: notifications and editor previews cannot steal LEDs. Ringing interrupts; answer/dismiss restores charging.
 5. Unplug while screen-off with no ringing/notification: all LEDs clear; hot cooling remains permitted.
 6. Selected game: call/charging exit restores its saved LED profile; leaving for Toolbox clears game ownership. Verify saved effects, brightness and split zones on restored ordinary profiles.
+7. Settings boot diagnostics: exactAccess=true and no root quarantine. Test ordinary main-process kill during a locked notification separately from Android force-stop; expiry/reconnection must restore the eligible owner. Use a prepared delayed Termux `su -c` command so observing the test does not require waking the phone.
 
 No merge until phone results and explicit authorization.

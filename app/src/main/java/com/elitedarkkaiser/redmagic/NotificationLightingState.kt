@@ -13,6 +13,7 @@ internal object NotificationLightingState {
     fun enabled(c: Context) = prefs(c).getBoolean("enabled", false)
     fun setEnabled(c: Context, value: Boolean) { prefs(c).edit().putBoolean("enabled", value).apply() }
     @Volatile var expiresAt = 0L
+    @Volatile var windowToken: String? = null
     fun isActive() = expiresAt > SystemClock.elapsedRealtime()
     fun isEligible(c: Context) = LightingPriorityPolicy.notificationEligible(
         enabled(c), expiresAt, SystemClock.elapsedRealtime(), LedScreenPolicy.isScreenInteractive(c),
