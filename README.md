@@ -817,3 +817,17 @@ Restore requires confirmation and applies current settings through the existing 
 Reads are bounded to 5,000,000 decoded characters. Backup schema, profile counts, nested app-profile exports, supplemental version, notification durations/brightness/split encodings, and finite paired position coordinates are validated before persistent restore writes. Restoration uses multiple existing preference stores and hardware actions; it is not an atomic transaction. Storage/hardware failures can leave a partial restore and are reported rather than claimed rolled back. Keep an export of the current configuration before restoring.
 
 Phone checks: export from Settings; change a benign setting and notification preset; cancel restore and confirm nothing changes; restore and verify settings, Master Profiles, split notification colors and Edit position; verify an old backup preserves newer notification data; reject a malformed/oversized file; reopen Toolbox and confirm persistence. Hardware/runtime behavior still requires phone testing. Step 4 was cancelled; its optimizations are not included.
+
+### Notification expiry investigation
+
+The notification-expiry test branch adds an elapsed-realtime wakeup alarm alongside the existing Handler timer and bounded partial wake lock. Bursts retain the original deadline; an expired pending window is cleaned before a new alert starts, and slow profile application cleans up immediately if the deadline has passed. Neither alarm nor wake lock turns on the display. Alarm callbacks use a separate bounded five-second cleanup lock while restoration runs. Ordinary exact alarms can still be deferred in Doze; the bounded window lock remains necessary. Listener alarms do not survive process death, so reconnection remains the recovery path. No new exact-alarm permission is requested.
+
+Targeted NotificationLighting logs report selected zones, root-write success, shared-power cooling shutdown, deadline arming, alarm delivery and restoration entry. They contain no notification text or key. Fan/trigger LEDs currently require the fan-enable power node; cool screen-off policy disables that node after LED application. The missing fan/trigger output is therefore still under device investigation, and this branch does not bypass cooling safety or claim all selected zones are fixed.
+
+Phone checks: lock the unplugged cool phone, receive one Messenger alert with all three zones selected and a 10-second window, and leave it locked for at least 30 seconds. Check expiry without waking it, then repeat with a notification burst. Check charging still prevents takeover, a ringing call takes priority, and waking restores saved lighting. Capture the targeted logs in Termux after reproducing:
+
+```sh
+su -c 'logcat -d -v time -s NotificationLighting RedmagicModeCoordinator RedmagicScreenPolicy HardwareController' > "$HOME/notification-lighting-log.txt"
+```
+
+Top-trigger intent unlock already exists under Trigger Safety; two to four top taps require an unlock sequence, while one tap bypasses it. No trigger controls or behavior are changed by this investigation.

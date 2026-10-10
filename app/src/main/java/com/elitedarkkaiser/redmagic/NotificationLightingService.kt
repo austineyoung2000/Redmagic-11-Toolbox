@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -7,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
@@ -20,7 +22,38 @@ class NotificationLightingService : NotificationListenerService() {
     private var currentKey: String? = null
     @Volatile private var connectedAtMillis = 0L
     private val seen = LinkedHashSet<String>()
-    private val finish = Runnable { endWindow() }
+    private val finish = Runnable { endWindow("handler-expiry") }
+    private var expiryAlarm: AlarmManager.OnAlarmListener? = null
+    private fun scheduleExpiry() {
+        worker.removeCallbacks(finish)
+        expiryAlarm?.let { getSystemService(AlarmManager::class.java).cancel(it) }
+        val deadline = NotificationLightingState.expiresAt
+        val remaining = (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        worker.postDelayed(finish, remaining)
+        // A wakeup alarm uses elapsed realtime, unlike Handler's uptime clock.
+        // Keep the bounded partial wake lock too: Doze may defer ordinary alarms.
+        val alarm = AlarmManager.OnAlarmListener {
+            android.util.Log.i("NotificationLighting", "Elapsed alarm delivered deadline=$deadline")
+            val cleanupLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK, "Redmagic:NotificationCleanup").apply {
+                setReferenceCounted(false)
+                acquire(5000L)
+            }
+            worker.post {
+                try {
+                    if (NotificationLightingState.expiresAt == deadline && currentKey != null)
+                        endWindow("elapsed-alarm-expiry")
+                } finally { if (cleanupLock.isHeld) cleanupLock.release() }
+            }
+        }
+        expiryAlarm = alarm
+        runCatching {
+            getSystemService(AlarmManager::class.java).setExact(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline,
+                "Redmagic:NotificationExpiry", alarm, Handler(Looper.getMainLooper()))
+        }.onFailure { android.util.Log.w("NotificationLighting", "Expiry alarm unavailable; bounded wake lock and handler remain", it) }
+        android.util.Log.i("NotificationLighting", "Expiry armed remainingMs=$remaining wakeLockHeld=${wakeLock?.isHeld == true}")
+    }
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             worker.post {
@@ -52,8 +85,10 @@ class NotificationLightingService : NotificationListenerService() {
             val p = NotificationLightingState.read(this,sbn.packageName) ?: return@post
             if (!(p.logo || p.triggers || p.fan)) return@post
             val now = SystemClock.elapsedRealtime()
-            if (!NotificationLightingState.isActive()) {
-                if (currentKey != null) endWindow()
+            // An expired-but-not-cleaned window must finish before another alert
+            // can claim ownership. A burst never extends the first deadline.
+            if (currentKey != null && !NotificationLightingState.isActive()) endWindow("expired-before-post")
+            if (currentKey == null) {
                 NotificationLightingState.expiresAt = now + p.seconds * 1000L
                 wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
                     PowerManager.PARTIAL_WAKE_LOCK,"Redmagic:NotificationLighting").apply {
@@ -61,34 +96,44 @@ class NotificationLightingService : NotificationListenerService() {
                 }
             }
             currentKey = sbn.key
+            android.util.Log.i("NotificationLighting", "Apply window seconds=${p.seconds} logo=${p.logo} triggers=${p.triggers} fan=${p.fan} deadline=${NotificationLightingState.expiresAt}")
+            scheduleExpiry()
             try {
                 ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
                     HardwareController.turnOffAllLeds()
                     val effect = LedBrightness.encode(p.brightness,p.effect)
-                    if (p.logo) HardwareController.setLogoLedEffect(p.logoState?.effect ?: effect,p.logoState?.color ?: p.color)
-                    if (p.triggers) HardwareController.setShoulderLedEffect(p.triggerState?.effect ?: effect,p.triggerState?.color ?: p.color)
-                    if (p.fan) HardwareController.setFanLedEffect(effect,p.color)
+                    if (p.logo) logZone("logo", HardwareController.setLogoLedEffect(p.logoState?.effect ?: effect,p.logoState?.color ?: p.color))
+                    if (p.triggers) logZone("triggers", HardwareController.setShoulderLedEffect(p.triggerState?.effect ?: effect,p.triggerState?.color ?: p.color))
+                    if (p.fan) logZone("fan", HardwareController.setFanLedEffect(effect,p.color))
                     if (HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this,"notification-lighting")) {
                         // LED commands may have re-enabled fan power since the
                         // shared policy last shut it down. Enforce it again.
                         HardwareController.enableFan(false)
                         HardwareController.enablePump(false)
+                        android.util.Log.w("NotificationLighting", "Cooling safety disabled shared fan power; fan/trigger LEDs may be unavailable")
                     }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NotificationLighting", "Notification profile failed", e)
             } finally {
-                worker.removeCallbacks(finish)
-                worker.postDelayed(finish,(NotificationLightingState.expiresAt-SystemClock.elapsedRealtime()).coerceAtLeast(0L))
+                // Slow profile/root writes must not leave an already-expired
+                // profile lit or start a fresh full-duration timer afterward.
+                if (!NotificationLightingState.isActive()) endWindow("expired-during-apply")
             }
         }
     }
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         worker.post { seen.remove(sbn.key); if (currentKey == sbn.key) endWindow() }
     }
-    private fun endWindow() {
+    private fun logZone(zone: String, success: Boolean) {
+        android.util.Log.i("NotificationLighting", "Zone=$zone writeSucceeded=$success")
+    }
+    private fun endWindow(reason: String = "cancelled") {
         val hadWindow = currentKey != null
+        android.util.Log.i("NotificationLighting", "End reason=$reason hadWindow=$hadWindow overdueMs=${(SystemClock.elapsedRealtime()-NotificationLightingState.expiresAt).coerceAtLeast(0L)}")
         worker.removeCallbacks(finish)
+        expiryAlarm?.let { getSystemService(AlarmManager::class.java).cancel(it) }
+        expiryAlarm = null
         currentKey = null
         NotificationLightingState.expiresAt = 0L
         try { if (hadWindow) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-window-ended") }
