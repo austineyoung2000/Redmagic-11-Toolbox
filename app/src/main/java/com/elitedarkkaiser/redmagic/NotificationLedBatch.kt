@@ -17,11 +17,7 @@ internal object NotificationLedBatch {
             "printf '2\\n' > /sys/class/leds/aw22xxx_led/cfg"
         ).joinToString("\n")
     }
-    fun offCommand(): String = (1..3).joinToString("\n") { region ->
-        // Proven screen-off shutdown: effect=zone/off, then cfg=1.
-        "echo 0x${region}000000 > /sys/class/leds/aw22xxx_led/effect; " +
-            "echo 1 > /sys/class/leds/aw22xxx_led/cfg"
-    }
+    fun offCommand(): String = regions.values.joinToString("\n") { write(it, 0, 0) }
     fun command(zones: List<Zone>, stopCooling: Boolean): String? {
         if (zones.isEmpty() || zones.map { it.name }.distinct().size != zones.size) return null
         val writes = zones.map { zone ->
