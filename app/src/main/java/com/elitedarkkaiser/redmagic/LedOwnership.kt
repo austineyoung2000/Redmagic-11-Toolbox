@@ -30,7 +30,7 @@ object LedOwnership {
 
     fun canGameModeApply(context: Context): Boolean {
         val owner = current(context)
-        return owner == LedOwner.NORMAL || owner == LedOwner.GAME_MODE
+        return owner == LedOwner.GAME_MODE
     }
 
     fun canCallApply(context: Context): Boolean {

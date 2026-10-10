@@ -284,6 +284,14 @@ class GameModeService : Service() {
     ) {
         if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) return
 
+        if (currentPkg == packageName) {
+            // Our resumed activity is authoritative; no game-entry debounce
+            // is needed before releasing its obsolete lighting ownership.
+            handler.removeCallbacks(foregroundPackageRunnable)
+            pendingForegroundPackage = null
+            handleForegroundPackageNow(currentPkg)
+            return
+        }
         pendingForegroundPackage = currentPkg
 
         handler.removeCallbacks(
@@ -517,7 +525,8 @@ class GameModeService : Service() {
             val generation = coolingGeneration.incrementAndGet()
             coolingHandler.post {
                 if (generation != coolingGeneration.get() || stopping.get() ||
-                    !LedScreenPolicy.isScreenInteractive(this) || gameModeActiveFor != pkg) return@post
+                    !LedScreenPolicy.isScreenInteractive(this) || gameModeActiveFor != pkg ||
+                    !hasSelectedForegroundGame()) return@post
                 if (fanEnabled) {
                     HardwareController.setFanLevel(
                         fanLevel
