@@ -22,7 +22,7 @@ class NotificationLightingService : NotificationListenerService() {
     private var currentKey: String? = null
     private var windowTiming: NotificationWindowTiming? = null
     @Volatile private var connectedAtMillis = 0L
-    private val seen = LinkedHashSet<String>()
+    private val notificationSession = NotificationSessionDeduplicator()
     private val windowNotificationKeys = LinkedHashSet<String>()
     private val finish = Runnable { endWindow("handler-expiry") }
     private var expiryAlarm: AlarmManager.OnAlarmListener? = null
@@ -59,6 +59,7 @@ class NotificationLightingService : NotificationListenerService() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             worker.post {
+                if (intent?.action == Intent.ACTION_SCREEN_ON) notificationSession.reset()
                 if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_POWER_CONNECTED ||
                     intent?.action == ACTION_SETTINGS_CHANGED ||
                     !NotificationLightingState.enabled(this@NotificationLightingService)) endWindow()
@@ -86,17 +87,16 @@ class NotificationLightingService : NotificationListenerService() {
         android.util.Log.i("NotificationLighting", "Notification callback filter=${ignored ?: "eligible"}")
         if (ignored != null) return
         worker.post {
-            // Updates to the same notification do not extend its lighting window.
-            if (!seen.add(sbn.key)) {
-                android.util.Log.i("NotificationLighting", "Skipped duplicate notification update")
-                return@post
-            }
-            if (seen.size > 256) seen.remove(seen.first())
+            // Ineligible callbacks must not poison deduplication for a later locked alert.
             if (!DeviceCompatibility.isSupportedDevice() || !NotificationLightingState.enabled(this) ||
                 LedScreenPolicy.isScreenInteractive(this) || ChargingLedState.isChargingNow(this) ||
                 CallLightingState.isActive(this)) return@post
             val p = NotificationLightingState.read(this,sbn.packageName) ?: return@post
             if (!(p.logo || p.triggers || p.fan)) return@post
+            if (!notificationSession.accept(sbn.key, eligible = true)) {
+                android.util.Log.i("NotificationLighting", "Skipped duplicate notification update in current screen-off session")
+                return@post
+            }
             val now = SystemClock.elapsedRealtime()
             // An expired-but-not-cleaned window must finish before another alert
             // can claim ownership. Each distinct notification gets its selected duration.
@@ -161,7 +161,7 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         worker.post {
-            seen.remove(sbn.key)
+            notificationSession.remove(sbn.key)
             if (windowNotificationKeys.remove(sbn.key) && windowNotificationKeys.isEmpty())
                 endWindow("all-notifications-removed")
         }
@@ -189,8 +189,7 @@ class NotificationLightingService : NotificationListenerService() {
         connectedAtMillis = System.currentTimeMillis()
         val existingKeys = runCatching { activeNotifications.orEmpty().map { it.key } }.getOrDefault(emptyList())
         worker.post {
-            seen.clear()
-            seen.addAll(existingKeys.takeLast(256))
+            notificationSession.seed(existingKeys)
             // Rebinding after process death must clear any orphaned LED window.
             if (currentKey == null) ModeTransitionCoordinator.restoreEffectiveOwner(this,"notification-listener-connected")
         }

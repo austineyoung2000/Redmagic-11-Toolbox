@@ -843,3 +843,7 @@ New distinct notifications restart the selected duration; updates to an already 
 Validation: stock command-order and rejection tests cover separate rgb writes, cfg=2 and power-free shutdown. CI and phone validation for this revision are pending. Phone checks: Messenger orange Breathe, all zones, ten seconds; immediate start and expiry while locked; duplicate update versus distinct back-to-back notification; charging/call preemption; wake restoration; hot-phone fan/pump cooling.
 
 Device feedback: stock startup was confirmed almost immediate. Ten-second shutdown failed on that revision. The follow-up removes the separate HAL off path and routes expiry solely through the proven screen-off restoration/shutdown path. Device verification of the follow-up is pending.
+
+### Repeated screen-off notification sessions
+
+Device testing confirmed immediate startup and ten-second expiry on 50dd42d. Notification-ID deduplication previously survived screen wake, so Messenger could reuse a key and be ignored until a process restart. Deduplication now resets on screen-on, and awake, charging, call-preempted or unconfigured callbacks do not consume an eligible alert. Duplicate updates remain suppressed within the same screen-off session. Listener reconnection still seeds existing keys to suppress replay. Startup, expiry commands and cooling policy are unchanged. Validate several lock/message/expiry/unlock cycles without rebooting.
