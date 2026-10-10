@@ -10,6 +10,21 @@ import com.google.android.material.button.MaterialButton
 
 internal object GameModeActions {
 
+    fun toolboxResumed(context: Context) {
+        GameModeService.setToolboxForeground(true)
+        if (isGameModeLedOverrideActiveStorage(context)) {
+            runCatching {
+                context.startService(Intent(context, GameModeService::class.java)
+                    .putExtra("foreground_pkg", context.packageName))
+            }.onFailure { android.util.Log.e("RedmagicGameMode", "Toolbox LED handoff could not start", it) }
+        }
+    }
+
+    fun toolboxPaused() {
+        GameModeService.setToolboxForeground(false)
+    }
+
+
     fun startServiceSilentlyIfPermitted(context: Context) {
         if (PermissionActions.hasUsageStatsPermission(context)) {
             context.startService(Intent(context, GameModeService::class.java))

@@ -19,6 +19,16 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 
 class SettingsActivity : AppCompatActivity() {
+    override fun onResume() {
+        super.onResume()
+        GameModeActions.toolboxResumed(this)
+    }
+
+    override fun onPause() {
+        GameModeActions.toolboxPaused()
+        super.onPause()
+    }
+
     private val backupExecutor = Executors.newSingleThreadExecutor()
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode,resultCode,data)

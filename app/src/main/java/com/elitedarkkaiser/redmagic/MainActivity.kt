@@ -244,12 +244,18 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        GameModeActions.toolboxResumed(this)
 
         val savedUnit = isUseFahrenheitStorage(this)
         if (savedUnit != useFahrenheit) {
             useFahrenheit = savedUnit
             if (uiLaunched) refreshStatus()
         }
+    }
+
+    override fun onPause() {
+        GameModeActions.toolboxPaused()
+        super.onPause()
     }
 
     override fun onStop() {

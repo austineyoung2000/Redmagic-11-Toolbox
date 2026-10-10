@@ -17,7 +17,12 @@ class GameModeService : Service() {
     companion object {
         // A persisted override flag is not foreground evidence after process death.
         @Volatile private var selectedForegroundPackage: String? = null
-        internal fun hasSelectedForegroundGame(): Boolean = selectedForegroundPackage != null
+        @Volatile private var toolboxForeground = false
+        internal fun hasSelectedForegroundGame(): Boolean = !toolboxForeground && selectedForegroundPackage != null
+        internal fun setToolboxForeground(active: Boolean) {
+            toolboxForeground = active
+            if (active) selectedForegroundPackage = null
+        }
 
         const val EXTRA_APPLY_SAVED_PROFILE =
             "apply_saved_game_mode_profile"
