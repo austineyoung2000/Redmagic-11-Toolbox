@@ -103,8 +103,8 @@ class NotificationLightingService : NotificationListenerService() {
                 android.util.Log.e("NotificationLighting", "Cannot start notification LEDs without durable exact expiry access")
                 return@post
             }
-            if (!notificationSession.accept(sbn.key, eligible = true)) {
-                trace("rejected: duplicate key in locked session")
+            if (!notificationSession.accept(sbn.key, sbn.postTime, eligible = true)) {
+                trace("rejected: duplicate or older key/post-time delivery")
                 android.util.Log.i("NotificationLighting", "Skipped duplicate notification update in current screen-off session")
                 return@post
             }
@@ -239,9 +239,9 @@ class NotificationLightingService : NotificationListenerService() {
         android.util.Log.i("NotificationLighting", "Listener connected")
         // Replayed notifications belong to the old session, not a new alert.
         connectedAtMillis = System.currentTimeMillis()
-        val existingKeys = runCatching { activeNotifications.orEmpty().map { it.key } }.getOrDefault(emptyList())
+        val existingPosts = runCatching { activeNotifications.orEmpty().map { it.key to it.postTime } }.getOrDefault(emptyList())
         worker.post {
-            notificationSession.seed(existingKeys)
+            notificationSession.seed(existingPosts)
             // Rebinding after process death must clear any orphaned LED window.
             if (currentKey == null) NotificationWindowDeadline.finish(this, null, "notification-listener-connected")
         }
