@@ -64,7 +64,7 @@ class CallLightingService : Service() {
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent?) {
-            handler.post {
+            LedScreenPolicy.postScreenEvent(this@CallLightingService, handler, intent?.action, "call-screen") {
                 if (intent?.action == Intent.ACTION_SCREEN_OFF) {
                     ModeTransitionCoordinator.restoreEffectiveOwner(
                         this@CallLightingService, "call-screen-off")

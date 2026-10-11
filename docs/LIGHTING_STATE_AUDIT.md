@@ -52,3 +52,9 @@ Root acknowledgement is not optical verification. Android force-stop/disable/uni
 7. Settings boot diagnostics: exactAccess=true and no root quarantine. Test ordinary main-process kill during a locked notification separately from Android force-stop; expiry/reconnection must restore the eligible owner. Use a prepared delayed Termux `su -c` command so observing the test does not require waking the phone.
 
 No merge until phone results and explicit authorization.
+
+## Follow-up: phone still showed ordinary LEDs after locking
+
+Device feedback after a079a276 reported LEDs remaining lit on lock. CI success did not establish physical screen-off correctness. A source gap remained in ordinary/game/call/Studio/listener screen receivers: they returned after queueing cleanup without keeping CPU awake. The notification expiry wake lock alone did not cover these broadcast-to-worker handoffs.
+
+Screen-off now acquires a bounded 30-second partial wake lock before queueing its lighting worker. Cleanup runs at the front of that worker queue and releases the lock in finally; rejected queues release it immediately. Existing live priority checks still decide whether to clear or retain eligible call/charging/notification lighting. Wake locks do not wake the display, and no LED register payload or cooling command is changed. Phone confirmation is pending; this source gap is not claimed as the confirmed cause of the reported device failure without captured root/shutdown results.

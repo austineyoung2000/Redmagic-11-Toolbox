@@ -44,7 +44,10 @@ class RgbCycleService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     screenOffAt = SystemClock.elapsedRealtime()
-                    scheduleNext(0L)
+                    handler.removeCallbacks(cycleRunnable)
+                    LedScreenPolicy.postScreenEvent(this@RgbCycleService, handler, intent.action, "studio-screen-off") {
+                        runCycleTick()
+                    }
                 }
                 Intent.ACTION_SCREEN_ON,
                 Intent.ACTION_USER_PRESENT -> {

@@ -60,9 +60,9 @@ class GameModeService : Service() {
             val action = intent.action
             if (action == Intent.ACTION_SCREEN_OFF) selectedForegroundPackage = null
 
-            handler.post {
+            LedScreenPolicy.postScreenEvent(this@GameModeService, handler, action, "game-screen") event@ {
                 if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
-                    return@post
+                    return@event
                 }
 
                 when (action) {

@@ -32,7 +32,7 @@ class FanLedService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     handler.removeCallbacks(reapplyRunnable)
-                    handler.post {
+                    LedScreenPolicy.postScreenEvent(this@FanLedService, handler, intent.action, "normal-screen-off") {
                         if (
                             ChargingLedState.isEnabled(this@FanLedService) &&
                             ChargingLedState.isChargingNow(this@FanLedService)

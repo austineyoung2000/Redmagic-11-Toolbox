@@ -45,10 +45,10 @@ class NotificationLightingService : NotificationListenerService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_POWER_CONNECTED ||
                 intent?.action == ACTION_SETTINGS_CHANGED) NotificationLightingState.expiresAt = 0L
-            worker.post {
+            LedScreenPolicy.postScreenEvent(this@NotificationLightingService, worker, intent?.action, "notification-screen") event@ {
                 if (intent?.action == NotificationWindowDeadline.ACTION_RELEASE) {
                     if (intent.getStringExtra("token") == windowToken) releaseWindowFields()
-                    return@post
+                    return@event
                 }
                 if (intent?.action == Intent.ACTION_SCREEN_OFF)
                     ModeTransitionCoordinator.restoreEffectiveOwner(this@NotificationLightingService, "notification-listener-screen-off")
