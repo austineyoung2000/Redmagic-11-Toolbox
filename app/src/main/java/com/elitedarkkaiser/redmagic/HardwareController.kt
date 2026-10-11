@@ -122,7 +122,7 @@ object HardwareController {
     fun setFanLevel(level: Int): Boolean {
         val safe = level.coerceIn(0, 5)
         val cmds = if (safe == 0) {
-            "echo 0 > $FAN_LEVEL && echo 0 > $FAN_ENABLE"
+            CoolingShutdownCommand.fan(FAN_LEVEL, FAN_ENABLE)
         } else {
             "echo 1 > $FAN_ENABLE && echo $safe > $FAN_LEVEL"
         }
@@ -132,7 +132,7 @@ object HardwareController {
     fun setFanPwm(value: Int): Boolean {
         val safe = value.coerceIn(0, 255)
         val cmds = if (safe == 0) {
-            "echo 0 > $FAN_PWM && echo 0 > $FAN_ENABLE"
+            CoolingShutdownCommand.fan(FAN_PWM, FAN_ENABLE)
         } else {
             "echo 1 > $FAN_ENABLE && echo $safe > $FAN_PWM"
         }
