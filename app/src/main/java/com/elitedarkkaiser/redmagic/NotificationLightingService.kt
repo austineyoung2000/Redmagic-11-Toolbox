@@ -71,6 +71,8 @@ class NotificationLightingService : NotificationListenerService() {
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        val tracked = NotificationLightingState.packages(this).contains(sbn.packageName)
+        fun trace(stage: String) { if (tracked) recordAttempt("${sbn.packageName}: $stage") }
         val ignored = when {
             sbn.postTime <= connectedAtMillis -> "old-or-replayed"
             sbn.packageName == packageName -> "own-app"
@@ -79,19 +81,30 @@ class NotificationLightingService : NotificationListenerService() {
             else -> null
         }
         android.util.Log.i("NotificationLighting", "Notification callback filter=${ignored ?: "eligible"}")
+        trace("callback filter=${ignored ?: "eligible"}; flags=${sbn.notification.flags}; postAgeMs=${System.currentTimeMillis()-sbn.postTime}")
         if (ignored != null) return
         worker.post {
             // Ineligible callbacks must not poison deduplication for a later locked alert.
-            if (!DeviceCompatibility.isSupportedDevice() || !NotificationLightingState.enabled(this) ||
-                LedScreenPolicy.isScreenInteractive(this) || ChargingLedState.isChargingNow(this) ||
-                (CallLightingState.isEnabled(this) && CallLightingState.isRingingNow(this))) return@post
-            val p = NotificationLightingState.read(this,sbn.packageName) ?: return@post
-            if (!(p.logo || p.triggers || p.fan)) return@post
+            val rejected = when {
+                !DeviceCompatibility.isSupportedDevice() -> "unsupported device"
+                !NotificationLightingState.enabled(this) -> "feature disabled"
+                LedScreenPolicy.isScreenInteractive(this) -> "screen interactive"
+                ChargingLedState.isChargingNow(this) -> "plugged in"
+                CallLightingState.isEnabled(this) && CallLightingState.isRingingNow(this) -> "ringing call"
+                else -> null
+            }
+            if (rejected != null) { trace("rejected: $rejected"); return@post }
+            val p = NotificationLightingState.read(this,sbn.packageName)
+            if (p == null) { trace("rejected: missing or invalid profile"); return@post }
+            if (!(p.logo || p.triggers || p.fan)) { trace("rejected: no zones selected"); return@post }
+            trace("worker eligible; preparing exact expiry")
             if (!NotificationWindowDeadline.prepare(this)) {
+                trace("rejected: exact expiry unavailable")
                 android.util.Log.e("NotificationLighting", "Cannot start notification LEDs without durable exact expiry access")
                 return@post
             }
             if (!notificationSession.accept(sbn.key, eligible = true)) {
+                trace("rejected: duplicate key in locked session")
                 android.util.Log.i("NotificationLighting", "Skipped duplicate notification update in current screen-off session")
                 return@post
             }
@@ -113,10 +126,12 @@ class NotificationLightingService : NotificationListenerService() {
             currentKey = sbn.key
             android.util.Log.i("NotificationLighting", "Apply window seconds=${p.seconds} logo=${p.logo} triggers=${p.triggers} fan=${p.fan} deadline=${NotificationLightingState.expiresAt}")
             if (!scheduleExpiry()) {
+                trace("rejected: setup deadline could not be armed")
                 endWindow("durable-expiry-unavailable")
                 return@post
             }
             try {
+                trace("setup deadline armed; requesting NOTIFICATION ownership")
                 val applied = ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
                     val effect = p.effect
                     val zones = buildList {
@@ -125,10 +140,13 @@ class NotificationLightingService : NotificationListenerService() {
                         if (p.fan) add(NotificationLedBatch.Zone("fan", effect, p.color))
                     }
                     if (NotificationProfileReplayPolicy.shouldWrite(appliedZones, zones)) {
+                        trace("ownership accepted; reading cooling temperature")
                         val stopCooling = !HardwareScreenPolicy.isScreenInteractive(this) &&
                             !HardwareScreenPolicy.coolingAllowedWhileScreenOff(HardwareScreenPolicy.currentTempF())
                         val startedAt = SystemClock.elapsedRealtime()
+                        trace("issuing stock batch; zones=${zones.map { it.name }}; stopCooling=$stopCooling")
                         val success = HardwareController.applyNotificationLeds(zones, stopCooling)
+                        trace("stock batch returned success=$success; elapsedMs=${SystemClock.elapsedRealtime()-startedAt}")
                         android.util.Log.i("NotificationLighting", "Batch zones=${zones.map { it.name }} writeSucceeded=$success elapsedMs=${SystemClock.elapsedRealtime()-startedAt} coolingStopped=$stopCooling")
                         if (!success) throw IllegalStateException("Coordinated notification LED application failed")
                         appliedZones = zones
@@ -139,6 +157,7 @@ class NotificationLightingService : NotificationListenerService() {
                 }
                 if (!applied || LedScreenPolicy.isScreenInteractive(this) ||
                     ChargingLedState.isChargingNow(this) || (CallLightingState.isEnabled(this) && CallLightingState.isRingingNow(this))) {
+                    trace("profile not retained; applied=$applied; owner=${LedOwnership.current(this)}")
                     endWindow("ownership-changed-during-apply")
                     return@post
                 }
@@ -153,11 +172,14 @@ class NotificationLightingService : NotificationListenerService() {
                     true
                 }
                 if (!visibleStarted) {
+                    trace("rejected: visible deadline could not start")
                     endWindow("application-deadline-exceeded")
                     return@post
                 }
                 android.util.Log.i("NotificationLighting", "Visible window started seconds=${p.seconds} deadline=${timing.deadline}")
+                trace("visible timer started: ${p.seconds}s")
             } catch (e: Exception) {
+                trace("application failed: ${e.javaClass.simpleName}")
                 android.util.Log.e("NotificationLighting", "Notification profile failed", e)
                 endWindow("application-failed")
             } finally {
@@ -186,6 +208,7 @@ class NotificationLightingService : NotificationListenerService() {
     }
     private fun endWindow(reason: String = "cancelled") {
         val token = windowToken
+        if (token != null) recordAttempt("handoff: $reason")
         android.util.Log.i("NotificationLighting", "End reason=$reason hadWindow=${token != null}")
         // Keep CPU awake through the bounded physical handoff, not merely
         // through the visible timer. Releasing before root cleanup could let
@@ -211,6 +234,7 @@ class NotificationLightingService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         listenerConnected = true
+        rebindStatus = "connected at ${SystemClock.elapsedRealtime()/1000}s"
         BootDiagnostics.record(this, "Notification listener connected")
         android.util.Log.i("NotificationLighting", "Listener connected")
         // Replayed notifications belong to the old session, not a new alert.
@@ -242,6 +266,13 @@ class NotificationLightingService : NotificationListenerService() {
         @Volatile private var listenerConnected = false
         private var lastRebindAt = -10_000L
         @Volatile private var rebindStatus = "not requested"
+        private val attemptTrace = java.util.ArrayDeque<String>()
+        @Synchronized private fun recordAttempt(stage: String) {
+            if (attemptTrace.size == 32) attemptTrace.removeFirst()
+            attemptTrace.addLast("${SystemClock.elapsedRealtime()/1000}s: $stage")
+        }
+        @Synchronized fun attemptReport(): String = if (attemptTrace.isEmpty())
+            "No configured-app callbacks recorded in this process." else attemptTrace.joinToString("\n")
         fun connectionStatus() = "connected=$listenerConnected; rebind=$rebindStatus"
 
         @Synchronized fun ensureConnected(context: Context) {

@@ -64,6 +64,8 @@ internal object BootDiagnostics {
         appendLine("Charging lighting configured: ${ChargingLedState.isEnabled(context)}")
         appendLine("Charging now: ${ChargingLedState.isChargingNow(context)}")
         appendLine("Triggers auto-start: ${readTriggerPrefsSnapshot(context).triggersAutoStart}")
+        appendLine("\nNOTIFICATION ATTEMPT TRACE (configured apps; current process only)")
+        appendLine(NotificationLightingService.attemptReport())
         appendLine("\nRECORDED STARTUP EVENTS")
         appendLine("Recorded boot: ${prefs.getString("boot_id", "none")}")
         appendLine(prefs.getString("events", "No startup events recorded yet. Reboot with this build installed."))
