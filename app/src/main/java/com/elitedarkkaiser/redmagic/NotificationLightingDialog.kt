@@ -36,7 +36,10 @@ object NotificationLightingDialog {
                         activity.runOnUiThread {
                             if (!activity.isDestroyed) {
                                 isEnabled = true
-                                if (saved) activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+                                if (saved) {
+                                    activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+                                    NotificationLightingService.ensureConnected(activity)
+                                }
                                 else {
                                     restoring = true; isChecked = previous; restoring = false
                                     Toast.makeText(activity,"Notification setting could not be saved. Try again.",Toast.LENGTH_LONG).show()
@@ -122,7 +125,10 @@ object NotificationLightingDialog {
         val initialIndex=targetIndex.coerceAtLeast(0)
         appSpinner.setSelection(initialIndex)
         load(initialIndex)
-        fun changed() { activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName)) }
+        fun changed() {
+            activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+            NotificationLightingService.ensureConnected(activity)
+        }
         content.addView(Button(activity).apply { text="Save app profile"; isEnabled=apps.isNotEmpty(); setOnClickListener {
             val pkg = apps.getOrNull(appSpinner.selectedItemPosition)?.activityInfo?.packageName
             if (pkg == null) {
@@ -160,6 +166,7 @@ object NotificationLightingDialog {
             val granted=activity.getSystemService(NotificationManager::class.java)
                 .isNotificationListenerAccessGranted(ComponentName(activity,NotificationLightingService::class.java))
             text=if (granted) "Notification access granted · Manage" else "Grant notification access"
+            if (granted) NotificationLightingService.ensureConnected(activity)
         }
         init {
             refreshStatus()

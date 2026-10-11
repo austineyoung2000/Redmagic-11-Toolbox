@@ -210,6 +210,8 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onListenerConnected() {
         super.onListenerConnected()
+        listenerConnected = true
+        BootDiagnostics.record(this, "Notification listener connected")
         android.util.Log.i("NotificationLighting", "Listener connected")
         // Replayed notifications belong to the old session, not a new alert.
         connectedAtMillis = System.currentTimeMillis()
@@ -220,11 +222,44 @@ class NotificationLightingService : NotificationListenerService() {
             if (currentKey == null) NotificationWindowDeadline.finish(this, null, "notification-listener-connected")
         }
     }
-    override fun onListenerDisconnected() { worker.post { endWindow() } }
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        listenerConnected = false
+        BootDiagnostics.record(this, "Notification listener disconnected")
+        worker.post {
+            try { endWindow("listener-disconnected") }
+            finally { ensureConnected(this) }
+        }
+    }
     override fun onDestroy() {
+        listenerConnected = false
         unregisterReceiver(receiver)
         worker.post { endWindow(); thread.quitSafely() }
         super.onDestroy()
     }
-    companion object { const val ACTION_SETTINGS_CHANGED = "com.elitedarkkaiser.redmagic.NOTIFICATION_LIGHTING_CHANGED" }
+    companion object {
+        const val ACTION_SETTINGS_CHANGED = "com.elitedarkkaiser.redmagic.NOTIFICATION_LIGHTING_CHANGED"
+        @Volatile private var listenerConnected = false
+        private var lastRebindAt = -10_000L
+        @Volatile private var rebindStatus = "not requested"
+        fun connectionStatus() = "connected=$listenerConnected; rebind=$rebindStatus"
+
+        @Synchronized fun ensureConnected(context: Context) {
+            if (!DeviceCompatibility.isSupportedDevice() || !NotificationLightingState.enabled(context) || listenerConnected) return
+            val component = android.content.ComponentName(context, NotificationLightingService::class.java)
+            if (!context.getSystemService(android.app.NotificationManager::class.java).isNotificationListenerAccessGranted(component)) return
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastRebindAt < 10_000L) return
+            lastRebindAt = now
+            try {
+                // Android owns this binding; startService cannot substitute for it.
+                requestRebind(component)
+                rebindStatus = "requested at ${now / 1000}s (awaiting connection callback)"
+                BootDiagnostics.record(context, "Notification listener rebind requested")
+            } catch (error: Exception) {
+                rebindStatus = "failed: ${error.javaClass.simpleName}"
+                BootDiagnostics.record(context, "Notification listener rebind failed: ${error.javaClass.simpleName}")
+            }
+        }
+    }
 }

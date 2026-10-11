@@ -50,6 +50,7 @@ internal object BootDiagnostics {
         appendLine("Notification settings file: ${notificationFile.absolutePath}; exists=${notificationFile.exists()}")
         val listener = android.content.ComponentName(context, NotificationLightingService::class.java)
         appendLine("Notification listener access: ${context.getSystemService(android.app.NotificationManager::class.java).isNotificationListenerAccessGranted(listener)}")
+        appendLine("Notification listener: ${NotificationLightingService.connectionStatus()}")
         val notificationApps = NotificationLightingState.packages(context)
         appendLine("Notification profiles: ${notificationApps.size}")
         notificationApps.forEach { pkg ->

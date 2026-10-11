@@ -29,6 +29,7 @@ object HardwareServiceActions {
         // Starting services does not grant their profiles lighting ownership.
         BootDiagnostics.request(context, "LED screen/power guard") { startFanLed(context) }
         BootDiagnostics.request(context, "Charging mode") { startChargingMode(context) }
+        NotificationLightingService.ensureConnected(context)
         if (CallLightingState.isEnabled(context)) {
             BootDiagnostics.request(context, "Call lighting") { startCallLighting(context) }
         }
