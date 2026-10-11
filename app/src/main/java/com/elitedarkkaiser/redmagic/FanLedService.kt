@@ -57,6 +57,14 @@ class FanLedService : Service() {
                 Intent.ACTION_USER_PRESENT -> {
                     scheduleLedReapply(delayMs = 1_500L)
                 }
+                Intent.ACTION_POWER_CONNECTED,
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    LedScreenPolicy.postScreenEvent(this@FanLedService, handler,
+                        if (LedScreenPolicy.isScreenInteractive(this@FanLedService)) intent.action
+                        else Intent.ACTION_SCREEN_OFF, "led-power-handoff") {
+                        ModeTransitionCoordinator.restoreEffectiveOwner(this@FanLedService, "led-power-handoff")
+                    }
+                }
             }
         }
     }
@@ -66,7 +74,7 @@ class FanLedService : Service() {
         createNotificationChannel()
         startForeground(
             NOTIF_ID,
-            buildNotification("Fan LED persistence active")
+            buildNotification("LED screen and power policy active")
         )
 
         workerThread = HandlerThread(
@@ -78,6 +86,7 @@ class FanLedService : Service() {
         handler = Handler(workerThread.looper)
 
         registerFanLedReceiver()
+        BootDiagnostics.record(this, "LED screen/power guard receiver registered")
         handler.post {
             ChargingLedRecovery.repairStaleChargingOwnership(
                 this@FanLedService
@@ -90,8 +99,13 @@ class FanLedService : Service() {
         flags: Int,
         startId: Int
     ): Int {
-        scheduleLedReapply()
-        return START_NOT_STICKY
+        if (!LedScreenPolicy.isScreenInteractive(this)) {
+            LedScreenPolicy.postScreenEvent(this, handler, Intent.ACTION_SCREEN_OFF,
+                "led-guard-started-screen-off") { reapplySavedLedState() }
+        } else {
+            scheduleLedReapply()
+        }
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -107,6 +121,7 @@ class FanLedService : Service() {
         }
 
         super.onDestroy()
+        BootDiagnostics.record(this, "LED screen/power guard destroyed")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -116,6 +131,8 @@ class FanLedService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
         }
         registerReceiver(screenReceiver, filter)
     }
@@ -138,6 +155,11 @@ class FanLedService : Service() {
             Context.MODE_PRIVATE
         )
 
+        if (!LedScreenPolicy.isScreenInteractive(this)) {
+            // A sticky restart can happen after the screen-off broadcast.
+            ModeTransitionCoordinator.restoreEffectiveOwner(this, "led-guard-started-screen-off")
+            return
+        }
         if (!LedOwnership.canNormalApply(this)) {
             android.util.Log.i(
                 "RedmagicLedOwnership",
@@ -286,7 +308,7 @@ class FanLedService : Service() {
                     )
             )
         } else {
-            stopSelf()
+            updateNotification("LED screen and power policy active • Saved zones off")
         }
     }
 

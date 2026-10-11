@@ -36,6 +36,8 @@ internal object BootDiagnostics {
     fun buildReport(context: Context): String = buildString {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         appendLine("REDMAGIC BOOT DIAGNOSTICS")
+        val version = context.packageManager.getPackageInfo(context.packageName, 0)
+        appendLine("Installed app: ${version.versionName} (${version.longVersionCode})")
         appendLine("Current boot: ${bootId()}")
         appendLine("Uptime: ${SystemClock.elapsedRealtime() / 1000}s")
         appendLine("User unlocked: ${context.getSystemService(UserManager::class.java)?.isUserUnlocked}")
@@ -56,6 +58,7 @@ internal object BootDiagnostics {
         appendLine("\nCURRENT APP SERVICES (snapshot; started does not mean hardware is on)")
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         val services = manager.getRunningServices(100).filter { it.service.packageName == context.packageName }
+        appendLine("LED screen/power guard present: ${services.any { it.service.className == FanLedService::class.java.name && it.started }}")
         if (services.isEmpty()) appendLine("No services visible to ActivityManager.")
         services.forEach { appendLine("${it.service.shortClassName}: pid=${it.pid}, started=${it.started}, foreground=${it.foreground}") }
         appendLine("\nROOT BOOT HELPER — latest attempt; may be from a previous boot")

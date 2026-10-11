@@ -378,7 +378,9 @@ internal class MainLightingZoneDialogs(
     }
 
     private fun stopFanLedService() {
-        runBackground { HardwareServiceActions.stopFanLed(activity) }
+        // All zones disabled still requires a receiver to enforce screen-off
+        // and later power/ownership handoffs. Reapply the disabled profile.
+        startFanLedService()
     }
 
     private fun anyLedEnabled(): Boolean {
