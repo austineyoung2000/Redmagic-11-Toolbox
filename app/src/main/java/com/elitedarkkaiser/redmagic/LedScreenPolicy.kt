@@ -18,6 +18,7 @@ object LedScreenPolicy {
             } else null
         val work = Runnable {
             try {
+                if (off) LightingRootExecutor.retryQuarantinedWriters(context)
                 android.util.Log.i("RedmagicLedPolicy", "Screen handoff executing reason=$reason screenOff=$off")
                 block()
             } finally {

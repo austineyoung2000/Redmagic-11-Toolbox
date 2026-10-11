@@ -18,6 +18,7 @@ internal object LightingRootExecutor {
     private var useOneShot = false
     @Volatile private var quarantined = false
     private var recovered = false
+    private var lastQuarantineRecoveryAt = -5_000L
     @Volatile private var rootVerified = false
     private class Session(val process: Process, val oneShot: Boolean = false) {
         val input = process.inputStream.bufferedReader()
@@ -43,6 +44,32 @@ internal object LightingRootExecutor {
             if (!rootVerified && useOneShot && !quarantined)
                 rootVerified = execute("id -u", requireVerifiedRoot = false).let { it.succeeded && it.output.trim() == "0" }
         }
+    }
+
+    /** A fresh screen-off event may recover a writer that exited after its timeout. */
+    fun retryQuarantinedWriters(context: Context) = synchronized(lock) {
+        if (!quarantined) return@synchronized
+        val now = android.os.SystemClock.elapsedRealtime()
+        // Multiple lighting receivers see the same broadcast. Avoid duplicate
+        // recovery helpers; this is event-driven, never an added polling loop.
+        if (now - lastQuarantineRecoveryAt < 5_000L) return@synchronized
+        lastQuarantineRecoveryAt = now
+        val records = directory?.listFiles()?.filter { it.extension == "pid" }
+            ?: return@synchronized
+        if (records.isEmpty()) {
+            Log.e(TAG, "Quarantine recovery has no writer identity records; remaining blocked")
+            return@synchronized
+        }
+        var stopped = true
+        for (record in records) if (!cancelWriter(record)) stopped = false
+        if (!stopped) {
+            Log.e(TAG, "Screen-off recovery did not verify every former writer stopped")
+            return@synchronized
+        }
+        quarantined = false
+        rootVerified = false
+        Log.i(TAG, "Former writers verified stopped; reopening lighting channel for screen-off handoff")
+        initialize(context)
     }
 
     fun status(): String = if (quarantined) "quarantined: writer cancellation not acknowledged"
