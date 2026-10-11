@@ -190,19 +190,22 @@ internal class MainLightingTabActions(
         saveShoulderLedStateStorage(activity, LedState(true, LedBrightness.encode(selection.shoulderBrightness, selection.effect), color))
 
         runBackground {
-            HardwareController.setRgbCycleFrame(
-                effectName = selection.effect,
-                logoColor = color,
-                shoulderColor = color,
-                fanColor = color,
-                logoBrightness = selection.logoBrightness,
-                shoulderBrightness = selection.shoulderBrightness,
-                fanBrightness = selection.fanBrightness,
-                barColor = selection.barColors.firstOrNull() ?: color,
-                barBrightness = selection.barBrightness,
-                logoEnabled = selection.logoEnabled,
-                barEnabled = selection.barEnabled
-            )
+            ModeTransitionCoordinator.applyLedProfile(activity, LedOwner.NORMAL,
+                "normal-all-zones-preview", force = true) {
+                HardwareController.setRgbCycleFrame(
+                    effectName = selection.effect,
+                    logoColor = color,
+                    shoulderColor = color,
+                    fanColor = color,
+                    logoBrightness = selection.logoBrightness,
+                    shoulderBrightness = selection.shoulderBrightness,
+                    fanBrightness = selection.fanBrightness,
+                    barColor = selection.barColors.firstOrNull() ?: color,
+                    barBrightness = selection.barBrightness,
+                    logoEnabled = selection.logoEnabled,
+                    barEnabled = selection.barEnabled
+                )
+            }
             HardwareServiceActions.startFanLed(activity)
         }
         onUpdated()

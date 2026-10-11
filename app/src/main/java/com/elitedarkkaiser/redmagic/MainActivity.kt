@@ -244,12 +244,19 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        GameModeActions.toolboxResumed(this)
+        if (uiLaunched) HardwareServiceActions.ensureLightingServices(this)
 
         val savedUnit = isUseFahrenheitStorage(this)
         if (savedUnit != useFahrenheit) {
             useFahrenheit = savedUnit
             if (uiLaunched) refreshStatus()
         }
+    }
+
+    override fun onPause() {
+        GameModeActions.toolboxPaused()
+        super.onPause()
     }
 
     override fun onStop() {
@@ -334,7 +341,7 @@ class MainActivity : Activity() {
         selectPendingTab()
 
         coolingController.startAutoPumpIfEnabled()
-        lightingController.startRgbStudioIfEnabled()
+        HardwareServiceActions.ensureLightingServices(this)
         startTriggerAutoStartIfEnabled()
         activityRuntime.onUiReady()
         startCapabilityScan()

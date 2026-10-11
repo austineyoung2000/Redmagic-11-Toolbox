@@ -30,6 +30,7 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -78,6 +79,8 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/cooling_widget_info" />
         </receiver>
+
+        <receiver android:name=".NotificationExpiryReceiver" android:exported="false" />
 
         <service android:name=".NotificationLightingService"
             android:label="Redmagic notification lighting"

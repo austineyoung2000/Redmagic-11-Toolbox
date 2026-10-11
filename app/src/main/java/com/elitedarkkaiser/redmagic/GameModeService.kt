@@ -15,6 +15,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 class GameModeService : Service() {
 
     companion object {
+        // A persisted override flag is not foreground evidence after process death.
+        @Volatile private var selectedForegroundPackage: String? = null
+        @Volatile private var toolboxForeground = false
+        internal fun hasSelectedForegroundGame(): Boolean = !toolboxForeground && selectedForegroundPackage != null
+        internal fun setToolboxForeground(active: Boolean) {
+            toolboxForeground = active
+            if (active) selectedForegroundPackage = null
+        }
+
         const val EXTRA_APPLY_SAVED_PROFILE =
             "apply_saved_game_mode_profile"
         const val EXTRA_CONTINUE_AFTER_APPLY =
@@ -23,8 +32,11 @@ class GameModeService : Service() {
 
     private lateinit var workerThread: HandlerThread
     private lateinit var handler: Handler
+    private lateinit var coolingThread: HandlerThread
+    private lateinit var coolingHandler: Handler
+    private val coolingGeneration = java.util.concurrent.atomic.AtomicLong(0)
 
-    private var gameModeActiveFor: String? = null
+    @Volatile private var gameModeActiveFor: String? = null
     private var gameModeApplyPendingFor: String? = null
     private var pollingPausedForScreenOff = false
 
@@ -46,10 +58,11 @@ class GameModeService : Service() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
+            if (action == Intent.ACTION_SCREEN_OFF) selectedForegroundPackage = null
 
-            handler.post {
+            LedScreenPolicy.postScreenEvent(this@GameModeService, handler, action, "game-screen") event@ {
                 if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
-                    return@post
+                    return@event
                 }
 
                 when (action) {
@@ -99,6 +112,7 @@ class GameModeService : Service() {
             try {
                 val currentPkg = getForegroundPackageName()
                 val tracked = getSavedGamePackagesStorage(this@GameModeService)
+                selectedForegroundPackage = currentPkg?.takeIf { tracked.contains(it) }
 
                 if (!currentPkg.isNullOrBlank() && tracked.contains(currentPkg)) {
                     if (gameModeActiveFor != currentPkg) {
@@ -144,6 +158,8 @@ class GameModeService : Service() {
             start()
         }
         handler = Handler(workerThread.looper)
+        coolingThread = HandlerThread("RedMagicGameCooling", android.os.Process.THREAD_PRIORITY_BACKGROUND).apply { start() }
+        coolingHandler = Handler(coolingThread.looper)
 
         handler.post {
             if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) {
@@ -172,6 +188,7 @@ class GameModeService : Service() {
         startId: Int
     ): Int {
         val pkg = intent?.getStringExtra("foreground_pkg")
+        if (!pkg.isNullOrBlank()) selectedForegroundPackage = pkg.takeIf { getSavedGamePackagesStorage(this).contains(it) }
         val applySavedProfile =
             intent?.getBooleanExtra(
                 EXTRA_APPLY_SAVED_PROFILE,
@@ -210,6 +227,7 @@ class GameModeService : Service() {
                      * a package. Probe UsageStats immediately so
                      * process recreation restores the right mode.
                      */
+                    gameModeApplyPendingFor = gameModeActiveFor
                     handler.removeCallbacks(pollRunnable)
                     handler.post(pollRunnable)
                 }
@@ -221,7 +239,7 @@ class GameModeService : Service() {
 
     private fun applySavedProfileNow() {
         if (!LedScreenPolicy.isScreenInteractive(this)) {
-            HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this, "saved-game-profile-screen-off")
+            coolingHandler.post { HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this, "saved-game-profile-screen-off") }
             ModeTransitionCoordinator.restoreEffectiveOwner(this, "saved-game-profile-screen-off")
             return
         }
@@ -230,6 +248,22 @@ class GameModeService : Service() {
 
         GameModeActions.applyProfileNow(
             profile = profile,
+            applyCooling = { block ->
+                val generation = coolingGeneration.incrementAndGet()
+                coolingHandler.post {
+                    if (generation == coolingGeneration.get() && LedScreenPolicy.isScreenInteractive(this)) block()
+                }
+            },
+            applyLighting = { block ->
+                // An explicit profile application cannot claim LEDs without a
+                // selected foreground game, or interrupt a higher owner.
+                val foreground = getForegroundPackageName()
+                selectedForegroundPackage = foreground?.takeIf { getSavedGamePackagesStorage(this).contains(it) }
+                if (foreground != null && getSavedGamePackagesStorage(this).contains(foreground)) {
+                    ModeTransitionCoordinator.applyLedProfile(this, LedOwner.GAME_MODE,
+                        "saved-game-profile", force = true, block = block)
+                }
+            },
             applyFanLed = { effect, color ->
                 if (effect.startsWith("preset:")) {
                     HardwareController.setFanLedStockPreset(
@@ -250,6 +284,14 @@ class GameModeService : Service() {
     ) {
         if (!GameModeLifecyclePolicy.acceptsWork(stopping.get())) return
 
+        if (currentPkg == packageName) {
+            // Our resumed activity is authoritative; no game-entry debounce
+            // is needed before releasing its obsolete lighting ownership.
+            handler.removeCallbacks(foregroundPackageRunnable)
+            pendingForegroundPackage = null
+            handleForegroundPackageNow(currentPkg)
+            return
+        }
         pendingForegroundPackage = currentPkg
 
         handler.removeCallbacks(
@@ -272,6 +314,7 @@ class GameModeService : Service() {
         ) return
 
         val tracked = getSavedGamePackagesStorage(this)
+        selectedForegroundPackage = currentPkg.takeIf { tracked.contains(it) }
         handler.removeCallbacks(pollRunnable)
 
         if (!tracked.contains(currentPkg)) {
@@ -338,10 +381,12 @@ class GameModeService : Service() {
                 restoreAndClear("service destroyed")
             }
 
+            coolingHandler.post { coolingThread.quitSafely() }
             workerThread.quitSafely()
         }
 
         if (!cleanupPosted) {
+            coolingThread.quitSafely()
             workerThread.quitSafely()
         }
 
@@ -362,6 +407,7 @@ class GameModeService : Service() {
 
         /* Clear ownership before restoring so re-entrant cleanup cannot run
          * the same hardware restoration twice. */
+        selectedForegroundPackage = null
         gameModeActiveFor = null
         gameModeApplyPendingFor = null
 
@@ -376,6 +422,8 @@ class GameModeService : Service() {
             )
         }
     }
+
+    private var observedForegroundPackage: String? = null
 
     private fun getForegroundPackageName(): String? {
         val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -399,16 +447,16 @@ class GameModeService : Service() {
             }
         }
 
-        return lastForeground
+        if (lastForeground != null) observedForegroundPackage = lastForeground
+        return observedForegroundPackage
     }
 
     private fun shouldIgnorePackage(pkg: String): Boolean {
-        if (pkg == packageName) return true
         if (pkg == "com.android.systemui") return true
         return false
     }
 
-    
+
 
     private fun getProfileForPackage(pkg: String): Map<String, Any> {
         val prefs = getSharedPreferences("redmagic_hw_controls_prefs", Context.MODE_PRIVATE)
@@ -474,20 +522,26 @@ class GameModeService : Service() {
         fun applyOnce(reason: String) {
             if (gameModeActiveFor != pkg) return
 
-            if (fanEnabled) {
-                HardwareController.setFanLevel(
-                    fanLevel
-                )
-            } else {
-                HardwareController.enableFan(false)
-            }
+            val generation = coolingGeneration.incrementAndGet()
+            coolingHandler.post {
+                if (generation != coolingGeneration.get() || stopping.get() ||
+                    !LedScreenPolicy.isScreenInteractive(this) || gameModeActiveFor != pkg ||
+                    !hasSelectedForegroundGame()) return@post
+                if (fanEnabled) {
+                    HardwareController.setFanLevel(
+                        fanLevel
+                    )
+                } else {
+                    HardwareController.enableFan(false)
+                }
 
-            if (pumpEnabled) {
-                HardwareController.setPumpProfile(
-                    pumpProfile
-                )
-            } else {
-                HardwareController.enablePump(false)
+                if (pumpEnabled) {
+                    HardwareController.setPumpProfile(
+                        pumpProfile
+                    )
+                } else {
+                    HardwareController.enablePump(false)
+                }
             }
 
             val ledSignature = listOf(
@@ -505,7 +559,7 @@ class GameModeService : Service() {
                 shoulderLedColor
             ).joinToString("|")
 
-            ModeTransitionCoordinator.applyLedProfile(
+            val applied = ModeTransitionCoordinator.applyLedProfile(
                 context = this@GameModeService,
                 owner = LedOwner.GAME_MODE,
                 signature = ledSignature
@@ -577,61 +631,12 @@ class GameModeService : Service() {
                 )
             }
 
-            gameModeApplyPendingFor = null
+            gameModeApplyPendingFor = if (applied) null else pkg
         }
 
         applyOnce("now")
     }
     private fun restoreNormalProfile() {
-        val coolingBlocked = HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(
-            this, "game-profile-restoration"
-        )
-        val prefs = getSharedPreferences(
-            "redmagic_hw_controls_prefs",
-            Context.MODE_PRIVATE
-        )
-
-        val fanEnabled =
-            prefs.getBoolean("fan_enabled", false)
-        val fanLevel =
-            prefs.getInt("fan_level", 0)
-        val pumpEnabled =
-            prefs.getBoolean("pump_enabled", false)
-        val pumpProfile =
-            prefs.getString(
-                "pump_profile",
-                "quick"
-            ) ?: "quick"
-
-        /*
-         * If a call currently owns the fan pause, update the
-         * state that Call Lighting will restore. Do not briefly
-         * restart the fan underneath the active call.
-         */
-        if (
-            CallLightingState.isActive(this) &&
-            CallLightingState
-                .wasFanPausedForCall(this)
-        ) {
-            CallLightingState.savePreCallFanState(
-                context = this,
-                enabled = fanEnabled,
-                level = fanLevel
-            )
-        } else if (fanEnabled && !coolingBlocked) {
-            HardwareController.setFanLevel(fanLevel)
-        } else {
-            HardwareController.enableFan(false)
-        }
-
-        if (pumpEnabled && !coolingBlocked) {
-            HardwareController.setPumpProfile(
-                pumpProfile
-            )
-        } else {
-            HardwareController.enablePump(false)
-        }
-
         /*
          * Release Game Mode before selecting the next owner.
          * This prevents its own saved flag from winning the
@@ -649,9 +654,63 @@ class GameModeService : Service() {
                 "game-mode-ended"
             )
 
+        val generation = coolingGeneration.incrementAndGet()
+        coolingHandler.post {
+            if (generation != coolingGeneration.get()) return@post
+            val coolingBlocked = HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(
+                this, "game-profile-restoration"
+            )
+            val prefs = getSharedPreferences(
+                "redmagic_hw_controls_prefs",
+                Context.MODE_PRIVATE
+            )
+
+            val fanEnabled =
+                prefs.getBoolean("fan_enabled", false)
+            val fanLevel =
+                prefs.getInt("fan_level", 0)
+            val pumpEnabled =
+                prefs.getBoolean("pump_enabled", false)
+            val pumpProfile =
+                prefs.getString(
+                    "pump_profile",
+                    "quick"
+                ) ?: "quick"
+
+            /*
+             * If a call currently owns the fan pause, update the
+             * state that Call Lighting will restore. Do not briefly
+             * restart the fan underneath the active call.
+             */
+            if (
+                CallLightingState.isActive(this) &&
+                CallLightingState
+                    .wasFanPausedForCall(this)
+            ) {
+                CallLightingState.savePreCallFanState(
+                    context = this,
+                    enabled = fanEnabled,
+                    level = fanLevel
+                )
+            } else if (fanEnabled && !coolingBlocked) {
+                HardwareController.setFanLevel(fanLevel)
+            } else {
+                HardwareController.enableFan(false)
+            }
+
+            if (pumpEnabled && !coolingBlocked) {
+                HardwareController.setPumpProfile(
+                    pumpProfile
+                )
+            } else {
+                HardwareController.enablePump(false)
+            }
+
+        }
+
         android.util.Log.i(
             "RedmagicGameMode",
-            "restored normal cooling and reconciled LEDs"
+            "reconciled LEDs and queued normal cooling restoration"
         )
     }
 }

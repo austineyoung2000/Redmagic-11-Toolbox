@@ -9,6 +9,7 @@ open class BootReceiver : BroadcastReceiver() {
         if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             if (DeviceCompatibility.isSupportedDevice()) {
                 GameplayRuntimeService.ensureRunning(context)
+                HardwareServiceActions.ensureLightingServices(context)
             }
             return
         }
@@ -55,6 +56,8 @@ open class BootReceiver : BroadcastReceiver() {
         if (decision.startCoreServices) {
             startCoreServices(appContext)
         }
+        // The boot claim deduplicates one-time setup, not receiver liveness.
+        HardwareServiceActions.ensureLightingServices(appContext)
 
         if (!decision.needsAsyncWork) return
 
@@ -97,14 +100,6 @@ open class BootReceiver : BroadcastReceiver() {
         }
         if (savedPumpStateStorage(context).autoEnabled) {
             BootDiagnostics.request(context, "Auto pump") { HardwareServiceActions.startAutoPump(context) }
-        }
-        BootDiagnostics.request(context, "Charging mode") { HardwareServiceActions.startChargingMode(context) }
-
-        if (CallLightingState.isEnabled(context)) {
-            BootDiagnostics.request(context, "Call lighting") { HardwareServiceActions.startCallLighting(context) }
-        }
-        if (RgbStudioStorage.isEnabled(context)) {
-            BootDiagnostics.request(context, "RGB Studio") { HardwareServiceActions.startRgbCycle(context) }
         }
         if (SliderDualAppStorage.read(context).enabled) {
             BootDiagnostics.request(context, "Slider") { HardwareServiceActions.startSliderDualApp(context) }

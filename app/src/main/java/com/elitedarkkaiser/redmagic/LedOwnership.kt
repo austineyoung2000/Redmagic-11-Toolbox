@@ -15,11 +15,12 @@ enum class LedOwner {
 object LedOwnership {
     fun current(context: Context): LedOwner {
         return LightingPriorityPolicy.select(
-            incomingCall = CallLightingState.isEnabled(context) && CallLightingState.isActive(context),
+            incomingCall = CallLightingState.isEnabled(context) && CallLightingState.isRingingNow(context),
             charging = ChargingLedState.isEnabled(context) && ChargingLedState.isChargingNow(context),
-            notification = NotificationLightingState.isActive(),
-            game = isGameModeLedOverrideActiveStorage(context),
-            rgbStudio = RgbStudioStorage.isEnabled(context)
+            notification = NotificationLightingState.isEligible(context),
+            game = isGameModeLedOverrideActiveStorage(context) && GameModeService.hasSelectedForegroundGame(),
+            rgbStudio = RgbStudioStorage.isEnabled(context),
+            screenInteractive = LedScreenPolicy.isScreenInteractive(context)
         )
     }
 
@@ -29,7 +30,7 @@ object LedOwnership {
 
     fun canGameModeApply(context: Context): Boolean {
         val owner = current(context)
-        return owner == LedOwner.NORMAL || owner == LedOwner.GAME_MODE
+        return owner == LedOwner.GAME_MODE
     }
 
     fun canCallApply(context: Context): Boolean {

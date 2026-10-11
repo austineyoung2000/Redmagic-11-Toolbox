@@ -23,13 +23,26 @@ object HardwareServiceActions {
         startForegroundCapableService(context, Intent(context, FanLedService::class.java))
     }
 
-    fun stopFanLed(context: Context) {
-        context.stopService(Intent(context, FanLedService::class.java))
+    fun ensureLightingServices(context: Context) {
+        if (!DeviceCompatibility.isSupportedDevice()) return
+        // The screen/power guard must exist even when every saved zone is off.
+        // Starting services does not grant their profiles lighting ownership.
+        BootDiagnostics.request(context, "LED screen/power guard") { startFanLed(context) }
+        BootDiagnostics.request(context, "Charging mode") { startChargingMode(context) }
+        NotificationLightingService.ensureConnected(context)
+        if (CallLightingState.isEnabled(context)) {
+            BootDiagnostics.request(context, "Call lighting") { startCallLighting(context) }
+        }
+        if (RgbStudioStorage.isEnabled(context)) {
+            BootDiagnostics.request(context, "RGB Studio") { startRgbCycle(context) }
+        }
     }
 
     fun startRgbCycle(context: Context) {
         if (!DeviceCompatibility.isSupportedDevice()) return
-        stopFanLed(context)
+        // Normal writes are ownership-gated. Keep its screen/power receiver
+        // alive while Studio owns lighting instead of removing the guard.
+        startFanLed(context)
         startForegroundCapableService(
             context,
             Intent(context, RgbCycleService::class.java)

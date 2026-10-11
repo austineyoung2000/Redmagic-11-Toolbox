@@ -115,7 +115,7 @@ internal object ChargingLedState {
     fun applyChargingProfile(
         context: Context,
         force: Boolean = false
-    ) {
+    ): Boolean {
         val prefs = context.getSharedPreferences(
             PREFS,
             Context.MODE_PRIVATE
@@ -169,7 +169,7 @@ internal object ChargingLedState {
             shoulderColor
         ).joinToString("|")
 
-        ModeTransitionCoordinator.applyLedProfile(
+        return ModeTransitionCoordinator.applyLedProfile(
             context = context,
             owner = LedOwner.CHARGING,
             signature = signature,

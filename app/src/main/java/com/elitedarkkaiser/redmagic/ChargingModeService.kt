@@ -78,6 +78,9 @@ class ChargingModeService : Service() {
 
         if (::handler.isInitialized) {
             handler.removeCallbacksAndMessages(null)
+            handler.post {
+                ModeTransitionCoordinator.restoreEffectiveOwner(this, "charging-service-stopped")
+            }
         }
         if (::workerThread.isInitialized) {
             workerThread.quitSafely()
@@ -128,11 +131,14 @@ class ChargingModeService : Service() {
             )
 
             if (!wasActive || force) {
-                ChargingLedState
-                    .applyChargingProfile(
-                        this,
-                        force = force
-                    )
+                val applied = ChargingLedState.applyChargingProfile(this, force = force)
+                if (!applied && LedOwnership.current(this) == LedOwner.CHARGING) {
+                    // A failed transition must not become an unchanged-state
+                    // cache entry that suppresses the next battery evaluation.
+                    lastEnabled = null
+                    lastCharging = null
+                    ChargingLedState.setActive(this, false)
+                }
             }
             return
         }

@@ -28,6 +28,11 @@ internal class MainLightingZoneDialogs(
     private val state: LightingZoneState,
     private val previewEnabled: () -> Boolean
 ) {
+    private fun runLedPreview(block: () -> Unit): Boolean = runBackground {
+        ModeTransitionCoordinator.applyLedProfile(activity, LedOwner.NORMAL,
+            "normal-editor-preview", force = true, block = block)
+    }
+
     private var refreshFan: (() -> Unit)? = null
     private var refreshLogo: (() -> Unit)? = null
     private var refreshShoulder: (() -> Unit)? = null
@@ -60,7 +65,7 @@ internal class MainLightingZoneDialogs(
             },
             disableLed = {
                 disableRgbStudioForManualControl()
-                runBackground {
+                runLedPreview {
                     HardwareController.setShoulderLedEnabled(false)
                 }
             },
@@ -111,7 +116,7 @@ internal class MainLightingZoneDialogs(
         val original = LedState(state.logoEnabled, state.logoEffect, state.logoColor)
         fun apply(selection: LedState) {
             if (selection.enabled) applyLogoSelection(selection.effect, selection.color)
-            else runBackground { HardwareController.setLogoLedEnabled(false) }
+            else runLedPreview { HardwareController.setLogoLedEnabled(false) }
         }
         fun update(selection: LedState) {
             state.logoEnabled = selection.enabled
@@ -163,7 +168,7 @@ internal class MainLightingZoneDialogs(
             },
             disableLed = {
                 disableRgbStudioForManualControl()
-                runBackground {
+                runLedPreview {
                     HardwareController.setFanLedEnabled(false)
                 }
             },
@@ -281,14 +286,14 @@ internal class MainLightingZoneDialogs(
         if (state.fanEnabled) {
             applyFanSelection(state.fanEffect, state.fanColor)
         } else {
-            runBackground { HardwareController.setFanLedEnabled(false) }
+            runLedPreview { HardwareController.setFanLedEnabled(false) }
         }
     }
 
     private fun applyLogoPreviewIfEnabled() {
         if (!previewEnabled()) return
 
-        runBackground {
+        runLedPreview {
             if (state.logoEnabled) {
                 if (!HardwareController.setLogoLedEffect(state.logoEffect, state.logoColor)) {
                     reportLightingFailure("Logo")
@@ -305,12 +310,12 @@ internal class MainLightingZoneDialogs(
         if (state.shoulderEnabled) {
             applyShoulderSelection(state.shoulderEffect, state.shoulderColor)
         } else {
-            runBackground { HardwareController.setShoulderLedEnabled(false) }
+            runLedPreview { HardwareController.setShoulderLedEnabled(false) }
         }
     }
 
     private fun applyShoulderSelection(effect: String, color: Int) {
-        runBackground {
+        runLedPreview {
             if (!HardwareController.setShoulderLedEffect(effect, color)) {
                 activity.runOnUiThread {
                     android.widget.Toast.makeText(
@@ -332,13 +337,13 @@ internal class MainLightingZoneDialogs(
     }
 
     private fun applyLogoSelection(effect: String, color: Int) {
-        runBackground {
+        runLedPreview {
             if (!HardwareController.setLogoLedEffect(effect, color)) reportLightingFailure("Logo")
         }
     }
 
     private fun applyFanSelection(effect: String, color: Int) {
-        runBackground {
+        runLedPreview {
             val success = if (effect.startsWith("preset:")) {
                 HardwareController.setFanLedStockPreset(effect.removePrefix("preset:"))
             } else HardwareController.setFanLedEffect(effect, color)
@@ -373,7 +378,9 @@ internal class MainLightingZoneDialogs(
     }
 
     private fun stopFanLedService() {
-        runBackground { HardwareServiceActions.stopFanLed(activity) }
+        // All zones disabled still requires a receiver to enforce screen-off
+        // and later power/ownership handoffs. Reapply the disabled profile.
+        startFanLedService()
     }
 
     private fun anyLedEnabled(): Boolean {

@@ -817,3 +817,37 @@ Restore requires confirmation and applies current settings through the existing 
 Reads are bounded to 5,000,000 decoded characters. Backup schema, profile counts, nested app-profile exports, supplemental version, notification durations/brightness/split encodings, and finite paired position coordinates are validated before persistent restore writes. Restoration uses multiple existing preference stores and hardware actions; it is not an atomic transaction. Storage/hardware failures can leave a partial restore and are reported rather than claimed rolled back. Keep an export of the current configuration before restoring.
 
 Phone checks: export from Settings; change a benign setting and notification preset; cancel restore and confirm nothing changes; restore and verify settings, Master Profiles, split notification colors and Edit position; verify an old backup preserves newer notification data; reject a malformed/oversized file; reopen Toolbox and confirm persistence. Hardware/runtime behavior still requires phone testing. Step 4 was cancelled; its optimizations are not included.
+
+### Notification expiry investigation
+
+The notification-expiry test branch adds an elapsed-realtime wakeup alarm alongside the existing Handler timer and bounded partial wake lock. Bursts retain the original deadline; an expired pending window is cleaned before a new alert starts, and slow profile application cleans up immediately if the deadline has passed. Neither alarm nor wake lock turns on the display. Alarm callbacks use a separate bounded five-second cleanup lock while restoration runs. Ordinary exact alarms can still be deferred in Doze; the bounded window lock remains necessary. Listener alarms do not survive process death, so reconnection remains the recovery path. No new exact-alarm permission is requested.
+
+Targeted NotificationLighting logs report selected zones, root-write success, shared-power cooling shutdown, deadline arming, alarm delivery and restoration entry. They contain no notification text or key. Fan/trigger LEDs currently require the fan-enable power node; cool screen-off policy disables that node after LED application. The missing fan/trigger output is therefore still under device investigation, and this branch does not bypass cooling safety or claim all selected zones are fixed.
+
+Phone checks: lock the unplugged cool phone, receive one Messenger alert with all three zones selected and a 10-second window, and leave it locked for at least 30 seconds. Check expiry without waking it, then repeat with a notification burst. Check charging still prevents takeover, a ringing call takes priority, and waking restores saved lighting. Capture the targeted logs in Termux after reproducing:
+
+```sh
+su -c 'logcat -d -v time -s NotificationLighting RedmagicModeCoordinator RedmagicScreenPolicy HardwareController' > "$HOME/notification-lighting-log.txt"
+```
+
+Top-trigger intent unlock already exists under Trigger Safety; two to four top taps require an unlock sequence, while one tap bypasses it. No trigger controls or behavior are changed by this investigation.
+
+### Stock NX809J notification lighting
+
+Notification LEDs use the supplied NX809J stock Lights HAL command order: three separate rgb writes (region, effect, color), then the packed effect and cfg=2. All selected zones are submitted in one serialized root command. Startup retains the stock HAL sequence. Expiry uses the same ownership-locked turnOffAllLeds path as screen-off receivers, with zone/off effect followed by cfg=1; no separate rgb/cfg=2 shutdown is inserted. Firmware patching and register replay are no longer used for notifications.
+
+The notification editor offers common preset color/effect, zone checkboxes and 3/5/10/15/30-second duration. Notification brightness and split controls are removed; older saved profiles retain their data but those overrides are ignored by notifications until saving a stock profile. Other lighting editors retain brightness and split settings.
+
+New distinct notifications restart the selected duration; updates to an already seen notification key do not. The selected visible duration starts after successful application, with a separate bounded setup deadline. A bounded partial wake lock and elapsed-realtime listener alarm handle expiry without waking the display. Unlike stock system_server, the app does not have privileged exact-idle alarm access; listener reconnection remains process-death recovery. Charging/call ownership and screen-off cooling safety remain enforced. Hot cooling continues; LED shutdown itself never writes fan or pump power.
+
+Validation: stock command-order and rejection tests cover separate rgb writes, cfg=2 and power-free shutdown. CI and phone validation for this revision are pending. Phone checks: Messenger orange Breathe, all zones, ten seconds; immediate start and expiry while locked; duplicate update versus distinct back-to-back notification; charging/call preemption; wake restoration; hot-phone fan/pump cooling.
+
+Device feedback: stock startup was confirmed almost immediate. Ten-second shutdown failed on that revision. The follow-up removes the separate HAL off path and routes expiry solely through the proven screen-off restoration/shutdown path. Device verification of the follow-up is pending.
+
+### Repeated screen-off notification sessions
+
+Device testing confirmed immediate startup and ten-second expiry on 50dd42d. Notification-ID deduplication previously survived screen wake, so Messenger could reuse a key and be ignored until a process restart. Deduplication now resets on screen-on, and awake, charging, call-preempted or unconfigured callbacks do not consume an eligible alert. Duplicate updates remain suppressed within the same screen-off session. Listener reconnection still seeds existing keys to suppress replay. Startup, expiry commands and cooling policy are unchanged. Validate several lock/message/expiry/unlock cycles without rebooting.
+
+### Overlapping notification output
+
+Matching active notification presets now restart the selected timer without submitting another full LED batch, following stock unchanged-output suppression. The previous code forced an all-zone clear/reload for every distinct notification, including simultaneous friends using the same Messenger preset. Output identity uses the actual preset color, effect and selected zones; a different output still applies through the existing coordinator. The identity clears on expiry/wake/removal/disconnect, so a later screen-off window still executes its normal startup. Hardware start/stop command files are unchanged. Overlapping-message phone validation remains pending.

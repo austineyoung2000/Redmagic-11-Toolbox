@@ -10,6 +10,21 @@ import com.google.android.material.button.MaterialButton
 
 internal object GameModeActions {
 
+    fun toolboxResumed(context: Context) {
+        GameModeService.setToolboxForeground(true)
+        if (isGameModeLedOverrideActiveStorage(context)) {
+            runCatching {
+                context.startService(Intent(context, GameModeService::class.java)
+                    .putExtra("foreground_pkg", context.packageName))
+            }.onFailure { android.util.Log.e("RedmagicGameMode", "Toolbox LED handoff could not start", it) }
+        }
+    }
+
+    fun toolboxPaused() {
+        GameModeService.setToolboxForeground(false)
+    }
+
+
     fun startServiceSilentlyIfPermitted(context: Context) {
         if (PermissionActions.hasUsageStatsPermission(context)) {
             context.startService(Intent(context, GameModeService::class.java))
@@ -318,36 +333,42 @@ internal object GameModeActions {
     }
     fun applyProfileNow(
         profile: GameModeProfile,
-        applyFanLed: (String, Int) -> Unit
+        applyFanLed: (String, Int) -> Unit,
+        applyLighting: (() -> Unit) -> Unit,
+        applyCooling: (() -> Unit) -> Unit
     ) {
-        if (profile.fanEnabled) {
-            HardwareController.setFanLevel(profile.fanLevel)
-        } else {
-            HardwareController.enableFan(false)
+        applyCooling {
+            if (profile.fanEnabled) {
+                HardwareController.setFanLevel(profile.fanLevel)
+            } else {
+                HardwareController.enableFan(false)
+            }
+
+            if (profile.pumpEnabled) {
+                HardwareController.setPumpProfile(profile.pumpProfile)
+            } else {
+                HardwareController.enablePump(false)
+            }
         }
 
-        if (profile.pumpEnabled) {
-            HardwareController.setPumpProfile(profile.pumpProfile)
-        } else {
-            HardwareController.enablePump(false)
-        }
+        applyLighting {
+            if (profile.fanLedEnabled) {
+                applyFanLed(profile.fanLedEffect, profile.fanLedColor)
+            } else {
+                HardwareController.setFanLedEnabled(false)
+            }
 
-        if (profile.fanLedEnabled) {
-            applyFanLed(profile.fanLedEffect, profile.fanLedColor)
-        } else {
-            HardwareController.setFanLedEnabled(false)
-        }
+            if (profile.logoLedEnabled) {
+                HardwareController.setLogoLedEffect(profile.logoLedEffect, profile.logoLedColor)
+            } else {
+                HardwareController.setLogoLedEnabled(false)
+            }
 
-        if (profile.logoLedEnabled) {
-            HardwareController.setLogoLedEffect(profile.logoLedEffect, profile.logoLedColor)
-        } else {
-            HardwareController.setLogoLedEnabled(false)
-        }
-
-        if (profile.shoulderLedEnabled) {
-            HardwareController.setShoulderLedEffect(profile.shoulderLedEffect, profile.shoulderLedColor)
-        } else {
-            HardwareController.setShoulderLedEnabled(false)
+            if (profile.shoulderLedEnabled) {
+                HardwareController.setShoulderLedEffect(profile.shoulderLedEffect, profile.shoulderLedColor)
+            } else {
+                HardwareController.setShoulderLedEnabled(false)
+            }
         }
     }
 

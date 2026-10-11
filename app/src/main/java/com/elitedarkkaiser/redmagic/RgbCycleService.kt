@@ -44,7 +44,10 @@ class RgbCycleService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     screenOffAt = SystemClock.elapsedRealtime()
-                    scheduleNext(0L)
+                    handler.removeCallbacks(cycleRunnable)
+                    LedScreenPolicy.postScreenEvent(this@RgbCycleService, handler, intent.action, "studio-screen-off") {
+                        runCycleTick()
+                    }
                 }
                 Intent.ACTION_SCREEN_ON,
                 Intent.ACTION_USER_PRESENT -> {
@@ -106,6 +109,10 @@ class RgbCycleService : Service() {
         runCatching { unregisterReceiver(screenReceiver) }
         if (::handler.isInitialized) {
             handler.removeCallbacksAndMessages(null)
+            handler.post {
+                if (!RgbStudioStorage.isEnabled(this) || !LedScreenPolicy.isScreenInteractive(this))
+                    ModeTransitionCoordinator.restoreEffectiveOwner(this, "rgb-service-stopped")
+            }
         }
         if (::workerThread.isInitialized) {
             workerThread.quitSafely()
@@ -123,14 +130,9 @@ class RgbCycleService : Service() {
             return
         }
 
-        if (LedOwnership.current(this) != LedOwner.RGB_CYCLE) {
-            scheduleNext(OWNER_RECHECK_MS)
-            return
-        }
-
         if (shouldPauseForScreenTimeout()) {
             if (!ledsOffForTimeout) {
-                ModeTransitionCoordinator
+                ledsOffForTimeout = ModeTransitionCoordinator
                     .applyLedProfile(
                         context = this,
                         owner = LedOwner.NONE,
@@ -141,8 +143,12 @@ class RgbCycleService : Service() {
                         HardwareController
                             .turnOffAllLeds()
                     }
-                ledsOffForTimeout = true
             }
+            scheduleNext(OWNER_RECHECK_MS)
+            return
+        }
+
+        if (LedOwnership.current(this) != LedOwner.RGB_CYCLE) {
             scheduleNext(OWNER_RECHECK_MS)
             return
         }

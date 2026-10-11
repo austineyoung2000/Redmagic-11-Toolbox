@@ -10,6 +10,12 @@ object HardwareScreenPolicy {
     @Volatile
     private var screenOffShutdownApplied = false
 
+    fun invalidateCoolingShutdownReceipt() {
+        // LED programs may change fan power after an earlier cold shutdown.
+        // Invalidate the receipt without changing cooling hardware or policy.
+        screenOffShutdownApplied = false
+    }
+
     fun isScreenInteractive(context: Context): Boolean {
         return try {
             val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager

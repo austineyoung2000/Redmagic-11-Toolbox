@@ -24,6 +24,8 @@ object HardwareTelemetry {
         HardwareTelemetrySnapshot? = null
 
     private var cachedSnapshotAtMs = 0L
+    private val cacheGeneration = java.util.concurrent.atomic.AtomicLong()
+    private var cachedGeneration = -1L
 
     fun read(): HardwareTelemetrySnapshot {
         if (!DeviceCompatibility.isSupportedDevice()) {
@@ -33,12 +35,13 @@ object HardwareTelemetry {
         return synchronized(readLock) {
             val now =
                 android.os.SystemClock.elapsedRealtime()
+            val generation = cacheGeneration.get()
             val cached = cachedSnapshot
             val temperature =
                 DeviceTemperatureMonitor.readTemperatureC()
 
             if (
-                cached != null &&
+                cached != null && cachedGeneration == generation &&
                 now - cachedSnapshotAtMs <
                 HARDWARE_CACHE_MS
             ) {
@@ -137,6 +140,7 @@ object HardwareTelemetry {
 
             cachedSnapshot = fresh
             cachedSnapshotAtMs = now
+            cachedGeneration = generation
             fresh
         }
     }
@@ -147,9 +151,7 @@ object HardwareTelemetry {
     }
 
     fun invalidateHardwareCache() {
-        synchronized(readLock) {
-            cachedSnapshotAtMs = 0L
-        }
+        cacheGeneration.incrementAndGet()
     }
 
     private fun StringBuilder.appendRead(

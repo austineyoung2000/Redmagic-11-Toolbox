@@ -11,6 +11,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 
 object NotificationLightingDialog {
+    private val saveExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     fun show(activity: Activity) {
         val host=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL }
         val dialog=MaterialAlertDialogBuilder(activity).setTitle("Notification lighting")
@@ -24,9 +25,29 @@ object NotificationLightingDialog {
         val panel = LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(32,16,32,16) }
         panel.addView(CheckBox(activity).apply {
             text="Enable screen-off notification lighting"; isChecked=NotificationLightingState.enabled(activity)
+            var restoring = false
             setOnCheckedChangeListener { _, value ->
-                NotificationLightingState.setEnabled(activity,value)
-                activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+                if (!restoring) {
+                    isEnabled = false
+                    val previous = !value
+                    saveExecutor.execute {
+                        val saved = runCatching { NotificationLightingState.setEnabled(activity,value) }.getOrDefault(false)
+                        if (!saved) runCatching { NotificationLightingState.setEnabled(activity,previous) }
+                        activity.runOnUiThread {
+                            if (!activity.isDestroyed) {
+                                isEnabled = true
+                                if (saved) {
+                                    activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+                                    NotificationLightingService.ensureConnected(activity)
+                                }
+                                else {
+                                    restoring = true; isChecked = previous; restoring = false
+                                    Toast.makeText(activity,"Notification setting could not be saved. Try again.",Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }
             }
         })
         panel.addView(notificationAccessButton(activity))
@@ -52,7 +73,7 @@ object NotificationLightingDialog {
         content.addView(appSpinner)
         val effects=listOf("steady","breathe","flashing","rapid")
         val effect=Spinner(activity).apply { adapter=ArrayAdapter(activity,android.R.layout.simple_spinner_dropdown_item,listOf("Steady","Breathe","Flashing","Rapid")) }
-        content.addView(TextView(activity).apply { text="Default effect (split zones use their editor settings)" }); content.addView(effect)
+        content.addView(TextView(activity).apply { text="Effect" }); content.addView(effect)
         val colors=listOf(1 to 0xffff0000.toInt(),3 to 0xffff8800.toInt(),4 to 0xffffd700.toInt(),5 to 0xff00dd77.toInt(),6 to 0xff00ddee.toInt(),7 to 0xff1765ff.toInt(),8 to 0xffaa22ee.toInt(),9 to 0xffff66bb.toInt())
         val names=listOf("Red","Orange","Yellow","Green","Cyan","Blue","Purple","Pink")
         var selectedColor=7
@@ -72,62 +93,17 @@ object NotificationLightingDialog {
         val duration=Spinner(activity).apply { adapter=ArrayAdapter(activity,android.R.layout.simple_spinner_dropdown_item,listOf("3 seconds","5 seconds","10 seconds","15 seconds","30 seconds")) }
         val seconds=listOf(3,5,10,15,30)
         content.addView(TextView(activity).apply { text="Lighting window" }); content.addView(duration)
-        val brightnessLabel=TextView(activity); val brightness=SeekBar(activity).apply { max=223 }
-        brightness.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s:SeekBar?,p:Int,user:Boolean) { brightnessLabel.text="Default brightness: ${p+32} / 255" }
-            override fun onStartTrackingTouch(s:SeekBar?) {}
-            override fun onStopTrackingTouch(s:SeekBar?) {}
-        })
-        content.addView(brightnessLabel);content.addView(brightness)
+        content.addView(TextView(activity).apply { text="Uses REDMAGIC stock brightness. New distinct notifications restart the selected lighting window." })
         val logo=CheckBox(activity).apply { text="Logo / GAME MODE bar" }
         val triggers=CheckBox(activity).apply { text="Trigger LEDs" }
         val fan=CheckBox(activity).apply { text="Fan LEDs" }
         content.addView(logo);content.addView(triggers);content.addView(fan)
-        var logoState: com.elitedarkkaiser.redmagic.state.LedState? = null
-        var triggerState: com.elitedarkkaiser.redmagic.state.LedState? = null
-        val logoPanel=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; visibility=android.view.View.GONE }
-        val triggerPanel=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; visibility=android.view.View.GONE }
-        fun defaultState(enabled: Boolean)=com.elitedarkkaiser.redmagic.state.LedState(enabled,LedBrightness.encode(brightness.progress+32,effects[effect.selectedItemPosition]),selectedColor)
-        val splitLogo=CheckBox(activity).apply { text="Separate logo / GAME MODE bar" }
-        val splitTriggers=CheckBox(activity).apply { text="Separate top / bottom triggers" }
-        fun renderLogo() {
-            logoPanel.removeAllViews()
-            logoPanel.visibility=if (splitLogo.isChecked) android.view.View.VISIBLE else android.view.View.GONE
-            if (!splitLogo.isChecked) { logoState=null; return }
-            val initial=logoState ?: defaultState(logo.isChecked)
-            logoState=LogoBarSelection.from(initial).state(initial.color)
-            logoPanel.addView(LogoBarProfileUi.create(activity,logoState!!) {
-                logoState=it; logo.isChecked=it.enabled
-            })
-        }
-        fun renderTriggers() {
-            triggerPanel.removeAllViews()
-            triggerPanel.visibility=if (splitTriggers.isChecked) android.view.View.VISIBLE else android.view.View.GONE
-            if (!splitTriggers.isChecked) { triggerState=null; return }
-            val initial=TriggerLedProfileSelection(triggerState ?: defaultState(triggers.isChecked)).apply { split=true }.snapshot()
-            triggerState=initial
-            val swatches=LedControlViewFactory(activity)
-            triggerPanel.addView(TriggerLedProfileUi.create(activity,"Trigger LEDs","Enable trigger LEDs",initial,
-                TriggerLedProfileUi.Deps(AppTheme.textPrimary,AppTheme.textSecondary,AppTheme.accentColor,AppTheme.panelPressed,AppTheme.borderColor,
-                    { (it*activity.resources.displayMetrics.density).toInt() },swatches::colorDot,swatches::colorDotDrawable),splitOnly=true) {
-                    triggerState=it
-                })
-        }
-        splitLogo.setOnCheckedChangeListener { _,_ -> renderLogo() }
-        splitTriggers.setOnCheckedChangeListener { _,_ -> renderTriggers() }
-        content.addView(splitLogo);content.addView(logoPanel)
-        content.addView(splitTriggers);content.addView(triggerPanel)
         fun load(index:Int) {
             val pkg=apps.getOrNull(index)?.activityInfo?.packageName ?: return
             val p=NotificationLightingState.read(activity,pkg) ?: NotificationLightingState.Profile()
-            logoState=p.logoState
-            triggerState=p.triggerState
             selectedColor=p.color;refreshDots();effect.setSelection(effects.indexOf(p.effect).coerceAtLeast(0))
             duration.setSelection(seconds.indexOf(p.seconds).takeIf { it>=0 } ?: 2)
-            brightness.progress=p.brightness-32;brightnessLabel.text="Brightness: ${p.brightness} / 255"
             logo.isChecked=p.logo;triggers.isChecked=p.triggers;fan.isChecked=p.fan
-            splitLogo.isChecked=p.logoState != null;splitTriggers.isChecked=p.triggerState != null
-            renderLogo();renderTriggers()
         }
         appSpinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent:AdapterView<*>?,view:android.view.View?,position:Int,id:Long) { load(position) }
@@ -149,12 +125,30 @@ object NotificationLightingDialog {
         val initialIndex=targetIndex.coerceAtLeast(0)
         appSpinner.setSelection(initialIndex)
         load(initialIndex)
-        fun changed() { activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName)) }
+        fun changed() {
+            activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+            NotificationLightingService.ensureConnected(activity)
+        }
         content.addView(Button(activity).apply { text="Save app profile"; isEnabled=apps.isNotEmpty(); setOnClickListener {
-            apps.getOrNull(appSpinner.selectedItemPosition)?.activityInfo?.packageName?.let {
-                NotificationLightingState.save(activity,it,NotificationLightingState.Profile(selectedColor,effects[effect.selectedItemPosition],seconds[duration.selectedItemPosition],brightness.progress+32,logo.isChecked,triggers.isChecked,fan.isChecked,logoState?.copy(enabled=logo.isChecked),triggerState?.copy(enabled=triggers.isChecked)))
+            val pkg = apps.getOrNull(appSpinner.selectedItemPosition)?.activityInfo?.packageName
+            if (pkg == null) {
+                Toast.makeText(activity,"Select an app before saving.",Toast.LENGTH_LONG).show()
+                return@setOnClickListener
             }
-            changed();showManager(activity,dialog,host)
+            val profile = NotificationLightingState.Profile(selectedColor,effects[effect.selectedItemPosition],seconds[duration.selectedItemPosition],255,logo.isChecked,triggers.isChecked,fan.isChecked)
+            isEnabled = false
+            saveExecutor.execute {
+                val saved = runCatching { NotificationLightingState.save(activity,pkg,profile) }.getOrDefault(false)
+                activity.runOnUiThread {
+                    if (!activity.isDestroyed) {
+                        isEnabled = true
+                        if (saved) {
+                            changed(); showManager(activity,dialog,host)
+                            Toast.makeText(activity,"Notification profile saved",Toast.LENGTH_SHORT).show()
+                        } else Toast.makeText(activity,"Profile could not be saved. Your editor remains open; try again.",Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
         } })
         content.addView(Button(activity).apply { text="Back to configured apps"; setOnClickListener { showManager(activity,dialog,host) } })
         if (targetPackage != null) content.addView(Button(activity).apply { text="Remove app"; setOnClickListener {
@@ -172,6 +166,7 @@ object NotificationLightingDialog {
             val granted=activity.getSystemService(NotificationManager::class.java)
                 .isNotificationListenerAccessGranted(ComponentName(activity,NotificationLightingService::class.java))
             text=if (granted) "Notification access granted · Manage" else "Grant notification access"
+            if (granted) NotificationLightingService.ensureConnected(activity)
         }
         init {
             refreshStatus()
