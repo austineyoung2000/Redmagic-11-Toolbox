@@ -11,7 +11,8 @@ internal object NotificationLightingState {
         val triggerState: com.elitedarkkaiser.redmagic.state.LedState? = null)
     private fun prefs(c: Context) = c.getSharedPreferences("notification_lighting", Context.MODE_PRIVATE)
     fun enabled(c: Context) = prefs(c).getBoolean("enabled", false)
-    fun setEnabled(c: Context, value: Boolean) { prefs(c).edit().putBoolean("enabled", value).apply() }
+    fun setEnabled(c: Context, value: Boolean): Boolean =
+        prefs(c).edit().putBoolean("enabled", value).commit()
     @Volatile var expiresAt = 0L
     @Volatile var windowToken: String? = null
     fun isActive() = expiresAt > SystemClock.elapsedRealtime()
@@ -25,14 +26,14 @@ internal object NotificationLightingState {
             j.optInt("brightness",128).coerceIn(32,255),j.optBoolean("logo",true),j.optBoolean("triggers"),j.optBoolean("fan"), readLed(j,"logoState"), readLed(j,"triggerState"))
             .takeIf { it.color in listOf(1,3,4,5,6,7,8,9) && it.effect in listOf("steady","breathe","flashing","rapid") }
     }.getOrNull()
-    fun save(c: Context, pkg: String, p: Profile) {
+    fun save(c: Context, pkg: String, p: Profile): Boolean {
         val j = JSONObject().put("color",p.color).put("effect",p.effect).put("seconds",p.seconds)
             .put("brightness",p.brightness).put("logo",p.logo).put("triggers",p.triggers).put("fan",p.fan)
         fun writeLed(key: String, state: com.elitedarkkaiser.redmagic.state.LedState?) {
             if (state != null) j.put(key, JSONObject().put("enabled",state.enabled).put("effect",state.effect).put("color",state.color))
         }
         writeLed("logoState",p.logoState); writeLed("triggerState",p.triggerState)
-        prefs(c).edit().putString("app:$pkg",j.toString()).apply()
+        return prefs(c).edit().putString("app:$pkg",j.toString()).commit()
     }
     private fun readLed(j: JSONObject, key: String): com.elitedarkkaiser.redmagic.state.LedState? {
         val v = j.optJSONObject(key) ?: return null

@@ -45,6 +45,17 @@ internal object BootDiagnostics {
         appendLine("LED owner: ${LedOwnership.current(context)}")
         appendLine("LED root safety: ${LightingRootExecutor.status()}")
         appendLine("Notification deadline: ${NotificationWindowDeadline.status(context)}")
+        appendLine("Notification lighting enabled: ${NotificationLightingState.enabled(context)}")
+        val notificationFile = File(context.applicationInfo.dataDir, "shared_prefs/notification_lighting.xml")
+        appendLine("Notification settings file: ${notificationFile.absolutePath}; exists=${notificationFile.exists()}")
+        val listener = android.content.ComponentName(context, NotificationLightingService::class.java)
+        appendLine("Notification listener access: ${context.getSystemService(android.app.NotificationManager::class.java).isNotificationListenerAccessGranted(listener)}")
+        val notificationApps = NotificationLightingState.packages(context)
+        appendLine("Notification profiles: ${notificationApps.size}")
+        notificationApps.forEach { pkg ->
+            val profile = NotificationLightingState.read(context, pkg)
+            appendLine("  $pkg: ${profile?.let { "seconds=${it.seconds}, effect=${it.effect}, color=${it.color}, logo=${it.logo}, triggers=${it.triggers}, fan=${it.fan}" } ?: "INVALID saved profile"}")
+        }
         appendLine("Auto fan configured: ${isAutoFanEnabledStorage(context)}")
         appendLine("Auto pump configured: ${savedPumpStateStorage(context).autoEnabled}")
         appendLine("RGB Studio configured: ${RgbStudioStorage.isEnabled(context)}")

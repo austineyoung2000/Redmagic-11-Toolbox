@@ -11,6 +11,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.elitedarkkaiser.redmagic.ui.AppTheme
 
 object NotificationLightingDialog {
+    private val saveExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     fun show(activity: Activity) {
         val host=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL }
         val dialog=MaterialAlertDialogBuilder(activity).setTitle("Notification lighting")
@@ -24,9 +25,26 @@ object NotificationLightingDialog {
         val panel = LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(32,16,32,16) }
         panel.addView(CheckBox(activity).apply {
             text="Enable screen-off notification lighting"; isChecked=NotificationLightingState.enabled(activity)
+            var restoring = false
             setOnCheckedChangeListener { _, value ->
-                NotificationLightingState.setEnabled(activity,value)
-                activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+                if (!restoring) {
+                    isEnabled = false
+                    val previous = !value
+                    saveExecutor.execute {
+                        val saved = runCatching { NotificationLightingState.setEnabled(activity,value) }.getOrDefault(false)
+                        if (!saved) runCatching { NotificationLightingState.setEnabled(activity,previous) }
+                        activity.runOnUiThread {
+                            if (!activity.isDestroyed) {
+                                isEnabled = true
+                                if (saved) activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
+                                else {
+                                    restoring = true; isChecked = previous; restoring = false
+                                    Toast.makeText(activity,"Notification setting could not be saved. Try again.",Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }
             }
         })
         panel.addView(notificationAccessButton(activity))
@@ -106,10 +124,25 @@ object NotificationLightingDialog {
         load(initialIndex)
         fun changed() { activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName)) }
         content.addView(Button(activity).apply { text="Save app profile"; isEnabled=apps.isNotEmpty(); setOnClickListener {
-            apps.getOrNull(appSpinner.selectedItemPosition)?.activityInfo?.packageName?.let {
-                NotificationLightingState.save(activity,it,NotificationLightingState.Profile(selectedColor,effects[effect.selectedItemPosition],seconds[duration.selectedItemPosition],255,logo.isChecked,triggers.isChecked,fan.isChecked))
+            val pkg = apps.getOrNull(appSpinner.selectedItemPosition)?.activityInfo?.packageName
+            if (pkg == null) {
+                Toast.makeText(activity,"Select an app before saving.",Toast.LENGTH_LONG).show()
+                return@setOnClickListener
             }
-            changed();showManager(activity,dialog,host)
+            val profile = NotificationLightingState.Profile(selectedColor,effects[effect.selectedItemPosition],seconds[duration.selectedItemPosition],255,logo.isChecked,triggers.isChecked,fan.isChecked)
+            isEnabled = false
+            saveExecutor.execute {
+                val saved = runCatching { NotificationLightingState.save(activity,pkg,profile) }.getOrDefault(false)
+                activity.runOnUiThread {
+                    if (!activity.isDestroyed) {
+                        isEnabled = true
+                        if (saved) {
+                            changed(); showManager(activity,dialog,host)
+                            Toast.makeText(activity,"Notification profile saved",Toast.LENGTH_SHORT).show()
+                        } else Toast.makeText(activity,"Profile could not be saved. Your editor remains open; try again.",Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
         } })
         content.addView(Button(activity).apply { text="Back to configured apps"; setOnClickListener { showManager(activity,dialog,host) } })
         if (targetPackage != null) content.addView(Button(activity).apply { text="Remove app"; setOnClickListener {
