@@ -19,7 +19,10 @@ internal object LedWriteReceipt {
 
     fun capture(stillEligible: () -> Boolean = { true }, block: () -> Unit): Boolean {
         val parent = current.get()
-        val receipt = Receipt(stillEligible)
+        // Nested helpers inherit the outer owner's live authorization and failures.
+        val receipt = Receipt(stillEligible = {
+            (parent == null || (parent.succeeded && parent.stillEligible())) && stillEligible()
+        })
         current.set(receipt)
         try {
             block()

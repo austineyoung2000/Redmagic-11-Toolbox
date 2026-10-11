@@ -122,9 +122,9 @@ object HardwareController {
     fun setFanLevel(level: Int): Boolean {
         val safe = level.coerceIn(0, 5)
         val cmds = if (safe == 0) {
-            "echo 0 > $FAN_LEVEL; echo 0 > $FAN_ENABLE"
+            "echo 0 > $FAN_LEVEL && echo 0 > $FAN_ENABLE"
         } else {
-            "echo 1 > $FAN_ENABLE; echo $safe > $FAN_LEVEL"
+            "echo 1 > $FAN_ENABLE && echo $safe > $FAN_LEVEL"
         }
         return execHardwareWrite("fan_control", cmds)
     }
@@ -132,9 +132,9 @@ object HardwareController {
     fun setFanPwm(value: Int): Boolean {
         val safe = value.coerceIn(0, 255)
         val cmds = if (safe == 0) {
-            "echo 0 > $FAN_PWM; echo 0 > $FAN_ENABLE"
+            "echo 0 > $FAN_PWM && echo 0 > $FAN_ENABLE"
         } else {
-            "echo 1 > $FAN_ENABLE; echo $safe > $FAN_PWM"
+            "echo 1 > $FAN_ENABLE && echo $safe > $FAN_PWM"
         }
         return execHardwareWrite("fan_control", cmds)
     }
@@ -153,12 +153,12 @@ object HardwareController {
 
     fun setPumpProfile(profile: String): Boolean {
         val cmd = when (profile.lowercase()) {
-            "slow" -> "echo 1 > $PUMP_ENABLE; echo 4 > $PUMP_FREQ; echo 40 > $PUMP_SPEED"
-            "medium" -> "echo 1 > $PUMP_ENABLE; echo 4 > $PUMP_FREQ; echo 60 > $PUMP_SPEED"
-            "quick" -> "echo 1 > $PUMP_ENABLE; echo 4 > $PUMP_FREQ; echo 80 > $PUMP_SPEED"
-            "experimental" -> "echo 1 > $PUMP_ENABLE; echo 4 > $PUMP_FREQ; echo 90 > $PUMP_SPEED"
+            "slow" -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 40 > $PUMP_SPEED"
+            "medium" -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 60 > $PUMP_SPEED"
+            "quick" -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 80 > $PUMP_SPEED"
+            "experimental" -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 90 > $PUMP_SPEED"
             "off" -> "echo 0 > $PUMP_ENABLE"
-            else -> "echo 1 > $PUMP_ENABLE; echo 4 > $PUMP_FREQ; echo 80 > $PUMP_SPEED"
+            else -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 80 > $PUMP_SPEED"
         }
         return execHardwareWrite("pump_control", cmd)
     }
@@ -270,6 +270,7 @@ object HardwareController {
     @Synchronized
     private fun applyZoneEffect(zone: LedZone, effectName: String, color: Int): Boolean {
         val name = when (zone) { LedZone.LOGO -> "logo"; LedZone.FAN -> "fan"; LedZone.SHOULDER -> "triggers" }
+        if (!LedProfileValidation.isValid(name, effectName, color)) return LedWriteReceipt.record(false)
         val base = LedBrightness.effect(effectName)
         val normalizedEffect = if (zone == LedZone.FAN) FanLedPalette.normalizeEffect(base) else base
         val normalizedColor = if (zone == LedZone.FAN) FanLedPalette.normalizeColor(base, color) else color

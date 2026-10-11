@@ -18,6 +18,24 @@ class LedWriteReceiptTest {
         })
     }
 
+    @Test fun nestedHelperCannotEscapeRevokedOuterOwner() {
+        var eligible = true
+        assertFalse(LedWriteReceipt.capture(stillEligible = { eligible }) {
+            assertFalse(LedWriteReceipt.capture {
+                assertTrue(LedWriteReceipt.canWrite())
+                eligible = false
+                assertFalse(LedWriteReceipt.canWrite())
+            })
+        })
+    }
+
+    @Test fun nestedHelperInheritsPreviouslyFailedOuterWrite() {
+        assertFalse(LedWriteReceipt.capture {
+            LedWriteReceipt.record(false)
+            assertFalse(LedWriteReceipt.capture { assertFalse(LedWriteReceipt.canWrite()) })
+        })
+    }
+
     @Test fun laterSuccessCannotHideFailedZone() {
         assertFalse(LedWriteReceipt.capture {
             LedWriteReceipt.record(false)

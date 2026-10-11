@@ -71,7 +71,7 @@ class NotificationLightingService : NotificationListenerService() {
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val tracked = NotificationLightingState.packages(this).contains(sbn.packageName)
+        val tracked = NotificationLightingState.hasProfile(this, sbn.packageName)
         fun trace(stage: String) { if (tracked) recordAttempt("${sbn.packageName}: $stage") }
         val ignored = when {
             sbn.postTime <= connectedAtMillis -> "old-or-replayed"

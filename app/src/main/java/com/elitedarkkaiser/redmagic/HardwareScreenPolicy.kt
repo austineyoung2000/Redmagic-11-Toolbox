@@ -7,14 +7,15 @@ object HardwareScreenPolicy {
     private const val HOT_KEEP_COOLING_F = 100f
     private const val SAFE_SHUTDOWN_F = 92f
 
-    @Volatile
-    private var screenOffShutdownApplied = false
+    private val coolingShutdownReceipt = CoolingShutdownReceipt()
 
     fun invalidateCoolingShutdownReceipt() {
         // LED programs may change fan power after an earlier cold shutdown.
         // Invalidate the receipt without changing cooling hardware or policy.
-        screenOffShutdownApplied = false
+        coolingShutdownReceipt.invalidate()
     }
+
+    fun hasCoolingShutdownReceipt(): Boolean = coolingShutdownReceipt.isApplied()
 
     fun isScreenInteractive(context: Context): Boolean {
         return try {
@@ -55,14 +56,14 @@ object HardwareScreenPolicy {
         reason: String
     ): Boolean {
         if (isScreenInteractive(context)) {
-            screenOffShutdownApplied = false
+            coolingShutdownReceipt.invalidate()
             return false
         }
 
         val tempF = currentTempF()
 
         if (coolingAllowedWhileScreenOff(tempF)) {
-            screenOffShutdownApplied = false
+            coolingShutdownReceipt.invalidate()
             android.util.Log.i(
                 "RedmagicScreenPolicy",
                 "Allowed cooling while screen is off because temp is hot: reason=$reason tempF=$tempF"
@@ -75,10 +76,11 @@ object HardwareScreenPolicy {
             "Blocked fan/pump while screen is off: reason=$reason tempF=$tempF"
         )
 
-        if (!screenOffShutdownApplied) {
-            HardwareController.enableFan(false)
-            HardwareController.enablePump(false)
-            screenOffShutdownApplied = true
+        if (!coolingShutdownReceipt.isApplied()) {
+            val token = coolingShutdownReceipt.token()
+            val fanStopped = HardwareController.enableFan(false)
+            val pumpStopped = HardwareController.enablePump(false)
+            coolingShutdownReceipt.record(token, fanStopped, pumpStopped)
         }
 
         return true
