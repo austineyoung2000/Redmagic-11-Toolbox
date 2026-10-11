@@ -86,3 +86,12 @@ With the listener connected, the NX809J trace showed Messenger's fresh locked al
 Deduplication now remembers key plus postTime. Repeated or older deliveries of a seen post are rejected; a newer post on the same conversation key is accepted and follows the existing selected-duration window path. Listener seeding records each existing key's postTime, preserving replay protection while allowing fresh posts. State remains bounded to 256 entries and no notification contents are inspected. Existing expiry, priorities, stock batch, root limits, cooling and ordinary screen-off shutdown remain unchanged. Distinct notification posts, including newer posts with reused keys, can restart the selected duration; key/postTime is metadata and is not claimed to perfectly classify every cosmetic app update.
 
 CI regression coverage exercises seeded-key refresh, same-key new posts without removal/wake, identical/older deliveries, repeated lock cycles and ineligible callbacks. Phone activation and physical timed shutdown remain pending for this follow-up.
+
+
+### Independent module listener recovery
+
+Device exit history records paired main/watchdog SIGKILL at 22:18:24 and 22:25:45 after two successful notification cycles. It does not identify the killer. The notification listener was granted but absent after process recovery. Uploaded NX809J framework and services JAR hashes match the previously decompiled device copies exactly. ManagedServices.setComponentState returns early when requested enablement equals current snoozing state; requestRebind alone does not reset an already-unsnoozed dead binding.
+
+The APK now publishes an AtomicFile in no_backup/notification-listener-recovery only when desired/connection/process identity changes. It contains schema, boot ID, PID, UID, process start time, desired and actual callback-connected state; no notification data. The Bridge module test branch reads this state, recovers the app using its existing boot path, and can reset only Toolbox's binding through firmware-verified transactions 83/81 under Toolbox's UID. Permission and feature choices remain untouched. The native trigger daemon and existing gameplay supervisor are unchanged.
+
+The independent supervisor cannot prevent kills, recover messages missed while unbound, or run during CPU suspend. It is not a replacement for exact notification expiry. Host policy checks and CI do not prove that root-manager UID switching or actual Binder reset succeeds on the phone; test the matched APK/module pair before merging either repository.

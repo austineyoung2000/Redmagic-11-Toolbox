@@ -234,6 +234,7 @@ class NotificationLightingService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         listenerConnected = true
+        NotificationListenerRecoveryState.publish(this, true)
         rebindStatus = "connected at ${SystemClock.elapsedRealtime()/1000}s"
         BootDiagnostics.record(this, "Notification listener connected")
         android.util.Log.i("NotificationLighting", "Listener connected")
@@ -249,6 +250,7 @@ class NotificationLightingService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         listenerConnected = false
+        NotificationListenerRecoveryState.publish(this, false)
         BootDiagnostics.record(this, "Notification listener disconnected")
         worker.post {
             try { endWindow("listener-disconnected") }
@@ -257,6 +259,7 @@ class NotificationLightingService : NotificationListenerService() {
     }
     override fun onDestroy() {
         listenerConnected = false
+        NotificationListenerRecoveryState.publish(this, false)
         unregisterReceiver(receiver)
         worker.post { endWindow(); thread.quitSafely() }
         super.onDestroy()
@@ -276,6 +279,7 @@ class NotificationLightingService : NotificationListenerService() {
         fun connectionStatus() = "connected=$listenerConnected; rebind=$rebindStatus"
 
         @Synchronized fun ensureConnected(context: Context) {
+            NotificationListenerRecoveryState.publish(context, listenerConnected)
             if (!DeviceCompatibility.isSupportedDevice() || !NotificationLightingState.enabled(context) || listenerConnected) return
             val component = android.content.ComponentName(context, NotificationLightingService::class.java)
             if (!context.getSystemService(android.app.NotificationManager::class.java).isNotificationListenerAccessGranted(component)) return
