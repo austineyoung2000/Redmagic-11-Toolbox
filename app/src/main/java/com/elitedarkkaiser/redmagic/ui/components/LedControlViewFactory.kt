@@ -37,31 +37,7 @@ class LedControlViewFactory(
             isSingleLine = true
             minWidth = 0
             minimumWidth = 0
-            setTextColor(AppTheme.textPrimary)
-
-            backgroundTintList = ColorStateList.valueOf(
-                if (selected) {
-                    AppTheme.panelPressed
-                } else {
-                    Color.TRANSPARENT
-                }
-            )
-            strokeWidth = dp(1)
-            strokeColor = ColorStateList.valueOf(
-                if (selected) {
-                    AppTheme.highlightBorder
-                } else {
-                    AppTheme.borderColor
-                }
-            )
-            rippleColor =
-                ColorStateList.valueOf(AppTheme.rippleColor)
-            cornerRadius = dp(16)
-
-            insetTop = 0
-            insetBottom = 0
-            minHeight = dp(40)
-            setPadding(dp(10), dp(6), dp(10), dp(6))
+            SelectionControlStyle.apply(this, selected)
             setOnClickListener { onClick() }
         }
     }

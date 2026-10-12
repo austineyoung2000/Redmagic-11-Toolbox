@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic.ui
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.widget.Button
 import android.widget.CheckBox
 import com.google.android.material.checkbox.MaterialCheckBox
@@ -39,7 +40,7 @@ object CoolingTabUi {
         lateinit var curveStatusText: TextView
         lateinit var autoCurveCheck: CheckBox
 
-        val fanSeek = Slider(container.context).apply {
+        val fanSeek = SelectionControlStyle.slider(container.context).apply {
             valueFrom = 0f
             valueTo = 5f
             stepSize = 1f

@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.ColorStateList
@@ -149,13 +150,13 @@ internal object FanLedDialogUi {
             dialogRefresh?.invoke()
         }
 
-        effectsRow.addView(steadyBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectsRow.addView(steadyBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         effectsRow.addView(deps.space(deps.dp(8)))
-        effectsRow.addView(breatheBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectsRow.addView(breatheBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         effectsRow.addView(deps.space(deps.dp(8)))
-        effectsRow.addView(flashingBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectsRow.addView(flashingBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         effectsRow.addView(deps.space(deps.dp(8)))
-        effectsRow.addView(rapidBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectsRow.addView(rapidBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
 
         val blinkBtn = deps.filterChip("Blink", visibleEffect() == "blink") {
             changeEffect("blink")
@@ -164,7 +165,8 @@ internal object FanLedDialogUi {
         }
         val blinkRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(blinkBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+            setPadding(0, deps.dp(8), 0, 0)
+            addView(blinkBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         }
 
         val colorLabel = TextView(activity).apply {
@@ -382,34 +384,8 @@ internal object FanLedDialogUi {
             button: Button,
             selected: Boolean
         ) {
-            button.isSelected = selected
-
-            if (button is MaterialButton) {
-                button.backgroundTintList = ColorStateList.valueOf(
-                    if (selected) {
-                        deps.panelPressed
-                    } else {
-                        Color.TRANSPARENT
-                    }
-                )
-                button.strokeColor = ColorStateList.valueOf(
-                    if (selected) {
-                        deps.accent
-                    } else {
-                        deps.borderColor
-                    }
-                )
-            } else {
-                button.background = deps.roundedFill(
-                    if (selected) {
-                        deps.panelPressed
-                    } else {
-                        deps.panelColor
-                    },
-                    999
-                )
-            }
-        }
+            SelectionControlStyle.apply(button, selected)
+    }
 
         fun repaint() {
             updateEffectButton(blinkBtn, visibleEffect() == "blink")

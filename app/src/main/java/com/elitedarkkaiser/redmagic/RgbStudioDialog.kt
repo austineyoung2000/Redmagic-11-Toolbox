@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -147,13 +148,13 @@ object RgbStudioDialog {
             }
             effectRow.addView(
                 button,
-                LinearLayout.LayoutParams(0, deps.dp(44), 1f)
+                LinearLayout.LayoutParams(0, deps.dp(48), 1f)
             )
         }
 
         addEffect("Steady", "steady")
         addEffect("Breathe", "breathe")
-        addEffect("Flash", "flashing")
+        addEffect("Flashing", "flashing")
         addEffect("Rapid", "rapid")
         content.addView(effectRow)
         content.addView(label("Zone brightness"))
@@ -258,7 +259,7 @@ object RgbStudioDialog {
                 setTextColor(AppTheme.textSecondary)
                 gravity = Gravity.END
             }
-            val slider = Slider(activity).apply {
+            val slider = SelectionControlStyle.slider(activity).apply {
                 valueFrom = 0.5f
                 valueTo = 6.0f
                 stepSize = 0.1f

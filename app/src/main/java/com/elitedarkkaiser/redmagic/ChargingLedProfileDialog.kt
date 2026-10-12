@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.ColorStateList
@@ -147,34 +148,8 @@ internal object ChargingLedProfileDialog {
             button: Button,
             selected: Boolean
         ) {
-            button.isSelected = selected
-
-            if (button is MaterialButton) {
-                button.backgroundTintList = ColorStateList.valueOf(
-                    if (selected) {
-                        deps.panelPressed
-                    } else {
-                        Color.TRANSPARENT
-                    }
-                )
-                button.strokeColor = ColorStateList.valueOf(
-                    if (selected) {
-                        deps.accent
-                    } else {
-                        deps.borderColor
-                    }
-                )
-            } else {
-                button.background = deps.roundedFill(
-                    if (selected) {
-                        deps.panelPressed
-                    } else {
-                        deps.panelColor
-                    },
-                    999
-                )
-            }
-        }
+            SelectionControlStyle.apply(button, selected)
+    }
 
         val paletteViews = mutableListOf<View>()
         fun refreshButtons() {

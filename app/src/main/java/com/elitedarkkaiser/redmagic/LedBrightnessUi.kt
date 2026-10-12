@@ -3,7 +3,8 @@ package com.elitedarkkaiser.redmagic
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.widget.LinearLayout
-import android.widget.SeekBar
+import com.google.android.material.slider.Slider
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.widget.TextView
 
 /** Stage every slider value, but send hardware previews only when the drag ends. */
@@ -15,28 +16,30 @@ internal class LedBrightnessUi(activity: Activity, parent: LinearLayout, private
         setTextColor(textColor); textSize = 13f
         setPadding(0, dp(14), 0, dp(4))
     }
-    private val slider = SeekBar(activity).apply {
-        max = LedBrightness.MAX - LedBrightness.MIN
-        progressTintList = ColorStateList.valueOf(accent)
-        thumbTintList = ColorStateList.valueOf(accent)
+    private val slider = SelectionControlStyle.slider(activity).apply {
+        valueFrom = LedBrightness.MIN.toFloat()
+        valueTo = LedBrightness.MAX.toFloat()
+        stepSize = 1f
+        value = LedBrightness.level(getEffect()).toFloat()
+        isTickVisible = false
         contentDescription = "LED brightness, 32 to 255"
     }
     private val note = TextView(activity).apply { setTextColor(textColor); textSize = 12f }
     init {
         parent.addView(label)
-        parent.addView(slider, LinearLayout.LayoutParams(-1, dp(48)))
+        parent.addView(slider, LinearLayout.LayoutParams(-1, dp(56)))
         parent.addView(note)
         refresh()
-        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+        slider.addOnChangeListener { _, value, fromUser ->
                 if (fromUser) {
-                    val level = progress + LedBrightness.MIN
+                    val level = value.toInt()
                     setEffect(LedBrightness.encode(level, getEffect()))
                     showLevel(level)
                 }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-            override fun onStopTrackingTouch(seekBar: SeekBar?) { preview() }
+        }
+        slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) = Unit
+            override fun onStopTrackingTouch(slider: Slider) { preview() }
         })
     }
     private fun showLevel(level: Int) {
@@ -45,7 +48,7 @@ internal class LedBrightnessUi(activity: Activity, parent: LinearLayout, private
     fun refresh() {
         val supported = LedBrightness.supported(zone, getEffect(), getColor())
         slider.isEnabled = supported
-        slider.progress = LedBrightness.level(getEffect()) - LedBrightness.MIN
+        slider.value = LedBrightness.level(getEffect()).toFloat()
         showLevel(LedBrightness.level(getEffect()))
         note.text = if (supported) "32 is the lowest tested level. Off uses the enable switch."
             else "Dimming is not available for this effect in the test build. Uses full brightness."
