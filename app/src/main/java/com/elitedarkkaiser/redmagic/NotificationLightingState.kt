@@ -42,6 +42,7 @@ internal object NotificationLightingState {
             com.elitedarkkaiser.redmagic.state.LedState(v.optBoolean("enabled"),v.getString("effect"),v.getInt("color"))
         }.getOrNull()
     }
+    fun hasProfile(c: Context, pkg: String) = prefs(c).contains("app:$pkg")
     fun packages(c: Context) = prefs(c).all.keys.filter { it.startsWith("app:") }.map { it.removePrefix("app:") }.sorted()
     fun remove(c: Context, pkg: String) { prefs(c).edit().remove("app:$pkg").apply() }
 }

@@ -123,7 +123,8 @@ object RgbStudioStorage {
 
     @Synchronized
     fun isEnabled(context: Context): Boolean {
-        return read(context).enabled
+        return context.getSharedPreferences(AppPrefs.PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(ENABLED, false)
     }
 
     @Synchronized
