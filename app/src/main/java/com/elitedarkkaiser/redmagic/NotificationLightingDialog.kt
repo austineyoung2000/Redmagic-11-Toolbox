@@ -23,8 +23,8 @@ object NotificationLightingDialog {
     private fun showManager(activity: Activity, dialog: androidx.appcompat.app.AlertDialog, host: LinearLayout) {
         dialog.setTitle("Notification lighting")
         host.removeAllViews()
-        val panel = LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(32,16,32,16) }
-        panel.addView(CheckBox(activity).apply {
+        val panel = LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(AppTheme.dp(activity,16),AppTheme.dp(activity,8),AppTheme.dp(activity,16),AppTheme.dp(activity,12)) }
+        panel.addView(com.google.android.material.materialswitch.MaterialSwitch(activity).apply {
             text="Enable screen-off notification lighting"; isChecked=NotificationLightingState.enabled(activity)
             var restoring = false
             setOnCheckedChangeListener { _, value ->
@@ -53,21 +53,50 @@ object NotificationLightingDialog {
         })
         panel.addView(notificationAccessButton(activity))
         host.addView(panel)
-        panel.addView(Button(activity).apply { text="Add app"; setOnClickListener { showEditor(activity,null,dialog,host) } })
+        panel.addView(com.google.android.material.button.MaterialButton(activity).apply { isAllCaps=false; text="Add app"; setOnClickListener { showEditor(activity,null,dialog,host) } })
         panel.addView(TextView(activity).apply { text="Configured apps" })
         val packages=NotificationLightingState.packages(activity)
         if(packages.isEmpty()) panel.addView(TextView(activity).apply { text="No apps configured. Tap Add app to create a notification profile." })
-        packages.forEach { pkg ->
-            val label=runCatching { activity.packageManager.getApplicationLabel(activity.packageManager.getApplicationInfo(pkg,0)).toString() }.getOrDefault(pkg)
-            panel.addView(Button(activity).apply { text="Edit $label"; setOnClickListener { showEditor(activity,pkg,dialog,host) } })
-
+        val configuredApps = packages.map { pkg ->
+            val label = runCatching { activity.packageManager.getApplicationLabel(
+                activity.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+            MaterialAppPicker.App(pkg, label)
+        }.sortedBy { it.label.lowercase() }
+        val cards = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        fun renderApps(query: String = "") {
+            cards.removeAllViews()
+            val matching = configuredApps.filter { it.label.contains(query, true) || it.packageName.contains(query, true) }
+            matching.forEach { app ->
+                cards.addView(MaterialAppPicker.editCard(activity, app) {
+                    showEditor(activity, app.packageName, dialog, host)
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = AppTheme.dp(activity, 8) })
+            }
+            if (matching.isEmpty() && configuredApps.isNotEmpty()) cards.addView(TextView(activity).apply {
+                text = "No matching configured apps"; setTextColor(AppTheme.textSecondary)
+            })
         }
+        if (configuredApps.isNotEmpty()) {
+            val search = com.google.android.material.textfield.TextInputEditText(activity).apply { isSingleLine = true }
+            panel.addView(com.google.android.material.textfield.TextInputLayout(activity).apply {
+                hint = "Search configured apps"
+                boxBackgroundMode = com.google.android.material.textfield.TextInputLayout.BOX_BACKGROUND_OUTLINE
+                addView(search)
+            })
+            search.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderApps(s?.toString()?.trim().orEmpty()) }
+                override fun afterTextChanged(s: android.text.Editable?) = Unit
+            })
+        }
+        panel.addView(cards)
+        renderApps()
+
     }
     private fun showEditor(activity: Activity, targetPackage: String?, dialog: androidx.appcompat.app.AlertDialog, host: LinearLayout) {
         val apps = activity.packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0)
             .distinctBy { it.activityInfo.packageName }.sortedBy { it.loadLabel(activity.packageManager).toString().lowercase() }
-        val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(32,16,32,16) }
+        val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(AppTheme.dp(activity,16),AppTheme.dp(activity,8),AppTheme.dp(activity,16),AppTheme.dp(activity,12)) }
         content.addView(TextView(activity).apply { text="New notifications light up while locked and unplugged. Calls take priority. Fan/trigger LEDs may activate fan power; cooling safety still applies." })
         var selectedAppIndex = -1
         val appButton = com.google.android.material.button.MaterialButton(activity).apply {
@@ -116,9 +145,9 @@ object NotificationLightingDialog {
         val seconds=listOf(3,5,10,15,30)
         content.addView(TextView(activity).apply { text="Lighting window" }); content.addView(duration)
         content.addView(TextView(activity).apply { text="Uses REDMAGIC stock brightness. New distinct notifications restart the selected lighting window." })
-        val logo=CheckBox(activity).apply { text="Logo / GAME MODE bar" }
-        val triggers=CheckBox(activity).apply { text="Trigger LEDs" }
-        val fan=CheckBox(activity).apply { text="Fan LEDs" }
+        val logo=com.google.android.material.checkbox.MaterialCheckBox(activity).apply { text="Logo / GAME MODE bar" }
+        val triggers=com.google.android.material.checkbox.MaterialCheckBox(activity).apply { text="Trigger LEDs" }
+        val fan=com.google.android.material.checkbox.MaterialCheckBox(activity).apply { text="Fan LEDs" }
         content.addView(logo);content.addView(triggers);content.addView(fan)
         fun load(index:Int) {
             val pkg=apps.getOrNull(index)?.activityInfo?.packageName ?: return
@@ -141,8 +170,8 @@ object NotificationLightingDialog {
             host.removeAllViews()
             dialog.setTitle("App unavailable")
             host.addView(TextView(activity).apply { text="$targetPackage is no longer available. Its saved profile is retained." })
-            host.addView(Button(activity).apply { text="Back"; setOnClickListener { showManager(activity,dialog,host) } })
-            host.addView(Button(activity).apply { text="Remove profile"; setOnClickListener {
+            host.addView(com.google.android.material.button.MaterialButton(activity).apply { isAllCaps=false; text="Back"; setOnClickListener { showManager(activity,dialog,host) } })
+            host.addView(com.google.android.material.button.MaterialButton(activity).apply { isAllCaps=false; text="Remove profile"; setOnClickListener {
                 confirmRemoval(activity,targetPackage) { showManager(activity,dialog,host) }
             } })
             return
@@ -157,7 +186,7 @@ object NotificationLightingDialog {
             activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
             NotificationLightingService.ensureConnected(activity)
         }
-        content.addView(Button(activity).apply { text="Save app profile"; isEnabled=apps.isNotEmpty(); setOnClickListener {
+        content.addView(com.google.android.material.button.MaterialButton(activity).apply { isAllCaps=false; text="Save app profile"; isEnabled=apps.isNotEmpty(); setOnClickListener {
             val pkg = apps.getOrNull(selectedAppIndex)?.activityInfo?.packageName
             if (pkg == null) {
                 Toast.makeText(activity,"Select an app before saving.",Toast.LENGTH_LONG).show()
@@ -178,8 +207,8 @@ object NotificationLightingDialog {
                 }
             }
         } })
-        content.addView(Button(activity).apply { text="Back to configured apps"; setOnClickListener { showManager(activity,dialog,host) } })
-        if (targetPackage != null) content.addView(Button(activity).apply { text="Remove app"; setOnClickListener {
+        content.addView(com.google.android.material.button.MaterialButton(activity).apply { isAllCaps=false; text="Back to configured apps"; setOnClickListener { showManager(activity,dialog,host) } })
+        if (targetPackage != null) content.addView(com.google.android.material.button.MaterialButton(activity).apply { isAllCaps=false; text="Remove app"; setOnClickListener {
             confirmRemoval(activity,targetPackage) { showManager(activity,dialog,host) }
         } })
         dialog.setTitle(if (targetPackage == null) "Add notification app" else runCatching {
@@ -189,7 +218,7 @@ object NotificationLightingDialog {
         (host.parent as? ScrollView)?.post { (host.parent as? ScrollView)?.scrollTo(0,0) }
     }
 
-    private fun notificationAccessButton(activity: Activity): Button = object : Button(activity) {
+    private fun notificationAccessButton(activity: Activity): Button = object : com.google.android.material.button.MaterialButton(activity) {
         private fun refreshStatus() {
             val granted=activity.getSystemService(NotificationManager::class.java)
                 .isNotificationListenerAccessGranted(ComponentName(activity,NotificationLightingService::class.java))
@@ -197,6 +226,7 @@ object NotificationLightingDialog {
             if (granted) NotificationLightingService.ensureConnected(activity)
         }
         init {
+            isAllCaps = false
             refreshStatus()
             setOnClickListener { activity.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
         }

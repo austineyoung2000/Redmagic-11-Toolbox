@@ -21,6 +21,43 @@ import com.google.android.material.textfield.TextInputLayout
 /** Shared presentation; the feature still owns its selection and saved profile. */
 internal object MaterialAppPicker {
     data class App(val packageName: String, val label: String)
+
+    fun editCard(context: Context, app: App, onEdit: () -> Unit): View {
+        fun dp(value: Int) = AppTheme.dp(context, value)
+        val card = MaterialCardView(context).apply {
+            radius = dp(16).toFloat(); cardElevation = 0f; strokeWidth = dp(1)
+            strokeColor = context.getColor(R.color.redmagic_border)
+            setCardBackgroundColor(context.getColor(R.color.redmagic_surface))
+        }
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        row.addView(ImageView(context).apply {
+            setImageDrawable(runCatching { context.packageManager.getApplicationIcon(app.packageName) }.getOrNull())
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        row.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(context).apply {
+                text = app.label; textSize = 15f; setTypeface(null, Typeface.BOLD)
+                setTextColor(context.getColor(R.color.redmagic_on_surface))
+                maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            addView(TextView(context).apply {
+                text = app.packageName; textSize = 11f
+                setTextColor(context.getColor(R.color.redmagic_on_surface_variant))
+                maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12); marginEnd = dp(8) })
+        row.addView(com.google.android.material.button.MaterialButton(context).apply {
+            text = "Edit"; isAllCaps = false; minWidth = 0; minimumWidth = 0
+            setOnClickListener { onEdit() }
+        })
+        card.addView(row)
+        card.setOnClickListener { onEdit() }
+        return card
+    }
     fun show(context: Context, title: String, apps: List<App>, selectedPackage: String? = null,
         subtitle: String = "Choose an app", actionLabel: String? = null,
         onManage: (() -> Unit)? = null, onDefaults: (() -> Unit)? = null,
