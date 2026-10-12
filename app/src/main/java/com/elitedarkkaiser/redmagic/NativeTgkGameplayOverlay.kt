@@ -43,6 +43,9 @@ object NativeTgkGameplayOverlay {
     @Volatile
     private var ownerOrientation: NativeTgkOrientation? = null
 
+    internal fun diagnosticStatus(): String =
+        "owner=$ownerPackageName; orientation=$ownerOrientation; targetsAttached=${overlayRoot?.isAttachedToWindow == true}; gsAttached=${gameSpaceOverlay?.isAttached() == true}"
+
     fun isVisibleFor(
         packageName: String,
         orientation: NativeTgkOrientation

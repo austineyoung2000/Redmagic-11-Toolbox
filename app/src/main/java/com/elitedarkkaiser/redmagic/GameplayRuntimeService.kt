@@ -145,6 +145,7 @@ class GameplayRuntimeService : Service() {
         }
 
         serviceRunning = true
+        BootDiagnostics.record(this, "Gameplay runtime created pid=${android.os.Process.myPid()}")
         android.util.Log.i(
             TAG,
             "Gameplay runtime created pid=${android.os.Process.myPid()}"
@@ -1127,6 +1128,8 @@ class GameplayRuntimeService : Service() {
                 sleep $pollSeconds
             done
         """.trimIndent()
+
+        internal fun diagnosticRunning(): Boolean = serviceRunning
 
         internal fun ensureRunning(context: Context) {
             if (!isAccessibilityConfigured(context)) {
