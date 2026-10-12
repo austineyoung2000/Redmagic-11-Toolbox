@@ -3,7 +3,7 @@
 PATH=/system/bin:/system_ext/bin:/vendor/bin:/product/bin
 export PATH
 
-SUPERVISOR_VERSION=3
+SUPERVISOR_VERSION=4
 PACKAGE_NAME="com.elitedarkkaiser.redmagic"
 ACCESSIBILITY_COMPONENT="com.elitedarkkaiser.redmagic/com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
 WATCHDOG_PROCESS="com.elitedarkkaiser.redmagic:gameplay_watchdog"
@@ -44,9 +44,17 @@ acquire_lock() {
     fi
 
     old_pid="$(cat "$PID_FILE" 2>/dev/null)"
-    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-        return 1
-    fi
+    case "$old_pid" in
+        ''|*[!0-9]*) ;;
+        *)
+            if kill -0 "$old_pid" 2>/dev/null &&
+                tr '\000' '\n' < /proc/"$old_pid"/cmdline 2>/dev/null |
+                grep -Fx "$0" >/dev/null; then
+                log_message "existing gameplay supervisor owns lock pid=$old_pid"
+                return 1
+            fi
+            ;;
+    esac
 
     rm -rf "$LOCK_DIR"
     mkdir "$LOCK_DIR" 2>/dev/null || return 1
@@ -67,10 +75,15 @@ handle_termination() {
 
 accessibility_configured() {
     enabled_services="$(
-        su 2000 -c \
+        timeout 8 su 2000 -c \
             'settings --user 0 get secure enabled_accessibility_services' \
             2>/dev/null
     )"
+    settings_status=$?
+    if [ "$settings_status" -ne 0 ]; then
+        log_message "accessibility check failed status=$settings_status; deferring recovery"
+        return 1
+    fi
 
     case ":$enabled_services:" in
         *":$ACCESSIBILITY_COMPONENT:"*) return 0 ;;
@@ -82,25 +95,13 @@ watchdog_running() {
     pidof "$WATCHDOG_PROCESS" >/dev/null 2>&1
 }
 
-arm_vendor_autolaunch_whitelist() {
-    # REDMAGIC's AutoLaunch policy blocks a shell-originated service start
-    # after the application UID has been killed. Transaction 6 is the
-    # framework's one-shot pending-launch whitelist. Keep this best-effort so
-    # retained service.d support still works on ROMs without that service.
-    su 2000 -c \
-        "service call AutoLaunch 6 s16 $PACKAGE_NAME" \
-        >/dev/null 2>&1
-}
-
 start_watchdog() {
-    if ! arm_vendor_autolaunch_whitelist; then
-        log_message \
-            "vendor AutoLaunch whitelist unavailable; trying framework start"
-    fi
-
+    # Keep the proven 500ms one-shot launch allowance and the service start in
+    # one shell invocation. Bound each Binder client independently so a hung
+    # whitelist call does not prevent the foreground-service attempt.
     start_output="$(
-        su 2000 -c \
-            "am start-foreground-service --user 0 -a $WATCHDOG_ACTION -n $WATCHDOG_COMPONENT" \
+        timeout 20 su 2000 -c \
+            "timeout 8 service call AutoLaunch 6 s16 $PACKAGE_NAME >/dev/null 2>&1; timeout 8 am start-foreground-service --user 0 -a $WATCHDOG_ACTION -n $WATCHDOG_COMPONENT" \
             2>&1
     )"
     start_status="$?"
@@ -137,7 +138,18 @@ while true; do
         continue
     fi
 
-    if ! pm path "$PACKAGE_NAME" >/dev/null 2>&1; then
+    package_output="$(timeout 8 pm path "$PACKAGE_NAME" 2>&1)"
+    package_status=$?
+    if [ "$package_status" -ne 0 ]; then
+        # A timeout/Binder failure is not proof of uninstall. Never delete the
+        # only recovery script because Android temporarily rejects a query.
+        log_message "package check failed status=$package_status; retaining supervisor"
+        sleep 15
+        continue
+    fi
+    case "$package_output" in
+    package:*) missing_package_checks=0 ;;
+    *)
         missing_package_checks=$((missing_package_checks + 1))
         if [ "$missing_package_checks" -ge 20 ]; then
             log_message "package absent; removing orphaned supervisor"
@@ -146,10 +158,11 @@ while true; do
         fi
         sleep 15
         continue
-    fi
-    missing_package_checks=0
+        ;;
+    esac
 
     if ! accessibility_configured; then
+        log_message "accessibility unavailable; deferring watchdog start"
         failure_delay=2
         sleep 15
         continue

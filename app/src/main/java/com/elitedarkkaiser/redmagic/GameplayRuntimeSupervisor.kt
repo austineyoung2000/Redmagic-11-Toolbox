@@ -24,7 +24,7 @@ internal object GameplayRuntimeSupervisor {
         "/data/adb/redmagic_toolbox"
     private const val PID_FILE =
         "$STATE_DIRECTORY/gameplay_supervisor.lock/pid"
-    private const val REQUIRED_VERSION = "3"
+    private const val REQUIRED_VERSION = "4"
 
     private val installQueued = AtomicBoolean(false)
     private val installer = Executors.newSingleThreadExecutor { runnable ->
@@ -93,6 +93,7 @@ internal object GameplayRuntimeSupervisor {
 
     private fun buildInstallCommand(encodedScript: String): String {
         return """
+            ${supervisorIdentityFunction()}
             redmagic_install_supervisor() {
                 service_dir='$SERVICE_DIRECTORY'
                 service_path='$SERVICE_PATH'
@@ -110,18 +111,19 @@ internal object GameplayRuntimeSupervisor {
                 case "${'$'}old_pid" in
                     ''|*[!0-9]*) old_pid='' ;;
                 esac
+                old_start="${'$'}(redmagic_supervisor_start "${'$'}old_pid")"
 
-                if [ -n "${'$'}old_pid" ] &&
-                    kill -0 "${'$'}old_pid" 2>/dev/null; then
+                if [ -n "${'$'}old_start" ] &&
+                    [ "${'$'}(redmagic_supervisor_start "${'$'}old_pid")" = "${'$'}old_start" ]; then
                     kill "${'$'}old_pid" 2>/dev/null || true
                     remaining_waits=10
-                    while kill -0 "${'$'}old_pid" 2>/dev/null &&
+                    while [ "${'$'}(redmagic_supervisor_start "${'$'}old_pid")" = "${'$'}old_start" ] &&
                         [ "${'$'}remaining_waits" -gt 0 ]; do
                         sleep 1
                         remaining_waits="${'$'}((remaining_waits - 1))"
                     done
 
-                    if kill -0 "${'$'}old_pid" 2>/dev/null; then
+                    if [ "${'$'}(redmagic_supervisor_start "${'$'}old_pid")" = "${'$'}old_start" ]; then
                         kill -9 "${'$'}old_pid" 2>/dev/null || return 1
                         sleep 1
                     fi
@@ -129,24 +131,26 @@ internal object GameplayRuntimeSupervisor {
 
                 current_pid="${'$'}(cat '$PID_FILE' 2>/dev/null)"
                 if [ -z "${'$'}current_pid" ] ||
-                    ! kill -0 "${'$'}current_pid" 2>/dev/null; then
+                    ! redmagic_supervisor_start "${'$'}current_pid" >/dev/null; then
                     rm -rf '$STATE_DIRECTORY/gameplay_supervisor.lock'
                 fi
             }
             redmagic_install_supervisor
             redmagic_status="${'$'}?"
             unset -f redmagic_install_supervisor
+            unset -f redmagic_supervisor_start
             (exit "${'$'}redmagic_status")
         """.trimIndent()
     }
 
     private fun buildStartCommand(): String {
         return """
+            ${supervisorIdentityFunction()}
             redmagic_start_supervisor() {
                 service_path='$SERVICE_PATH'
                 supervisor_pid="${'$'}(cat '$PID_FILE' 2>/dev/null)"
                 if [ -n "${'$'}supervisor_pid" ] &&
-                    kill -0 "${'$'}supervisor_pid" 2>/dev/null; then
+                    redmagic_supervisor_start "${'$'}supervisor_pid" >/dev/null; then
                     return 0
                 fi
                 nohup "${'$'}service_path" \
@@ -155,7 +159,23 @@ internal object GameplayRuntimeSupervisor {
             redmagic_start_supervisor
             redmagic_status="${'$'}?"
             unset -f redmagic_start_supervisor
+            unset -f redmagic_supervisor_start
             (exit "${'$'}redmagic_status")
         """.trimIndent()
     }
+
+    private fun supervisorIdentityFunction(): String = """
+        redmagic_supervisor_start() {
+            case "${'$'}1" in ''|*[!0-9]*) return 1 ;; esac
+            [ "${'$'}1" -gt 1 ] || return 1
+            tr '\000' '\n' < /proc/"${'$'}1"/cmdline 2>/dev/null |
+                grep -Fx '$SERVICE_PATH' >/dev/null || return 1
+            read redmagic_stat < /proc/"${'$'}1"/stat || return 1
+            redmagic_fields="${'$'}{redmagic_stat##*) }"
+            set -- ${'$'}redmagic_fields
+            [ "${'$'}1" != Z ] || return 1
+            shift 19 || return 1
+            printf '%s\n' "${'$'}1"
+        }
+    """.trimIndent()
 }
