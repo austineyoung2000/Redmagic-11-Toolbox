@@ -288,14 +288,10 @@ object PerformanceModeProfileDialog {
                 .sortedBy { it.label.lowercase() }
                 .toList()
 
-            MaterialAlertDialogBuilder(activity)
-                .setTitle("Choose app")
-                .setItems(
-                    apps.map {
-                        "${it.label}\n${it.packageName}"
-                    }.toTypedArray()
-                ) { _, which ->
-                    val app = apps[which]
+            MaterialAppPicker.show(activity, "Select an app or game",
+                apps.map { MaterialAppPicker.App(it.packageName, it.label) }) { picked ->
+                val app = apps.first { it.packageName == picked.packageName }
+
                     chooseMode(
                         app,
                         PerformanceModeStorage.getProfile(
@@ -303,9 +299,7 @@ object PerformanceModeProfileDialog {
                             app.packageName
                         )
                     )
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
         }
 
         renderProfiles()

@@ -243,40 +243,17 @@ class GameModeService : Service() {
             ModeTransitionCoordinator.restoreEffectiveOwner(this, "saved-game-profile-screen-off")
             return
         }
-        val profile =
-            getSavedGameModeProfileStorage(this)
-
-        GameModeActions.applyProfileNow(
-            profile = profile,
-            applyCooling = { block ->
-                val generation = coolingGeneration.incrementAndGet()
-                coolingHandler.post {
-                    if (generation == coolingGeneration.get() && LedScreenPolicy.isScreenInteractive(this)) block()
-                }
-            },
-            applyLighting = { block ->
-                // An explicit profile application cannot claim LEDs without a
-                // selected foreground game, or interrupt a higher owner.
-                val foreground = getForegroundPackageName()
-                selectedForegroundPackage = foreground?.takeIf { getSavedGamePackagesStorage(this).contains(it) }
-                if (foreground != null && getSavedGamePackagesStorage(this).contains(foreground)) {
-                    ModeTransitionCoordinator.applyLedProfile(this, LedOwner.GAME_MODE,
-                        "saved-game-profile", force = true, block = block)
-                }
-            },
-            applyFanLed = { effect, color ->
-                if (effect.startsWith("preset:")) {
-                    HardwareController.setFanLedStockPreset(
-                        effect.removePrefix("preset:")
-                    )
-                } else {
-                    HardwareController.setFanLedEffect(
-                        effect,
-                        color
-                    )
-                }
-            }
-        )
+        val foreground = getForegroundPackageName()
+        selectedForegroundPackage = foreground?.takeIf { getSavedGamePackagesStorage(this).contains(it) }
+        val selected = selectedForegroundPackage
+        if (selected == null) {
+            restoreAndClear("saved profile outside a selected game")
+            return
+        }
+        gameModeActiveFor = selected
+        setGameModeLedOverrideActiveStorage(this, true)
+        gameModeApplyPendingFor = selected
+        applyGameModeProfile()
     }
 
     private fun scheduleForegroundPackage(
@@ -498,26 +475,23 @@ class GameModeService : Service() {
             )
             return
         }
-        val profile = getProfileForPackage(pkg)
-
-        val fanEnabled = profile["fanEnabled"] as? Boolean ?: prefs.getBoolean("game_mode_fan_enabled", true)
-        val fanLevel = profile["fanLevel"] as? Int ?: prefs.getInt("game_mode_fan_level", 3)
-        val pumpEnabled = prefs.getBoolean("game_mode_pump_enabled", false)
-        val pumpProfile = prefs.getString("game_mode_pump_profile", "quick") ?: "quick"
-
-        val fanLedEnabled = profile["fanLedEnabled"] as? Boolean ?: prefs.getBoolean("game_mode_fan_led_enabled", true)
-        val fanLedEffect = profile["fanLedEffect"] as? String ?: prefs.getString("game_mode_fan_led_effect", "steady") ?: "steady"
-        val fanLedColor = profile["fanLedColor"] as? Int ?: prefs.getInt("game_mode_fan_led_color", 5)
-        val fanLedModeType = profile["fanLedModeType"] as? String ?: "basic"
-        val fanLedPresetValue = profile["fanLedPresetValue"] as? String ?: ""
-
-        val logoLedEnabled = profile["logoLedEnabled"] as? Boolean ?: prefs.getBoolean("game_mode_logo_led_enabled", true)
-        val logoLedEffect = profile["logoLedEffect"] as? String ?: prefs.getString("game_mode_logo_led_effect", "steady") ?: "steady"
-        val logoLedColor = profile["logoLedColor"] as? Int ?: prefs.getInt("game_mode_logo_led_color", 1)
-
-        val shoulderLedEnabled = profile["shoulderLedEnabled"] as? Boolean ?: prefs.getBoolean("game_mode_shoulder_led_enabled", true)
-        val shoulderLedEffect = profile["shoulderLedEffect"] as? String ?: prefs.getString("game_mode_shoulder_led_effect", "breathe") ?: "breathe"
-        val shoulderLedColor = profile["shoulderLedColor"] as? Int ?: prefs.getInt("game_mode_shoulder_led_color", 8)
+        val profile = getSavedGameModeProfileForPackageStorage(this, pkg)
+        val legacy = getProfileForPackage(pkg)
+        val fanEnabled = profile.fanEnabled
+        val fanLevel = profile.fanLevel
+        val pumpEnabled = profile.pumpEnabled
+        val pumpProfile = profile.pumpProfile
+        val fanLedEnabled = profile.fanLedEnabled
+        val fanLedEffect = profile.fanLedEffect
+        val fanLedColor = profile.fanLedColor
+        val fanLedModeType = legacy["fanLedModeType"] as? String ?: "basic"
+        val fanLedPresetValue = legacy["fanLedPresetValue"] as? String ?: ""
+        val logoLedEnabled = profile.logoLedEnabled
+        val logoLedEffect = profile.logoLedEffect
+        val logoLedColor = profile.logoLedColor
+        val shoulderLedEnabled = profile.shoulderLedEnabled
+        val shoulderLedEffect = profile.shoulderLedEffect
+        val shoulderLedColor = profile.shoulderLedColor
 
         fun applyOnce(reason: String) {
             if (gameModeActiveFor != pkg) return

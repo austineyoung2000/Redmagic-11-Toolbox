@@ -41,7 +41,9 @@ internal object GameModeUi {
         activity: MainActivity,
         current: GameModeProfile,
         deps: Deps,
-        onSaveProfile: (GameModeProfile) -> Unit
+        onSaveProfile: (GameModeProfile) -> Unit,
+        appLabel: String? = null,
+        appPackage: String? = null
     ) {
         var gmFanEnabled = current.fanEnabled
         var gmFanLevel = current.fanLevel
@@ -74,14 +76,15 @@ internal object GameModeUi {
         }
 
         val titleView = TextView(activity).apply {
-            text = "Edit Game Profile"
+            text = appLabel?.let { "Edit $it" } ?: "Edit shared Game Mode defaults"
             textSize = 20f
             setTextColor(deps.textPrimary)
             setTypeface(deps.typeface, Typeface.BOLD)
         }
 
         val subtitleView = TextView(activity).apply {
-            text = "These settings will apply automatically when a selected game launches."
+            text = appPackage?.let { "Applies only while this app is foreground.\n$it" }
+                ?: "Starting settings for selected apps without their own saved profile."
             textSize = 13f
             setTextColor(deps.textSecondary)
             setPadding(0, deps.dp(8), 0, deps.dp(10))
@@ -562,6 +565,7 @@ internal object GameModeUi {
         cancelBtn.setOnClickListener { dialog.dismiss() }
 
         saveBtn.setOnClickListener {
+            runCatching {
             GameModeActions.saveProfile(
                 context = activity,
                 profile = GameModeActions.buildProfile(
@@ -582,6 +586,9 @@ internal object GameModeUi {
                 persistProfile = onSaveProfile,
                 onSaved = { dialog.dismiss() }
             )
+            }.onFailure {
+                android.widget.Toast.makeText(activity, "Profile could not be saved. Try again.", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
 
         dialog.show()

@@ -283,10 +283,10 @@ object NativeTgkProfileDialog {
                 "${it.label}\n${it.packageName}"
             }.toTypedArray()
 
-            MaterialAlertDialogBuilder(activity)
-                .setTitle("Select an app or game")
-                .setItems(labels) { _, position ->
-                    val app = apps[position]
+            MaterialAppPicker.show(activity, "Edit app profile",
+                apps.map { MaterialAppPicker.App(it.packageName, it.label) }) { picked ->
+                val app = apps.first { it.packageName == picked.packageName }
+
                     val existing =
                         NativeTgkStorage.getProfile(
                             activity,
@@ -300,9 +300,7 @@ object NativeTgkProfileDialog {
                         )
 
                     showOrientationPicker(profile)
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
         }
 
         fun disableActiveProfileIfNeeded(

@@ -81,7 +81,21 @@ fun gameModeProfileSummaryStorage(context: Context): String {
     val fanText = if (p.fanEnabled) "Fan ${p.fanLevel}" else "Fan Off"
     val pumpText = if (p.pumpEnabled) "Pump ${p.pumpProfile.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}" else "Pump Off"
     val ledText = if (p.fanLedEnabled) "Fan LED ${LedBrightness.effect(p.fanLedEffect)}" else "Fan LED Off"
-    return "$fanText • $pumpText • $ledText"
+    return "Per-app profiles • Default: $fanText • $pumpText • $ledText"
+}
+
+fun getSavedGameModeProfileForPackageStorage(context: Context, pkg: String): GameModeProfile {
+    val prefs = context.getSharedPreferences(GAME_PREFS_NAME, Context.MODE_PRIVATE)
+    return GameModeProfileCodec.decode(prefs.getString("game_profile_$pkg", null), getSavedGameModeProfileStorage(context))
+}
+
+fun saveGameModeProfileForPackageStorage(context: Context, pkg: String, profile: GameModeProfile): Boolean {
+    require(pkg.isNotBlank())
+    synchronized(gameModeStorageLock) {
+        val prefs = context.getSharedPreferences(GAME_PREFS_NAME, Context.MODE_PRIVATE)
+        val raw = GameModeProfileCodec.encode(profile, prefs.getString("game_profile_$pkg", null))
+        return prefs.edit().putString("game_profile_$pkg", raw).commit()
+    }
 }
 
 
