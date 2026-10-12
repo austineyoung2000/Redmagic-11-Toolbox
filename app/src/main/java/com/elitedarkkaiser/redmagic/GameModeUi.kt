@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -102,7 +103,7 @@ internal object GameModeUi {
             setPadding(0, deps.dp(10), 0, deps.dp(4))
         }
 
-        val fanLevelSeek = Slider(activity).apply {
+        val fanLevelSeek = SelectionControlStyle.slider(activity).apply {
             valueFrom = 0f
             valueTo = 5f
             stepSize = 1f
@@ -227,13 +228,13 @@ internal object GameModeUi {
         ledFlashingBtn = gmLedEffectBtn("Flashing", "flashing")
         ledRapidBtn = gmLedEffectBtn("Rapid", "rapid")
 
-        ledEffectRow.addView(ledSteadyBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        ledEffectRow.addView(ledSteadyBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         ledEffectRow.addView(deps.space(deps.dp(8)))
-        ledEffectRow.addView(ledBreatheBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        ledEffectRow.addView(ledBreatheBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         ledEffectRow.addView(deps.space(deps.dp(8)))
-        ledEffectRow.addView(ledFlashingBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        ledEffectRow.addView(ledFlashingBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         ledEffectRow.addView(deps.space(deps.dp(8)))
-        ledEffectRow.addView(ledRapidBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        ledEffectRow.addView(ledRapidBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
 
         val ledColorLabel = TextView(activity).apply {
             text = "Fan LED color"
@@ -499,13 +500,11 @@ internal object GameModeUi {
         }
         refreshBlink = {
             val selected = LedBrightness.effect(gmFanLedEffect) == "blink"
-            fanBlink.isSelected = selected
-            if (fanBlink is com.google.android.material.button.MaterialButton) {
-                fanBlink.backgroundTintList = ColorStateList.valueOf(if (selected) deps.panelPressed else deps.panelColor)
-            } else fanBlink.background = deps.roundedFill(if (selected) deps.panelPressed else deps.panelColor, 999)
+            SelectionControlStyle.apply(fanBlink, selected)
         }
         refreshBlink?.invoke()
-        container.addView(fanBlink)
+        container.addView(fanBlink, container.indexOfChild(ledEffectRow) + 1,
+            LinearLayout.LayoutParams(-1, deps.dp(48)).apply { topMargin = deps.dp(8) })
         LedBrightnessUi(activity, container, "fan", { gmFanLedEffect }, { gmFanLedColor },
             { gmFanLedEffect = it }, {}, deps.textSecondary, deps.accent, deps.dp)
 

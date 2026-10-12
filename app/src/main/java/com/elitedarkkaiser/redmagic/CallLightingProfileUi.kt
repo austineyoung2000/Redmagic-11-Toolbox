@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.res.ColorStateList
@@ -221,34 +222,8 @@ internal object CallLightingProfileUi {
             button: Button,
             selected: Boolean
         ) {
-            button.isSelected = selected
-
-            if (button is MaterialButton) {
-                button.backgroundTintList = ColorStateList.valueOf(
-                    if (selected) {
-                        deps.panelPressed
-                    } else {
-                        Color.TRANSPARENT
-                    }
-                )
-                button.strokeColor = ColorStateList.valueOf(
-                    if (selected) {
-                        deps.accent
-                    } else {
-                        deps.borderColor
-                    }
-                )
-            } else {
-                button.background = deps.roundedFill(
-                    if (selected) {
-                        deps.panelPressed
-                    } else {
-                        deps.panelColor
-                    },
-                    18
-                )
-            }
-        }
+            SelectionControlStyle.apply(button, selected)
+    }
 
         fun refreshEffects() {
             blinkBtn?.let { updateEffectButton(it, LedBrightness.effect(effect) == "blink") }
@@ -343,13 +318,13 @@ internal object CallLightingProfileUi {
         breatheBtn = effectButton("Breathe", "breathe")
         flashingBtn = effectButton("Flashing", "flashing")
         rapidBtn = effectButton("Rapid", "rapid")
-        effectRow.addView(steadyBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectRow.addView(steadyBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         effectRow.addView(deps.space(deps.dp(8)))
-        effectRow.addView(breatheBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectRow.addView(breatheBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         effectRow.addView(deps.space(deps.dp(8)))
-        effectRow.addView(flashingBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectRow.addView(flashingBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
         effectRow.addView(deps.space(deps.dp(8)))
-        effectRow.addView(rapidBtn, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+        effectRow.addView(rapidBtn, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
 
         row1 = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -416,7 +391,8 @@ internal object CallLightingProfileUi {
 
         if (showFanPresets) {
             blinkBtn = effectButton("Blink", "blink")
-            card.addView(blinkBtn)
+            card.addView(blinkBtn, card.indexOfChild(effectRow) + 1,
+                LinearLayout.LayoutParams(-1, deps.dp(48)).apply { topMargin = deps.dp(8) })
         }
         LedBrightnessUi(activity, card, if (showFanPresets) "fan" else "logo", { effect }, { color },
             { effect = it; publish() }, {}, deps.textSecondary, deps.accent, deps.dp)

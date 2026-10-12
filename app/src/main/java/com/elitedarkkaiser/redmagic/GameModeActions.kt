@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -120,19 +121,7 @@ internal object GameModeActions {
         selectedColor: Int,
         unselectedColor: Int
     ) {
-        val stateColor =
-            if (selected) selectedColor else unselectedColor
-
-        button.isSelected = selected
-
-        if (button is MaterialButton) {
-            button.backgroundTintList =
-                ColorStateList.valueOf(stateColor)
-            button.strokeColor =
-                ColorStateList.valueOf(stateColor)
-        } else {
-            button.background = roundedFill(stateColor, 999)
-        }
+        SelectionControlStyle.apply(button, selected)
     }
 
     fun refreshPumpButtons(

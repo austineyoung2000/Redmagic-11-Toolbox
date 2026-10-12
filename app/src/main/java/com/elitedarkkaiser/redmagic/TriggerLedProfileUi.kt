@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -75,9 +76,7 @@ internal object TriggerLedProfileUi {
         fun refreshEffects() {
             effectButtons.forEach { (value, button) ->
                 val selected = selection.effect == value
-                button.isSelected = selected
-                button.backgroundTintList = ColorStateList.valueOf(if (selected) deps.panelPressed else Color.TRANSPARENT)
-                button.strokeColor = ColorStateList.valueOf(if (selected) deps.accent else deps.borderColor)
+                SelectionControlStyle.apply(button, selected)
             }
         }
         listOf("steady" to "Steady", "breathe" to "Breathe", "flashing" to "Flashing", "rapid" to "Rapid").forEach { (value, title) ->
@@ -95,7 +94,9 @@ internal object TriggerLedProfileUi {
                 }
             }
             effectButtons.add(value to button)
-            effectRow.addView(button, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
+            effectRow.addView(button, LinearLayout.LayoutParams(0, deps.dp(48), 1f).apply {
+                if (effectRow.childCount > 0) marginStart = deps.dp(6)
+            })
         }
         panel.addView(effectRow)
         fun palette(parent: LinearLayout, title: String, top: Boolean?) {

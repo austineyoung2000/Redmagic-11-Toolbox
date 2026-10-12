@@ -250,24 +250,7 @@ class MainActivityUiKit(
         button: Button,
         selected: Boolean
     ) {
-        button.isSelected = selected
-
-        if (button is MaterialButton) {
-            button.backgroundTintList = ColorStateList.valueOf(
-                if (selected) {
-                    AppTheme.panelPressed
-                } else {
-                    Color.TRANSPARENT
-                }
-            )
-            button.strokeColor = ColorStateList.valueOf(
-                if (selected) {
-                    AppTheme.highlightBorder
-                } else {
-                    AppTheme.borderColor
-                }
-            )
-        }
+        SelectionControlStyle.apply(button, selected)
     }
 
     fun subtleLabel(text: String): TextView {

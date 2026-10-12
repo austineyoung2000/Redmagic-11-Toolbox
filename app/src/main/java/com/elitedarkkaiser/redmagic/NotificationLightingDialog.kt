@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.app.Activity
 import android.content.Intent
 import android.app.NotificationManager
@@ -72,8 +73,26 @@ object NotificationLightingDialog {
         if (targetPackage == null) content.addView(TextView(activity).apply { text="App" })
         content.addView(appSpinner)
         val effects=listOf("steady","breathe","flashing","rapid")
-        val effect=Spinner(activity).apply { adapter=ArrayAdapter(activity,android.R.layout.simple_spinner_dropdown_item,listOf("Steady","Breathe","Flashing","Rapid")) }
-        content.addView(TextView(activity).apply { text="Effect" }); content.addView(effect)
+        var selectedEffect = "steady"
+        val effectButtons = linkedMapOf<String, android.widget.Button>()
+        fun refreshEffects() {
+            effectButtons.forEach { (value, button) -> SelectionControlStyle.apply(button, value == selectedEffect) }
+        }
+        val effectRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+        val effectFactory = LedControlViewFactory(activity)
+        effects.zip(listOf("Steady", "Breathe", "Flashing", "Rapid")).forEach { (value, title) ->
+            val button = effectFactory.filterChip(title, value == selectedEffect) {
+                selectedEffect = value
+                refreshEffects()
+            }
+            effectButtons[value] = button
+            effectRow.addView(button, LinearLayout.LayoutParams(0,
+                AppTheme.dp(activity, 48), 1f).apply {
+                if (effectRow.childCount > 0) marginStart = AppTheme.dp(activity, 6)
+            })
+        }
+        content.addView(TextView(activity).apply { text="Effect" })
+        content.addView(effectRow)
         val colors=listOf(1 to 0xffff0000.toInt(),3 to 0xffff8800.toInt(),4 to 0xffffd700.toInt(),5 to 0xff00dd77.toInt(),6 to 0xff00ddee.toInt(),7 to 0xff1765ff.toInt(),8 to 0xffaa22ee.toInt(),9 to 0xffff66bb.toInt())
         val names=listOf("Red","Orange","Yellow","Green","Cyan","Blue","Purple","Pink")
         var selectedColor=7
@@ -101,7 +120,7 @@ object NotificationLightingDialog {
         fun load(index:Int) {
             val pkg=apps.getOrNull(index)?.activityInfo?.packageName ?: return
             val p=NotificationLightingState.read(activity,pkg) ?: NotificationLightingState.Profile()
-            selectedColor=p.color;refreshDots();effect.setSelection(effects.indexOf(p.effect).coerceAtLeast(0))
+            selectedColor=p.color;refreshDots();selectedEffect=p.effect.takeIf { it in effects } ?: "steady";refreshEffects()
             duration.setSelection(seconds.indexOf(p.seconds).takeIf { it>=0 } ?: 2)
             logo.isChecked=p.logo;triggers.isChecked=p.triggers;fan.isChecked=p.fan
         }
@@ -135,7 +154,7 @@ object NotificationLightingDialog {
                 Toast.makeText(activity,"Select an app before saving.",Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
-            val profile = NotificationLightingState.Profile(selectedColor,effects[effect.selectedItemPosition],seconds[duration.selectedItemPosition],255,logo.isChecked,triggers.isChecked,fan.isChecked)
+            val profile = NotificationLightingState.Profile(selectedColor,selectedEffect,seconds[duration.selectedItemPosition],255,logo.isChecked,triggers.isChecked,fan.isChecked)
             isEnabled = false
             saveExecutor.execute {
                 val saved = runCatching { NotificationLightingState.save(activity,pkg,profile) }.getOrDefault(false)

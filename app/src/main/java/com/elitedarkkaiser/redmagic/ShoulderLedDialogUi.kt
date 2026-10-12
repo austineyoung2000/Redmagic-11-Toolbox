@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -126,7 +127,7 @@ internal object ShoulderLedDialogUi {
             .map { (value, title) ->
                 val button = deps.filterChip(title, baseEffect() == value) { changeEffect(value) }
                 if (effectsRow.childCount > 0) effectsRow.addView(deps.space(deps.dp(6)))
-                effectsRow.addView(button, LinearLayout.LayoutParams(0, deps.dp(44), 1f))
+                effectsRow.addView(button, LinearLayout.LayoutParams(0, deps.dp(48), 1f))
                 value to button
             }
         container.addView(effectsRow)
@@ -188,8 +189,7 @@ internal object ShoulderLedDialogUi {
                 val selected = baseEffect() == value
                 button.isSelected = selected
                 if (button is MaterialButton) {
-                    button.backgroundTintList = ColorStateList.valueOf(if (selected) deps.panelPressed else Color.TRANSPARENT)
-                    button.strokeColor = ColorStateList.valueOf(if (selected) deps.accent else deps.borderColor)
+                    SelectionControlStyle.apply(button, selected)
                 }
             }
             dotUpdates.forEach { it() }

@@ -1,5 +1,6 @@
 package com.elitedarkkaiser.redmagic
 
+import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -7,7 +8,7 @@ import android.graphics.Typeface
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.SeekBar
+import com.google.android.material.slider.Slider
 import android.widget.TextView
 import com.elitedarkkaiser.redmagic.state.LedState
 import com.elitedarkkaiser.redmagic.ui.AppTheme
@@ -34,7 +35,10 @@ internal object LogoBarProfileUi {
             textSize = 13f
             setPadding(0, dp(12), 0, dp(8))
         }
-        val panel = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        val panel = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
         panel.addView(label("Logo and GAME MODE bar share this effect"))
         val effects = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
         val buttons = mutableMapOf<String, MaterialButton>()
@@ -46,20 +50,19 @@ internal object LogoBarProfileUi {
                 textSize = 11f
                 minWidth = 0
                 minimumWidth = 0
-                isSelected = effect == selection.effect
-                setTextColor(AppTheme.textPrimary)
-                strokeColor = ColorStateList.valueOf(if (isSelected) AppTheme.accentColor else AppTheme.borderColor)
+                SelectionControlStyle.apply(this, effect == selection.effect)
                 setOnClickListener {
                     selection = selection.copy(effect = effect)
                     buttons.forEach { (key, candidate) ->
-                        candidate.isSelected = key == effect
-                        candidate.strokeColor = ColorStateList.valueOf(if (key == effect) AppTheme.accentColor else AppTheme.borderColor)
+                        SelectionControlStyle.apply(candidate, key == effect)
                     }
                     publish()
                 }
             }
             buttons[effect] = button
-            effects.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f))
+            effects.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+                if (effects.childCount > 0) marginStart = dp(6)
+            })
         }
         panel.addView(effects)
         fun area(bar: Boolean) {
@@ -107,23 +110,25 @@ internal object LogoBarProfileUi {
             }
             val levelLabel = label("Brightness: ${if (bar) selection.barBrightness else selection.logoBrightness} / 255")
             card.addView(levelLabel)
-            card.addView(SeekBar(activity).apply {
-                max = 223
-                progress = (if (bar) selection.barBrightness else selection.logoBrightness) - 32
-                progressTintList = ColorStateList.valueOf(AppTheme.accentColor)
-                thumbTintList = ColorStateList.valueOf(AppTheme.accentColor)
-                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                        if (!fromUser) return
-                        val level = progress + 32
+            card.addView(SelectionControlStyle.slider(activity).apply {
+                valueFrom = 32f
+                valueTo = 255f
+                stepSize = 1f
+                value = (if (bar) selection.barBrightness else selection.logoBrightness).toFloat()
+                isTickVisible = false
+                addOnChangeListener { _, value, fromUser ->
+                    if (fromUser) {
+                        val level = value.toInt()
                         selection = if (bar) selection.copy(barBrightness = level) else selection.copy(logoBrightness = level)
                         levelLabel.text = "Brightness: $level / 255"
                         publish(preview = false)
                     }
-                    override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-                    override fun onStopTrackingTouch(seekBar: SeekBar?) { publish() }
+                }
+                addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                    override fun onStartTrackingTouch(slider: Slider) = Unit
+                    override fun onStopTrackingTouch(slider: Slider) { publish() }
                 })
-            })
+            }, LinearLayout.LayoutParams(-1, dp(56)))
             panel.addView(card)
         }
         if (onlyBar == null) { area(false); area(true) } else area(onlyBar)
