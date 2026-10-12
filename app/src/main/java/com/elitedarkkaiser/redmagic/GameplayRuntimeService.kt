@@ -145,6 +145,8 @@ class GameplayRuntimeService : Service() {
         }
 
         serviceRunning = true
+        diagnosticInstance = this
+        BootDiagnostics.record(this, "Gameplay runtime created pid=${android.os.Process.myPid()}")
         android.util.Log.i(
             TAG,
             "Gameplay runtime created pid=${android.os.Process.myPid()}"
@@ -413,8 +415,7 @@ class GameplayRuntimeService : Service() {
         }.onFailure {
             logRuntimeFailure("queue startup reset", it)
         }
-        val startupGeneration =
-            nativeTgkGeneration.incrementAndGet()
+        nativeTgkGeneration.incrementAndGet()
 
         runCatching {
             nativeTgkExecutor.submit {
@@ -430,15 +431,19 @@ class GameplayRuntimeService : Service() {
                 foregroundHandler.post {
                     if (
                         nativeTgkExecutor.isShutdown ||
-                        nativeTgkGeneration.get() !=
-                        startupGeneration
+                        !runtimeStarted
                     ) {
                         return@post
                     }
 
+                    // Screen-off cancels mapping generations, not service
+                    // initialization. Otherwise a lock during cleanup leaves
+                    // this runtime permanently unable to monitor foreground.
                     nativeTgkStartupCleanupComplete = true
                     forceForegroundReconcile = true
-                    ensureForegroundRootMonitor()
+                    if (isScreenInteractive()) {
+                        ensureForegroundRootMonitor()
+                    }
                     foregroundHandler.removeCallbacks(
                         foregroundMonitor
                     )
@@ -458,6 +463,7 @@ class GameplayRuntimeService : Service() {
     override fun onDestroy() {
         android.util.Log.i(TAG, "Gameplay runtime stopping")
         serviceRunning = false
+        if (diagnosticInstance === this) diagnosticInstance = null
         runtimeStarted = false
         lastForegroundPackage = null
         forceForegroundReconcile = false
@@ -1127,6 +1133,20 @@ class GameplayRuntimeService : Service() {
                 sleep $pollSeconds
             done
         """.trimIndent()
+
+        internal fun diagnosticRunning(): Boolean = serviceRunning
+
+        @Volatile private var diagnosticInstance: GameplayRuntimeService? = null
+
+        internal fun diagnosticRecovery(): String {
+            val runtime = diagnosticInstance ?: return "no runtime instance"
+            val sampleAge = runtime.lastForegroundRootSampleAt.takeIf { it > 0 }
+                ?.let { SystemClock.elapsedRealtime() - it }
+            return "started=${runtime.runtimeStarted}; startupCleanupComplete=${runtime.nativeTgkStartupCleanupComplete}; " +
+                "foregroundRootAlive=${runtime.foregroundRootProcess?.isAlive == true}; " +
+                "sampleAgeMs=$sampleAge; lastForeground=${runtime.lastForegroundPackage}; " +
+                "nativeQueueShutdown=${runtime.nativeTgkExecutor.isShutdown}"
+        }
 
         internal fun ensureRunning(context: Context) {
             if (!isAccessibilityConfigured(context)) {

@@ -177,11 +177,12 @@ class MainActivity : Activity() {
         initDefaultTriggerMappingsStorage(this)
         deviceCapabilities = deviceCapabilitiesStorage(this)
 
-        val needsFirstInstallSetup =
-            !isFirstInstallPermissionsPromptedStorage(this) ||
-                !PermissionBootstrap.inspect(this).success
+        val permissionSnapshot = PermissionBootstrap.inspect(this)
+        val setupCompleted = isFirstInstallPermissionsPromptedStorage(this)
+        val needsFirstInstallSetup = !setupCompleted || !permissionSnapshot.success
 
         if (needsFirstInstallSetup) {
+            BootDiagnostics.record(this, "Permission setup opened: completed=$setupCompleted; missing=${permissionSnapshot.missingPermissions.joinToString()}")
             FirstInstallPermissionsDialog.show(this) {
                 setCachedRootAccessStorage(this, true)
                 launchMainUi()
