@@ -414,8 +414,7 @@ class GameplayRuntimeService : Service() {
         }.onFailure {
             logRuntimeFailure("queue startup reset", it)
         }
-        val startupGeneration =
-            nativeTgkGeneration.incrementAndGet()
+        nativeTgkGeneration.incrementAndGet()
 
         runCatching {
             nativeTgkExecutor.submit {
@@ -431,15 +430,19 @@ class GameplayRuntimeService : Service() {
                 foregroundHandler.post {
                     if (
                         nativeTgkExecutor.isShutdown ||
-                        nativeTgkGeneration.get() !=
-                        startupGeneration
+                        !runtimeStarted
                     ) {
                         return@post
                     }
 
+                    // Screen-off cancels mapping generations, not service
+                    // initialization. Otherwise a lock during cleanup leaves
+                    // this runtime permanently unable to monitor foreground.
                     nativeTgkStartupCleanupComplete = true
                     forceForegroundReconcile = true
-                    ensureForegroundRootMonitor()
+                    if (isScreenInteractive()) {
+                        ensureForegroundRootMonitor()
+                    }
                     foregroundHandler.removeCallbacks(
                         foregroundMonitor
                     )
