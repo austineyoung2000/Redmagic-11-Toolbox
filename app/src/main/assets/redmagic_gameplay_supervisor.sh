@@ -3,9 +3,10 @@
 PATH=/system/bin:/system_ext/bin:/vendor/bin:/product/bin
 export PATH
 
-SUPERVISOR_VERSION=4
+SUPERVISOR_VERSION=5
 PACKAGE_NAME="com.elitedarkkaiser.redmagic"
 ACCESSIBILITY_COMPONENT="com.elitedarkkaiser.redmagic/com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
+ACCESSIBILITY_COMPONENT_SHORT="com.elitedarkkaiser.redmagic/.TriggerAccessibilityService"
 WATCHDOG_PROCESS="com.elitedarkkaiser.redmagic:gameplay_watchdog"
 WATCHDOG_COMPONENT="com.elitedarkkaiser.redmagic/.GameplayRuntimeWatchdogService"
 WATCHDOG_ACTION="com.elitedarkkaiser.redmagic.KEEP_GAMEPLAY_WATCHDOG"
@@ -86,7 +87,7 @@ accessibility_configured() {
     fi
 
     case ":$enabled_services:" in
-        *":$ACCESSIBILITY_COMPONENT:"*) return 0 ;;
+        *":$ACCESSIBILITY_COMPONENT:"*|*":$ACCESSIBILITY_COMPONENT_SHORT:"*) return 0 ;;
         *) return 1 ;;
     esac
 }

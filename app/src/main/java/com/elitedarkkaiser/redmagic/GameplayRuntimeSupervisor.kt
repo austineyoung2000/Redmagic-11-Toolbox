@@ -24,7 +24,7 @@ internal object GameplayRuntimeSupervisor {
         "/data/adb/redmagic_toolbox"
     private const val PID_FILE =
         "$STATE_DIRECTORY/gameplay_supervisor.lock/pid"
-    private const val REQUIRED_VERSION = "4"
+    private const val REQUIRED_VERSION = "5"
 
     private val installQueued = AtomicBoolean(false)
     private val installer = Executors.newSingleThreadExecutor { runnable ->
