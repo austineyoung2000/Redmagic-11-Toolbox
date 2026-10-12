@@ -18,9 +18,26 @@ internal class MainGameModeActions(
     }
 
     fun showProfileDialog() {
+        val manager = activity.packageManager
+        val apps = getSavedGamePackagesStorage(activity).map { pkg ->
+            MaterialAppPicker.App(pkg, runCatching {
+                manager.getApplicationLabel(manager.getApplicationInfo(pkg, 0)).toString()
+            }.getOrDefault(pkg))
+        }.sortedBy { it.label.lowercase() }
+        MaterialAppPicker.show(activity, "Game Mode profiles", apps,
+            subtitle = "Edit cooling and lighting for one app. Shared defaults are retained.",
+            actionLabel = "Edit",
+            onManage = { showAppPicker { showProfileDialog() } },
+            onDefaults = { showProfileEditor(null, "Shared defaults") }) { app ->
+            showProfileEditor(app.packageName, app.label)
+        }
+    }
+
+    private fun showProfileEditor(pkg: String?, label: String) {
         GameModeUi.showGameModeProfileDialog(
             activity = activity,
-            current = getSavedGameModeProfileStorage(activity),
+            current = if (pkg == null) getSavedGameModeProfileStorage(activity)
+                else getSavedGameModeProfileForPackageStorage(activity, pkg),
             deps = GameModeUi.Deps(
                 textPrimary = AppTheme.textPrimary,
                 textSecondary = AppTheme.textSecondary,
@@ -48,9 +65,14 @@ internal class MainGameModeActions(
                 }
             ),
             onSaveProfile = { profile ->
-                saveGameModeProfileStorage(activity, profile)
+                if (pkg == null) saveGameModeProfileStorage(activity, profile)
+                else if (!saveGameModeProfileForPackageStorage(activity, pkg, profile)) {
+                    throw IllegalStateException("App profile could not be saved")
+                }
                 GameModeActions.applySavedProfileThroughService(activity)
-            }
+            },
+            appLabel = label.takeIf { pkg != null },
+            appPackage = pkg
         )
     }
 }

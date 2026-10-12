@@ -350,13 +350,10 @@ object TouchTuningProfileDialog {
                 ).show()
                 return@setOnClickListener
             }
-            MaterialAlertDialogBuilder(activity)
-                .setTitle("Select an app or game")
-                .setItems(
-                    apps.map { "${it.label}\n${it.packageName}" }
-                        .toTypedArray()
-                ) { _, which ->
-                    val app = apps[which]
+            MaterialAppPicker.show(activity, "Select an app or game",
+                apps.map { MaterialAppPicker.App(it.packageName, it.label) }) { picked ->
+                val app = apps.first { it.packageName == picked.packageName }
+
                     showEditor(
                         app,
                         TouchTuningStorage.getProfile(
@@ -364,9 +361,7 @@ object TouchTuningProfileDialog {
                             app.packageName
                         )
                     )
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
         }
 
         renderProfiles()

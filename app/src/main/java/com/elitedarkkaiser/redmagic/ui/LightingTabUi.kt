@@ -63,11 +63,11 @@ object LightingTabUi {
 
         val gameModeCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("🎮", "GAME MODE"))
-            addView(deps.bodyText("Pick apps and configure a full hardware profile to apply while a game is active."))
+            addView(deps.bodyText("Select apps, then edit cooling and lighting separately for each app. Profiles apply only while that app is foreground."))
             addView(deps.infoRow("Apps", deps.subtleLabel(deps.gameModeAppsSummary())))
             addView(deps.row(
                 deps.actionButton("SELECT APPS", false) { deps.showGameModeAppPicker() },
-                deps.actionButton("GAME PROFILE", false) { deps.showGameModeProfileDialog() }
+                deps.actionButton("APP PROFILES", false) { deps.showGameModeProfileDialog() }
             ))
         }
 

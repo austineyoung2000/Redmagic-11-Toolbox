@@ -69,9 +69,12 @@ object NotificationLightingDialog {
             .distinctBy { it.activityInfo.packageName }.sortedBy { it.loadLabel(activity.packageManager).toString().lowercase() }
         val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(32,16,32,16) }
         content.addView(TextView(activity).apply { text="New notifications light up while locked and unplugged. Calls take priority. Fan/trigger LEDs may activate fan power; cooling safety still applies." })
-        val appSpinner=Spinner(activity).apply { adapter=ArrayAdapter(activity,android.R.layout.simple_spinner_dropdown_item,apps.map { it.loadLabel(activity.packageManager).toString() }) }
+        var selectedAppIndex = -1
+        val appButton = com.google.android.material.button.MaterialButton(activity).apply {
+            text = "Choose app"; isAllCaps = false
+        }
         if (targetPackage == null) content.addView(TextView(activity).apply { text="App" })
-        content.addView(appSpinner)
+        content.addView(appButton)
         val effects=listOf("steady","breathe","flashing","rapid")
         var selectedEffect = "steady"
         val effectButtons = linkedMapOf<String, android.widget.Button>()
@@ -124,9 +127,14 @@ object NotificationLightingDialog {
             duration.setSelection(seconds.indexOf(p.seconds).takeIf { it>=0 } ?: 2)
             logo.isChecked=p.logo;triggers.isChecked=p.triggers;fan.isChecked=p.fan
         }
-        appSpinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent:AdapterView<*>?,view:android.view.View?,position:Int,id:Long) { load(position) }
-            override fun onNothingSelected(parent:AdapterView<*>?) {}
+        appButton.setOnClickListener {
+            MaterialAppPicker.show(activity, "Choose notification app",
+                apps.map { MaterialAppPicker.App(it.activityInfo.packageName, it.loadLabel(activity.packageManager).toString()) },
+                apps.getOrNull(selectedAppIndex)?.activityInfo?.packageName) { app ->
+                selectedAppIndex = apps.indexOfFirst { it.activityInfo.packageName == app.packageName }
+                appButton.text = app.label
+                load(selectedAppIndex)
+            }
         }
         val targetIndex=apps.indexOfFirst { it.activityInfo.packageName==targetPackage }
         if (targetPackage != null && targetIndex < 0) {
@@ -139,17 +147,18 @@ object NotificationLightingDialog {
             } })
             return
         }
-        appSpinner.isEnabled=targetPackage == null
-        if (targetPackage != null) appSpinner.visibility=android.view.View.GONE
+        appButton.isEnabled=targetPackage == null
+
         val initialIndex=targetIndex.coerceAtLeast(0)
-        appSpinner.setSelection(initialIndex)
+        selectedAppIndex = initialIndex
+        appButton.text = apps.getOrNull(initialIndex)?.loadLabel(activity.packageManager) ?: "Choose app"
         load(initialIndex)
         fun changed() {
             activity.sendBroadcast(Intent(NotificationLightingService.ACTION_SETTINGS_CHANGED).setPackage(activity.packageName))
             NotificationLightingService.ensureConnected(activity)
         }
         content.addView(Button(activity).apply { text="Save app profile"; isEnabled=apps.isNotEmpty(); setOnClickListener {
-            val pkg = apps.getOrNull(appSpinner.selectedItemPosition)?.activityInfo?.packageName
+            val pkg = apps.getOrNull(selectedAppIndex)?.activityInfo?.packageName
             if (pkg == null) {
                 Toast.makeText(activity,"Select an app before saving.",Toast.LENGTH_LONG).show()
                 return@setOnClickListener

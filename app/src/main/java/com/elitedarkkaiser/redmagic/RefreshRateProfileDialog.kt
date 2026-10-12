@@ -298,10 +298,10 @@ object RefreshRateProfileDialog {
             val labels = apps.map {
                 "${it.label}\n${it.packageName}"
             }.toTypedArray()
-            MaterialAlertDialogBuilder(activity)
-                .setTitle("Select an app or game")
-                .setItems(labels) { _, which ->
-                    val app = apps[which]
+            MaterialAppPicker.show(activity, "Select an app or game",
+                apps.map { MaterialAppPicker.App(it.packageName, it.label) }) { picked ->
+                val app = apps.first { it.packageName == picked.packageName }
+
                     chooseRate(
                         app,
                         RefreshRateStorage.getProfile(
@@ -309,9 +309,7 @@ object RefreshRateProfileDialog {
                             app.packageName
                         )
                     ) { renderProfiles() }
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
         }
 
         renderProfiles()
