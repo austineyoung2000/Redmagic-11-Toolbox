@@ -863,3 +863,11 @@ Automatic fan/pump acknowledgements expire after 30 seconds and become invalid a
 ### OTA update control
 
 Controls → System includes **Enable OTA** and **Disable OTA**, plus live enabled/disabled state for `com.zte.zdm`, `com.zte.zdmdaemon`, and `com.zte.zdmdaemon.install`. Disable runs the three `pm disable-user --user 0` commands; enable runs `pm enable --user 0` for the same packages. Actions run through the bounded root channel and attempt every package even if one reports an error. Success requires all three package states to match the requested state afterward. Mixed, missing, or unreadable states remain visible. **Refresh Status** reads Android again; opening the tab, rebooting, or loading a profile never automatically enables or disables OTA.
+
+### Optional NX809J Device ID Repair
+
+Controls → System offers an explicit Run Repair action and an Apply repair once at boot option (off by default). It uses the uploaded Qualcomm KmInstallKeybox binary, SHA-256 `a5eedbc361c631d50398c6458b0b8cf1b6130fa97454e5ea203ada1c71287768`, with the device-tested `Keybox_file Device_ID true true` arguments. RKP mode skips attestation-keybox installation and provisions the phone's own device information. The user reports this standalone module restores the stock Widevine System ID and fixes integrity on NX809J; Toolbox completion means the provisioning command succeeded, not an independent integrity verdict.
+
+An enabled `autoDeviceID` module remains untouched and suppresses Toolbox execution. Boot repair is an independent service.d script with one attempt per boot, no polling/retries, and a boot-scoped lock retained after unknown termination. Disabling removes Toolbox's boot hook but does not undo provisioning. Raw identifiers are filtered from command output before storage. Existing gameplay recovery and LED/cooling ownership are unchanged.
+
+Binary provenance: user-supplied Repair OnePlus 15 RKP module, version 20251120, author Coolapk@Surfing Mouse. Source and a redistribution license were not supplied with the upload.

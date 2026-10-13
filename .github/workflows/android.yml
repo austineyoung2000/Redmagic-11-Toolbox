@@ -59,6 +59,9 @@ jobs:
         run: |
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/red-release.jks"
 
+      - name: Test device-ID repair runner without hardware
+        run: python3 -m unittest discover -s tests -v
+
       - name: Test and build signed release APK
         env:
           SIGNING_STORE_FILE: ${{ runner.temp }}/red-release.jks
