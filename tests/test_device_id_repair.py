@@ -76,7 +76,7 @@ class RepairRunnerTest(unittest.TestCase):
         self.assertIn('unfinished', self.run_repair().stdout)
         self.assertFalse((self.base / 'calls').exists())
         lock.rmdir()
-        (self.vendor / 'libcrypto.so').unlink()
+        (self.vendor / 'libminkdescriptor.so').unlink()
         self.assertIn('Required vendor library unavailable', self.run_repair().stdout)
         self.assertFalse((self.base / 'calls').exists())
 

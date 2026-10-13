@@ -16,7 +16,7 @@ internal object DeviceIdRepairController {
         val output = RootShell.execForOutput("""
             (m=/data/adb/modules/autoDeviceID
             if [ -d "${'$'}m" ] && [ ! -e "${'$'}m/disable" ] && [ ! -e "${'$'}m/remove" ]; then echo module; else echo standalone; fi
-            if [ -f '$BASE/boot_enabled' ]; then echo boot; else echo manual; fi
+            if [ -f '$BASE/boot_enabled' ] && [ -f '$BOOT' ]; then echo boot; else echo manual; fi
             cat '$BASE/status' 2>/dev/null || echo 'Not run by Toolbox')
         """.trimIndent()) ?: return null
         val lines = output.trim().lines()

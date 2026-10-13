@@ -22,9 +22,7 @@ lock="$BASE/operation-$boot"
 mkdir "$lock" 2>/dev/null || { printf '%s\n' 'Repair busy or unfinished; reboot before retrying'; exit 0; }
 finish() { result "$1"; rmdir "$lock"; exit 0; }
 [ "$(sha256sum "$BASE/KmInstallKeybox" | cut -d ' ' -f 1)" = "$EXPECTED" ] || finish 'Binary verification failed'
-for library in libminkdescriptor.so libmodem_device_ids.so libcrypto.so; do
-    [ -r "/vendor/lib64/$library" ] || finish 'Required vendor library unavailable'
-done
+[ -r /vendor/lib64/libminkdescriptor.so ] || finish 'Required vendor library unavailable'
 cp /vendor/lib64/libminkdescriptor.so "$BASE/libminkdescriptor.so.new" &&
 chmod 600 "$BASE/libminkdescriptor.so.new" &&
 mv -f "$BASE/libminkdescriptor.so.new" "$BASE/libminkdescriptor.so" || finish 'Dependency setup failed'
