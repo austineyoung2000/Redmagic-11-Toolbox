@@ -77,14 +77,18 @@ object ControlsTabUi {
             }
         }
 
+        var refreshOtaStatus: () -> Unit = {}
         val refreshBtn = deps.actionButton("REFRESH STATUS", false) {
             deps.refreshStatus()
+            refreshOtaStatus()
         }
 
         val systemCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("⚙", "SYSTEM"))
             addView(deps.row(rootCheckBtn, refreshBtn))
         }
+
+        refreshOtaStatus = OtaSystemControlUi.attach(activity, systemCard, deps)
 
         val magicKeyStatusLabel =
             deps.subtleLabel("Current: loading…")
