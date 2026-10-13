@@ -7,7 +7,7 @@ object HardwareScreenPolicy {
     private const val HOT_KEEP_COOLING_F = 100f
     private const val SAFE_SHUTDOWN_F = 92f
 
-    private val coolingShutdownReceipt = CoolingShutdownReceipt()
+    private val coolingShutdownReceipt = CoolingShutdownReceipt(clock = { android.os.SystemClock.elapsedRealtime() })
 
     fun invalidateCoolingShutdownReceipt() {
         // LED programs may change fan power after an earlier cold shutdown.

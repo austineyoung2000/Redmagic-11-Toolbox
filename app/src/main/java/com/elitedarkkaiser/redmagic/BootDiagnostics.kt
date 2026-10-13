@@ -51,6 +51,8 @@ internal object BootDiagnostics {
         appendLine("Native TGK: package=${NativeTgkRuntimeState.activePackage()}; backend=${NativeTgkRuntimeState.activeBackend()}")
         appendLine("Gameplay overlay windows: ${NativeTgkGameplayOverlay.diagnosticStatus()}")
         appendLine("LED owner: ${LedOwnership.current(context)}")
+        appendLine("Shared root channel: ${RootShell.status()}")
+        appendLine("Hardware telemetry: ${HardwareTelemetry.retryStatus()}")
         appendLine("LED root safety: ${LightingRootExecutor.status()}")
         appendLine("Notification deadline: ${NotificationWindowDeadline.status(context)}")
         appendLine("Notification lighting enabled: ${NotificationLightingState.enabled(context)}")

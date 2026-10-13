@@ -15,6 +15,29 @@ class AutoFanService : Service() {
     private lateinit var workerThread: HandlerThread
     private lateinit var handler: Handler
     private var lastAppliedLevel = -1
+    private val stateReceipt = CoolingStateReceipt(clock = { android.os.SystemClock.elapsedRealtime() })
+
+    private fun needsApply(expected: Int): Boolean {
+        val stamp = HardwareController.coolingStamp(true)
+        if (lastAppliedLevel != expected) return true
+        if (stateReceipt.isCurrent(stamp)) return false
+        val live = HardwareTelemetry.readForControl()
+        if (live != null && CoolingStateMatch.fan(live.fanEnabled, live.fanLevel, expected) &&
+            stamp == HardwareController.coolingStamp(true)) {
+            stateReceipt.record(stamp)
+            return false
+        }
+        HardwareScreenPolicy.invalidateCoolingShutdownReceipt()
+        return true
+    }
+
+    private fun applyLevel(level: Int, powerOnly: Boolean = false) {
+        val before = HardwareController.coolingStamp(true)
+        val applied = if (powerOnly) HardwareController.enableFan(false, force = true)
+            else HardwareController.setFanLevel(level, force = true)
+        stateReceipt.recordWrite(before, HardwareController.coolingStamp(true), applied)
+        if (applied) lastAppliedLevel = level
+    }
     @Volatile
     private var latestTemperatureF: Float? = null
     private var temperatureSubscription:
@@ -22,27 +45,32 @@ class AutoFanService : Service() {
 
     private val loop = object : Runnable {
         override fun run() {
+            if (HardwareScreenPolicy.isScreenInteractive(this@AutoFanService) &&
+                ((GameModeService.hasSelectedForegroundGame() && LedOwnership.canGameModeApply(this@AutoFanService)) ||
+                    (CallLightingState.isActive(this@AutoFanService) &&
+                        CallLightingState.wasFanPausedForCall(this@AutoFanService)))) {
+                stateReceipt.invalidate()
+                return
+            }
             val tempF = latestTemperatureF
                 ?: HardwareController.readTemperatureF()
             val nextLevel = chooseStableFanLevel(tempF, lastAppliedLevel)
 
             if (!HardwareScreenPolicy.isScreenInteractive(this@AutoFanService)) {
                 if (HardwareScreenPolicy.coolingShouldStopWhileScreenOff(tempF)) {
-                    if (lastAppliedLevel != 0 && HardwareController.enableFan(false)) {
-                        lastAppliedLevel = 0
-                    }
+                    if (needsApply(0)) applyLevel(0, powerOnly = true)
                     updateNotification(tempF, lastAppliedLevel)
                     return
                 }
             }
 
-            if (nextLevel != null && nextLevel != lastAppliedLevel) {
+            if (nextLevel != null && needsApply(nextLevel)) {
                 if (HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this@AutoFanService, "auto-fan-screen-off")) {
                     if (HardwareScreenPolicy.hasCoolingShutdownReceipt()) lastAppliedLevel = 0
                     updateNotification(tempF, lastAppliedLevel)
                     return
                 }
-                if (HardwareController.setFanLevel(nextLevel)) lastAppliedLevel = nextLevel
+                applyLevel(nextLevel)
             }
 
             updateNotification(
