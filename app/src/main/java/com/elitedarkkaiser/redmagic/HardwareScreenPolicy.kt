@@ -9,13 +9,13 @@ object HardwareScreenPolicy {
 
     private val coolingShutdownReceipt = CoolingShutdownReceipt(clock = { android.os.SystemClock.elapsedRealtime() })
 
-    fun invalidateCoolingShutdownReceipt(clock = { android.os.SystemClock.elapsedRealtime() }) {
+    fun invalidateCoolingShutdownReceipt() {
         // LED programs may change fan power after an earlier cold shutdown.
         // Invalidate the receipt without changing cooling hardware or policy.
         coolingShutdownReceipt.invalidate()
     }
 
-    fun hasCoolingShutdownReceipt(clock = { android.os.SystemClock.elapsedRealtime() }): Boolean = coolingShutdownReceipt.isApplied()
+    fun hasCoolingShutdownReceipt(): Boolean = coolingShutdownReceipt.isApplied()
 
     fun isScreenInteractive(context: Context): Boolean {
         return try {
