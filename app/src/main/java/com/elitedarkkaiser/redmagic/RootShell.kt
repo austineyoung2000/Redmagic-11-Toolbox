@@ -62,8 +62,9 @@ object RootShell {
         val result = queue.run(limitMs, onTimeout = {
             revoked.set(true)
             runCatching { activeLease.get()?.revoke() }
-            blockedReason = "command timed out; awaiting completion receipt"
-            Log.w(TAG, blockedReason!!)
+            val reason = "command timed out; awaiting completion receipt"
+            blockedReason = reason
+            Log.w(TAG, reason)
         }) {
             if (!receipts.prepare()) {
                 blockedReason = "quarantined: unfinished command from earlier process"
@@ -109,6 +110,7 @@ object RootShell {
             opened = session
             val check = readCommand(session, "id -u")
             if (check.exitCode != 0 || check.output.trim() != "0") {
+                rootVerified = false
                 closeSession(session); null
             } else { rootVerified = true; session }
         }.onFailure {

@@ -46,7 +46,7 @@ class AutoFanService : Service() {
     private val loop = object : Runnable {
         override fun run() {
             if (HardwareScreenPolicy.isScreenInteractive(this@AutoFanService) &&
-                (GameModeService.hasSelectedForegroundGame() ||
+                ((GameModeService.hasSelectedForegroundGame() && LedOwnership.canGameModeApply(this@AutoFanService)) ||
                     (CallLightingState.isActive(this@AutoFanService) &&
                         CallLightingState.wasFanPausedForCall(this@AutoFanService)))) {
                 stateReceipt.invalidate()

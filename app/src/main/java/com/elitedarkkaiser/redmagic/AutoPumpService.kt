@@ -106,7 +106,8 @@ class AutoPumpService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun applyPumpRule(tempF: Float?): Float? {
-        if (HardwareScreenPolicy.isScreenInteractive(this@AutoPumpService) && GameModeService.hasSelectedForegroundGame()) {
+        if (HardwareScreenPolicy.isScreenInteractive(this@AutoPumpService) &&
+            GameModeService.hasSelectedForegroundGame() && LedOwnership.canGameModeApply(this@AutoPumpService)) {
             stateReceipt.invalidate()
             return tempF
         }
