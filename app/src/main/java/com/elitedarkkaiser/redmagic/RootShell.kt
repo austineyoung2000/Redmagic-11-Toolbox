@@ -71,12 +71,23 @@ object RootShell {
                 return@run null
             }
             blockedReason = null
+            val current = requested ?: sharedSession?.takeIf { it.isAlive } ?: openVerifiedSession().also { sharedSession = it }
+            if (revoked.get()) return@run null
+            if (current == null) {
+                // Read-only compatibility probe precedes every one-shot payload. A denied root
+                // request cannot leave an unfinished hardware lease or poison future grants.
+                val check = runOneShot("id -u")
+                if (check.exitCode != 0 || check.output.trim() != "0") {
+                    rootVerified = false
+                    return@run null
+                }
+                rootVerified = true
+            }
+            if (revoked.get()) return@run null
             val lease = receipts.begin()
             activeLease.set(lease)
-            if (revoked.get()) lease.revoke()
             try {
-                val current = requested ?: sharedSession?.takeIf { it.isAlive } ?: openVerifiedSession().also { sharedSession = it }
-                if (revoked.get()) return@run null
+                if (revoked.get()) { lease.revoke(); return@run null }
                 val program = receipts.program(command, lease)
                 lease.submitted = true
                 val completed = if (current != null) readCommand(current, program) else runOneShot(program)
