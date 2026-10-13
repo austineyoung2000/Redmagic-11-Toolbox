@@ -83,6 +83,7 @@ object RootShell {
                     blockedReason = "quarantined: command lacks completion receipt"
                     error("Root completion receipt missing")
                 }
+                if (completed.exitCode != 125) rootVerified = true // Durable guarded completion proves root, including fallback.
                 completed
             } catch (error: Exception) {
                 Log.e(TAG, "Root command failed without replay", error)

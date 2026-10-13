@@ -58,4 +58,27 @@ class BoundedCommandQueueTest {
             assertEquals(3, queue.run(100) { 3 })
         } finally { executor.shutdownNow() }
     }
+    @Test fun interruptedCallerKeepsItsInterruptAndFencesTheUnfinishedWriter() {
+        val executor = Executors.newSingleThreadExecutor()
+        val queue = BoundedCommandQueue(executor)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val interrupted = java.util.concurrent.atomic.AtomicBoolean()
+        val caller = Thread {
+            assertNull(queue.run(5_000) { entered.countDown(); release.await(); 1 })
+            interrupted.set(Thread.currentThread().isInterrupted)
+        }
+        try {
+            caller.start()
+            assertTrue(entered.await(1, TimeUnit.SECONDS))
+            caller.interrupt(); caller.join(1_000)
+            assertFalse(caller.isAlive)
+            assertTrue(interrupted.get())
+            assertNull(queue.run(100) { fail("Writer was still active"); 2 })
+            release.countDown()
+            executor.submit {}.get(1, TimeUnit.SECONDS)
+            assertEquals(3, queue.run(100) { 3 })
+        } finally { release.countDown(); caller.interrupt(); executor.shutdownNow() }
+    }
+
 }

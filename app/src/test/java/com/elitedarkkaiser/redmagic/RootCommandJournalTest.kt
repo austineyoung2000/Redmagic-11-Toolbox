@@ -50,4 +50,17 @@ class RootCommandJournalTest {
         assertFalse(marker.exists())
         assertTrue(revoked.completed())
     }
+    @Test fun deniedRootCannotRunPayloadAndRecordsGuardFailure() {
+        val journal = RootCommandJournal(temporary.newFolder(), "boot-a")
+        assertTrue(journal.prepare())
+        val lease = journal.begin()
+        val marker = temporary.root.resolve("not-root")
+        val program = journal.program("touch '${marker.path}'", lease)
+        val shell = ProcessBuilder("sh", "-c", "id() { echo 10000; };\n$program").start()
+        assertTrue(shell.waitFor(2, TimeUnit.SECONDS))
+        assertEquals(125, shell.exitValue())
+        assertTrue(lease.completed())
+        assertFalse(marker.exists())
+    }
+
 }

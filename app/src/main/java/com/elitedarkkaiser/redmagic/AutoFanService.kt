@@ -31,9 +31,10 @@ class AutoFanService : Service() {
         return true
     }
 
-    private fun applyLevel(level: Int) {
+    private fun applyLevel(level: Int, powerOnly: Boolean = false) {
         val before = HardwareController.coolingStamp(true)
-        val applied = HardwareController.setFanLevel(level, force = true)
+        val applied = if (powerOnly) HardwareController.enableFan(false, force = true)
+            else HardwareController.setFanLevel(level, force = true)
         stateReceipt.recordWrite(before, HardwareController.coolingStamp(true), applied)
         if (applied) lastAppliedLevel = level
     }
@@ -57,7 +58,7 @@ class AutoFanService : Service() {
 
             if (!HardwareScreenPolicy.isScreenInteractive(this@AutoFanService)) {
                 if (HardwareScreenPolicy.coolingShouldStopWhileScreenOff(tempF)) {
-                    if (needsApply(0)) applyLevel(0)
+                    if (needsApply(0)) applyLevel(0, powerOnly = true)
                     updateNotification(tempF, lastAppliedLevel)
                     return
                 }

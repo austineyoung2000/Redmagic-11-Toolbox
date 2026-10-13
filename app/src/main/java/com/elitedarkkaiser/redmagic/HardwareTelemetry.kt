@@ -163,12 +163,13 @@ object HardwareTelemetry {
             fanEnabled =
                 values["fan_enabled"]
                     ?.toIntOrNull()
-                    ?.let { it != 0 },
+                    ?.takeIf { it == 0 || it == 1 }
+                    ?.let { it == 1 },
 
             fanLevel =
                 values["fan_level"]
                     ?.toIntOrNull()
-                    ?.coerceIn(0, 5),
+                    ?.takeIf { it in 0..5 },
 
             fanRpm =
                 values["fan_rpm"]
