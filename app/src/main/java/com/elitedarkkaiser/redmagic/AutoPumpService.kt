@@ -11,6 +11,28 @@ class AutoPumpService : Service() {
     private lateinit var workerThread: HandlerThread
     private lateinit var handler: Handler
     private var lastProfile: String? = null
+    private val stateReceipt = CoolingStateReceipt(clock = { android.os.SystemClock.elapsedRealtime() })
+
+    private fun needsApply(expected: String): Boolean {
+        val stamp = HardwareController.coolingStamp(false)
+        if (lastProfile != expected) return true
+        if (stateReceipt.isCurrent(stamp)) return false
+        val live = HardwareTelemetry.readForControl()
+        if (live != null && CoolingStateMatch.pump(live.pumpEnabled, live.pumpFreq, live.pumpSpeed, expected) &&
+            stamp == HardwareController.coolingStamp(false)) {
+            stateReceipt.record(stamp)
+            return false
+        }
+        HardwareScreenPolicy.invalidateCoolingShutdownReceipt()
+        return true
+    }
+
+    private fun applyProfile(profile: String) {
+        val before = HardwareController.coolingStamp(false)
+        val applied = HardwareController.setPumpProfile(profile, force = true)
+        stateReceipt.recordWrite(before, HardwareController.coolingStamp(false), applied)
+        if (applied) lastProfile = profile
+    }
     @Volatile
     private var latestTemperatureF: Float? = null
     private var temperatureSubscription:
@@ -84,29 +106,30 @@ class AutoPumpService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun applyPumpRule(tempF: Float?): Float? {
-        tempF ?: return null
-
+        if (HardwareScreenPolicy.isScreenInteractive(this@AutoPumpService) && GameModeService.hasSelectedForegroundGame()) {
+            stateReceipt.invalidate()
+            return tempF
+        }
         if (!HardwareScreenPolicy.isScreenInteractive(this@AutoPumpService)) {
             if (HardwareScreenPolicy.coolingShouldStopWhileScreenOff(tempF)) {
-                if (lastProfile != "off" && HardwareController.enablePump(false)) {
-                    lastProfile = "off"
-                }
+                if (needsApply("off")) applyProfile("off")
                 return tempF
             }
         }
 
+        tempF ?: return null
         val profile = when {
             tempF >= 105f -> "quick"
             tempF >= 95f -> "medium"
             else -> "slow"
         }
 
-        if (profile != lastProfile) {
+        if (needsApply(profile)) {
             if (HardwareScreenPolicy.blockCoolingWhileScreenOffUnlessHot(this@AutoPumpService, "auto-pump-screen-off")) {
                 if (HardwareScreenPolicy.hasCoolingShutdownReceipt()) lastProfile = "off"
                 return tempF
             }
-            if (HardwareController.setPumpProfile(profile)) lastProfile = profile
+            applyProfile(profile)
 
         }
 

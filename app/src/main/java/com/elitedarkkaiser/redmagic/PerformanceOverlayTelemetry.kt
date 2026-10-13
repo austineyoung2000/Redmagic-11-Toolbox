@@ -20,6 +20,8 @@ object PerformanceOverlayTelemetry {
     private const val FAN_REFRESH_MS = 30_000L
 
     private val lock = Any()
+    private var generation = 0L
+    private val fanRetry = ReadRetryBackoff(FAN_REFRESH_MS, 300_000)
 
     private var workerThread: HandlerThread? = null
     private var handler: Handler? = null
@@ -32,13 +34,20 @@ object PerformanceOverlayTelemetry {
     @Volatile
     private var fanRpm: Int? = null
 
-    private val fanRunnable = object : Runnable {
+    private fun fanRunnable(owner: Long): Runnable = object : Runnable {
         override fun run() {
-            fanRpm = readFanRpm()
-            RefreshRateOverlay.refresh()
-
+            val now = android.os.SystemClock.elapsedRealtime()
+            val attempt = fanRetry.canAttempt(now)
+            val rpm = if (attempt) readFanRpm() else null
             synchronized(lock) {
-                handler?.postDelayed(this, FAN_REFRESH_MS)
+                if (generation != owner || handler == null) return
+                if (attempt) {
+                    fanRpm = rpm
+                    if (rpm == null) fanRetry.failed(android.os.SystemClock.elapsedRealtime()) else fanRetry.succeeded()
+                    RefreshRateOverlay.refresh()
+                }
+                handler?.postDelayed(this, maxOf(FAN_REFRESH_MS,
+                    fanRetry.remainingMs(android.os.SystemClock.elapsedRealtime())))
             }
         }
     }
@@ -54,22 +63,29 @@ object PerformanceOverlayTelemetry {
             ).apply { start() }
 
             workerThread = thread
+            generation++
+            val owner = generation
             handler = Handler(thread.looper).also {
-                it.post(fanRunnable)
+                it.post(fanRunnable(owner))
             }
             temperatureSubscription =
                 DeviceTemperatureMonitor.subscribe(
                     appContext,
                     DeviceTemperatureMonitor.SamplingMode.FOREGROUND
                 ) { value ->
-                    temperatureC = value
-                    RefreshRateOverlay.refresh()
+                    synchronized(lock) {
+                        if (generation == owner && handler != null) {
+                            temperatureC = value
+                            RefreshRateOverlay.refresh()
+                        }
+                    }
                 }
         }
     }
 
     fun stop() {
         synchronized(lock) {
+            generation++
             temperatureSubscription?.close()
             temperatureSubscription = null
             handler?.removeCallbacksAndMessages(null)

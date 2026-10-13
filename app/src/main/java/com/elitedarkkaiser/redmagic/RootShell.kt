@@ -1,27 +1,38 @@
 package com.elitedarkkaiser.redmagic
 
+import android.content.Context
 import android.util.Log
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.Closeable
+import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
+/** Persistent non-LED shell with bounded callers and no replay of dispatched work. */
 object RootShell {
     private const val TAG = "RedmagicRootShell"
+    private const val READ_LIMIT_MS = 8_000L
+    private const val WRITE_LIMIT_MS = 20_000L
+    private const val OUTPUT_LIMIT = 262_144
+    private val queue = BoundedCommandQueue()
+    @Volatile private var journal: RootCommandJournal? = null
+    @Volatile private var sharedSession: Session? = null
+    @Volatile private var rootVerified = false
+    @Volatile private var blockedReason: String? = null
+    private data class CommandResult(val exitCode: Int, val output: String)
 
-    /*
-     * All command-style root work shares one serialized shell.
-     * Blocking input readers remain separate because they must
-     * continuously consume independent device streams.
-     */
-    private val commandLock = Any()
+    internal fun initialize(context: Context) {
+        if (journal != null) return
+        runCatching {
+            val boot = File("/proc/sys/kernel/random/boot_id").readText().trim()
+            require(boot.matches(Regex("[0-9a-f-]{36}")))
+            journal = RootCommandJournal(File(context.noBackupFilesDir, "root-command-receipts"), boot)
+        }.onFailure { blockedReason = "private command journal unavailable"; Log.e(TAG, blockedReason, it) }
+    }
 
-    @Volatile
-    private var sharedSession: Session? = null
-
-    private data class CommandResult(
-        val exitCode: Int,
-        val output: String
-    )
+    internal fun stateGeneration(): Long = queue.revision.get()
+    internal fun status(): String = "verifiedRoot=$rootVerified; ${blockedReason ?: queue.status()}; read=${READ_LIMIT_MS}ms write=${WRITE_LIMIT_MS}ms"
 
     class Session internal constructor(
         internal val process: Process,
@@ -29,352 +40,127 @@ object RootShell {
         internal val reader: BufferedReader,
         internal val token: String
     ) : Closeable {
-        @Volatile
-        internal var closed = false
-
+        @Volatile internal var closed = false
         internal var commandId = 0L
+        val isAlive: Boolean get() = !closed && process.isAlive
+        fun exec(command: String): Boolean = execute(command, WRITE_LIMIT_MS, this)?.exitCode == 0
+        fun execForOutput(command: String): String? = output(execute(command, READ_LIMIT_MS, this))
+        override fun close() { queue.run(2_000) { closeSession(this) } }
+    }
 
-        val isAlive: Boolean
-            get() = !closed && process.isAlive
+    fun hasRoot(): Boolean = execForOutput("id -u")?.trim() == "0"
+    fun exec(command: String): Boolean = execute(command, WRITE_LIMIT_MS)?.exitCode == 0
+    fun execForOutput(command: String): String? = output(execute(command, READ_LIMIT_MS))
+    private fun output(result: CommandResult?): String? = result?.takeIf { it.exitCode == 0 }?.output?.ifEmpty { null }
+    fun openSession(): Session? = queue.run(READ_LIMIT_MS) { openVerifiedSession() }
+    fun closeSharedSession() { queue.run(2_000) { sharedSession?.let(::closeSession); sharedSession = null } }
 
-        fun exec(command: String): Boolean {
-            return RootShell.runSessionCommand(
-                this,
-                command
-            )?.exitCode == 0
-        }
-
-        fun execForOutput(command: String): String? {
-            val result =
-                RootShell.runSessionCommand(
-                    this,
-                    command
-                ) ?: return null
-
-            if (result.exitCode != 0) {
-                return null
+    private fun execute(command: String, limitMs: Long, requested: Session? = null): CommandResult? {
+        val receipts = journal ?: return null
+        val revoked = AtomicBoolean(false)
+        val activeLease = AtomicReference<RootCommandJournal.Lease?>()
+        val result = queue.run(limitMs, onTimeout = {
+            revoked.set(true)
+            runCatching { activeLease.get()?.revoke() }
+            blockedReason = "command timed out; awaiting completion receipt"
+            Log.w(TAG, blockedReason!!)
+        }) {
+            if (!receipts.prepare()) {
+                blockedReason = "quarantined: unfinished command from earlier process"
+                return@run null
             }
-
-            return result.output.ifEmpty { null }
-        }
-
-        override fun close() {
-            RootShell.closeSession(this)
-        }
-    }
-
-    fun hasRoot(): Boolean {
-        return execForOutput("id -u")
-            ?.trim() == "0"
-    }
-
-    fun exec(command: String): Boolean {
-        return runSharedCommand(command)
-            ?.exitCode == 0
-    }
-
-    fun execForOutput(command: String): String? {
-        val result =
-            runSharedCommand(command)
-                ?: return null
-
-        if (result.exitCode != 0) {
-            return null
-        }
-
-        return result.output.ifEmpty { null }
-    }
-
-    /*
-     * Dedicated sessions remain available for operations that
-     * explicitly need ownership of a shell. Normal application
-     * commands should use exec()/execForOutput() instead.
-     */
-    fun openSession(): Session? {
-        return synchronized(commandLock) {
-            openSessionLocked()
-        }
-    }
-
-    fun closeSharedSession() {
-        synchronized(commandLock) {
-            sharedSession?.let {
-                closeSessionLocked(it)
-            }
-            sharedSession = null
-        }
-    }
-
-    private fun runSharedCommand(
-        command: String
-    ): CommandResult? {
-        return synchronized(commandLock) {
-            val session = activeSharedSessionLocked()
-
-            if (session != null) {
-                val result =
-                    runSessionCommandLocked(
-                        session,
-                        command
-                    )
-
-                if (result != null) {
-                    return@synchronized result
+            blockedReason = null
+            val lease = receipts.begin()
+            activeLease.set(lease)
+            if (revoked.get()) lease.revoke()
+            try {
+                val current = requested ?: sharedSession?.takeIf { it.isAlive } ?: openVerifiedSession().also { sharedSession = it }
+                if (revoked.get()) return@run null
+                val program = receipts.program(command, lease)
+                lease.submitted = true
+                val completed = if (current != null) readCommand(current, program) else runOneShot(program)
+                if (!lease.completed()) {
+                    blockedReason = "quarantined: command lacks completion receipt"
+                    error("Root completion receipt missing")
                 }
-            }
-
-            /*
-             * Preserve compatibility if a root implementation
-             * refuses an interactive shell.
-             */
-            runOneShotCommandLocked(command)
-        }
-    }
-
-    private fun activeSharedSessionLocked(): Session? {
-        val current = sharedSession
-
-        if (current?.isAlive == true) {
-            return current
-        }
-
-        current?.let {
-            closeSessionLocked(it)
-        }
-
-        return openSessionLocked().also {
-            sharedSession = it
-        }
-    }
-
-    private fun openSessionLocked(): Session? {
-        return try {
-            val process = ProcessBuilder("su")
-                .redirectErrorStream(true)
-                .start()
-
-            val session = Session(
-                process = process,
-                writer =
-                    process.outputStream.bufferedWriter(),
-                reader =
-                    process.inputStream.bufferedReader(),
-                token = java.lang.Long.toHexString(
-                    android.os.SystemClock
-                        .elapsedRealtimeNanos()
-                )
-            )
-
-            val rootCheck =
-                runSessionCommandLocked(
-                    session,
-                    "id -u"
-                )
-
-            if (
-                rootCheck == null ||
-                rootCheck.exitCode != 0 ||
-                rootCheck.output.trim() != "0"
-            ) {
-                closeSessionLocked(session)
-                null
-            } else {
-                Log.i(
-                    TAG,
-                    "Persistent root command shell opened"
-                )
-                session
-            }
-        } catch (error: Throwable) {
-            Log.e(
-                TAG,
-                "Unable to open persistent root shell",
-                error
-            )
-            null
-        }
-    }
-
-    private fun runSessionCommand(
-        session: Session,
-        command: String
-    ): CommandResult? {
-        return synchronized(commandLock) {
-            runSessionCommandLocked(
-                session,
-                command
-            )
-        }
-    }
-
-    private fun runSessionCommandLocked(
-        session: Session,
-        command: String
-    ): CommandResult? {
-        if (!session.isAlive) {
-            return null
-        }
-
-        return try {
-            session.commandId += 1
-
-            val marker =
-                "__REDMAGIC_ROOT_" +
-                    session.token +
-                    "_" +
-                    session.commandId +
-                    "__"
-
-            session.writer.write(command)
-            session.writer.newLine()
-            session.writer.write(
-                "redmagic_status=${'$'}?; " +
-                    "printf '\\n$marker:%s\\n' " +
-                    "\"${'$'}redmagic_status\""
-            )
-            session.writer.newLine()
-            session.writer.flush()
-
-            val output = StringBuilder()
-            var exitCode: Int? = null
-
-            while (exitCode == null) {
-                val line =
-                    session.reader.readLine()
-                        ?: throw IllegalStateException(
-                            "Persistent root shell closed"
-                        )
-
-                if (line.startsWith("$marker:")) {
-                    exitCode =
-                        line.substringAfter(':')
-                            .trim()
-                            .toIntOrNull()
-                            ?: -1
-                } else {
-                    if (output.isNotEmpty()) {
-                        output.append('\n')
-                    }
-                    output.append(line)
-                }
-            }
-
-            if (exitCode != 0) {
-                Log.w(
-                    TAG,
-                    "Root command failed with exit code " +
-                        exitCode
-                )
-            }
-
-            CommandResult(
-                exitCode = exitCode,
-                output = output.toString().trim()
-            )
-        } catch (error: Throwable) {
-            Log.e(
-                TAG,
-                "Persistent root command failed",
-                error
-            )
-
-            closeSessionLocked(session)
-            null
-        }
-    }
-
-    private fun closeSession(
-        session: Session
-    ) {
-        synchronized(commandLock) {
-            closeSessionLocked(session)
-        }
-    }
-
-    private fun closeSessionLocked(
-        session: Session
-    ) {
-        if (session.closed) {
-            if (sharedSession === session) {
+                completed
+            } catch (error: Exception) {
+                Log.e(TAG, "Root command failed without replay", error)
+                sharedSession?.let(::closeSession)
                 sharedSession = null
+                throw error
+            } finally {
+                // Unknown work stays fenced. Never clear a record merely because a caller timed out.
+                if (!lease.submitted || lease.completed()) lease.clear()
+                if (lease.completed() || !lease.file.exists()) blockedReason = null
             }
-            return
         }
+        if (result != null && result.exitCode != 0) queue.revision.incrementAndGet()
+        return result
+    }
 
-        session.closed = true
+    private fun openVerifiedSession(): Session? {
+        var opened: Session? = null
+        return runCatching {
+            val process = ProcessBuilder("su").redirectErrorStream(true).start()
+            val session = Session(process, process.outputStream.bufferedWriter(), process.inputStream.bufferedReader(),
+                java.util.UUID.randomUUID().toString().replace("-", ""))
+            opened = session
+            val check = readCommand(session, "id -u")
+            if (check.exitCode != 0 || check.output.trim() != "0") {
+                closeSession(session); null
+            } else { rootVerified = true; session }
+        }.onFailure {
+            opened?.let(::closeSession)
+            rootVerified = false
+            Log.w(TAG, "Interactive root probe failed; no hardware command was dispatched", it)
+        }.getOrNull()
+    }
 
-        if (sharedSession === session) {
-            sharedSession = null
-        }
-
-        runCatching {
-            session.writer.write("exit")
-            session.writer.newLine()
-            session.writer.flush()
-        }
-
-        runCatching {
-            session.writer.close()
-        }
-
-        runCatching {
-            session.reader.close()
-        }
-
-        if (session.process.isAlive) {
-            runCatching {
-                session.process.destroy()
+    private fun readCommand(session: Session, command: String): CommandResult {
+        check(session.isAlive) { "Root session is closed" }
+        session.commandId++
+        val marker = "__REDMAGIC_ROOT_${session.token}_${session.commandId}__"
+        session.writer.write(command)
+        session.writer.newLine()
+        session.writer.write("redmagic_status=${'$'}?; printf '\\n$marker:%s\\n' \"${'$'}redmagic_status\"")
+        session.writer.newLine(); session.writer.flush()
+        val output = StringBuilder()
+        var overflow = false
+        while (true) {
+            val line = session.reader.readLine() ?: error("Root shell closed before receipt")
+            if (line.startsWith("$marker:")) {
+                val code = line.substringAfter(':').trim().toIntOrNull() ?: -1
+                return CommandResult(if (overflow) -1 else code, output.toString().trim())
             }
+            if (output.length + line.length > OUTPUT_LIMIT) overflow = true
+            if (!overflow) output.append(line).append('\n')
         }
     }
 
-    private fun runOneShotCommandLocked(
-        command: String
-    ): CommandResult? {
-        return try {
-            Log.w(
-                TAG,
-                "Using one-shot root fallback"
-            )
-
-            val process =
-                ProcessBuilder(
-                    "su",
-                    "-c",
-                    command
-                )
-                    .redirectErrorStream(true)
-                    .start()
-
-            val output =
-                process.inputStream
-                    .bufferedReader()
-                    .use {
-                        it.readText()
-                    }
-                    .trim()
-
-            val exitCode = process.waitFor()
-
-            if (exitCode != 0) {
-                Log.w(
-                    TAG,
-                    "One-shot root command failed with " +
-                        "exit code $exitCode"
-                )
+    private fun runOneShot(program: String): CommandResult {
+        // Compatibility fallback is permitted only before any hardware payload is sent.
+        val process = ProcessBuilder("su", "-c", program).redirectErrorStream(true).start()
+        val session = Session(process, process.outputStream.bufferedWriter(), process.inputStream.bufferedReader(), "one-shot")
+        val output = StringBuilder()
+        var overflow = false
+        try {
+            while (true) {
+                val line = session.reader.readLine() ?: break
+                if (output.length + line.length > OUTPUT_LIMIT) overflow = true
+                if (!overflow) output.append(line).append('\n')
             }
+            return CommandResult(if (overflow) -1 else process.waitFor(), output.toString().trim())
+        } finally { closeSession(session) }
+    }
 
-            CommandResult(
-                exitCode = exitCode,
-                output = output
-            )
-        } catch (error: Throwable) {
-            Log.e(
-                TAG,
-                "One-shot root execution failed",
-                error
-            )
-            null
-        }
+    private fun closeSession(session: Session) {
+        session.closed = true
+        if (sharedSession === session) sharedSession = null
+        // Only our Java child handle is retired; no PID file, app process, watchdog or daemon is signalled.
+        runCatching { session.process.destroy() }
+        // This only runs on the serialized worker after a read returns, never from a waiting caller.
+        runCatching { session.writer.close() }
+        runCatching { session.reader.close() }
     }
 }

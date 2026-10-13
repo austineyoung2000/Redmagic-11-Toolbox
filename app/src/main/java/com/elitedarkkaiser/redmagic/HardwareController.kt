@@ -8,7 +8,8 @@ object HardwareController {
 
     private data class RecentHardwareWrite(
         val command: String,
-        val completedAtMs: Long
+        val completedAtMs: Long,
+        val rootGeneration: Long
     )
 
     private val recentHardwareWrites =
@@ -16,12 +17,27 @@ object HardwareController {
 
     private const val DUPLICATE_WRITE_SKIP_MS = 2_000L
 
+    private val fanGeneration = java.util.concurrent.atomic.AtomicLong()
+    private val pumpGeneration = java.util.concurrent.atomic.AtomicLong()
+    internal fun coolingStamp(fan: Boolean) = CoolingWriteStamp(
+        RootShell.stateGeneration(), (if (fan) fanGeneration else pumpGeneration).get()
+    )
+    private fun invalidateCoolingWrite(resource: String) {
+        when (resource) {
+            "fan_control" -> fanGeneration.incrementAndGet()
+            "pump_control" -> pumpGeneration.incrementAndGet()
+        }
+        recentHardwareWrites.remove(resource)
+        DashboardSnapshot.invalidateHardwareCache()
+    }
+
     private val resourceLocks = ConcurrentHashMap<String, Any>()
 
     private fun execHardwareWrite(
         resource: String,
         command: String,
-        rootSession: RootShell.Session? = null
+        rootSession: RootShell.Session? = null,
+        force: Boolean = false
     ): Boolean {
         return synchronized(resourceLocks.getOrPut(resource) { Any() }) {
             if (resource == "led_control" && !LedWriteReceipt.canWrite()) return false
@@ -37,8 +53,9 @@ object HardwareController {
             val previous = recentHardwareWrites[resource]
 
             if (
-                previous != null &&
+                !force && previous != null &&
                 previous.command == command &&
+                (resource == "led_control" || previous.rootGeneration == RootShell.stateGeneration()) &&
                 (now - previous.completedAtMs) < DUPLICATE_WRITE_SKIP_MS
             ) {
                 android.util.Log.d(
@@ -53,8 +70,14 @@ object HardwareController {
             // scripts already manage set -e and their cleanup trap themselves.
             val checkedCommand = if (resource == "led_control" && !command.contains("set -e"))
                 "(\nset -e\n$command\n)" else command
+            val affected = mutableListOf<String>()
+            if (resource == "fan_control" || resource == "pump_control") affected.add(resource)
+            if (resource == "led_control" && command.contains(FAN_ENABLE)) affected.add("fan_control")
+            if (resource == "led_control" && command.contains(PUMP_ENABLE)) affected.add("pump_control")
+            affected.forEach(::invalidateCoolingWrite)
             val succeeded = if (resource == "led_control") LightingRootExecutor.exec(checkedCommand)
                 else rootSession?.exec(checkedCommand) ?: RootShell.exec(checkedCommand)
+            affected.forEach(::invalidateCoolingWrite)
             // Even a failed script may already have changed cooling power before
             // a later LED write failed. Invalidate those receipts on every attempt.
             if (resource == "led_control" && command.contains(FAN_ENABLE)) {
@@ -76,7 +99,8 @@ object HardwareController {
                 }
                 recentHardwareWrites[resource] = RecentHardwareWrite(
                     command = command,
-                    completedAtMs = android.os.SystemClock.elapsedRealtime()
+                    completedAtMs = android.os.SystemClock.elapsedRealtime(),
+                    rootGeneration = RootShell.stateGeneration()
                 )
             }
 
@@ -111,22 +135,22 @@ object HardwareController {
         DeviceCompatibility.Paths.SAR1_MODE
 
 
-    fun enableFan(enabled: Boolean): Boolean {
-        return execHardwareWrite("fan_control", "echo ${if (enabled) 1 else 0} > $FAN_ENABLE")
+    fun enableFan(enabled: Boolean, force: Boolean = false): Boolean {
+        return execHardwareWrite("fan_control", "echo ${if (enabled) 1 else 0} > $FAN_ENABLE", force = force)
     }
 
     fun isFanEnabled(): Boolean {
         return HardwareTelemetry.read().fanEnabled == true
     }
 
-    fun setFanLevel(level: Int): Boolean {
+    fun setFanLevel(level: Int, force: Boolean = false): Boolean {
         val safe = level.coerceIn(0, 5)
         val cmds = if (safe == 0) {
             CoolingShutdownCommand.fan(FAN_LEVEL, FAN_ENABLE)
         } else {
             "echo 1 > $FAN_ENABLE && echo $safe > $FAN_LEVEL"
         }
-        return execHardwareWrite("fan_control", cmds)
+        return execHardwareWrite("fan_control", cmds, force = force)
     }
 
     fun setFanPwm(value: Int): Boolean {
@@ -147,11 +171,11 @@ object HardwareController {
         return HardwareTelemetry.read().fanLevel
     }
 
-    fun enablePump(enabled: Boolean): Boolean {
-        return execHardwareWrite("pump_control", "echo ${if (enabled) 1 else 0} > $PUMP_ENABLE")
+    fun enablePump(enabled: Boolean, force: Boolean = false): Boolean {
+        return execHardwareWrite("pump_control", "echo ${if (enabled) 1 else 0} > $PUMP_ENABLE", force = force)
     }
 
-    fun setPumpProfile(profile: String): Boolean {
+    fun setPumpProfile(profile: String, force: Boolean = false): Boolean {
         val cmd = when (profile.lowercase()) {
             "slow" -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 40 > $PUMP_SPEED"
             "medium" -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 60 > $PUMP_SPEED"
@@ -160,7 +184,7 @@ object HardwareController {
             "off" -> "echo 0 > $PUMP_ENABLE"
             else -> "echo 1 > $PUMP_ENABLE && echo 4 > $PUMP_FREQ && echo 80 > $PUMP_SPEED"
         }
-        return execHardwareWrite("pump_control", cmd)
+        return execHardwareWrite("pump_control", cmd, force = force)
     }
 
     fun readPumpEnabled(): String? =
