@@ -44,10 +44,9 @@ internal object InsidePages {
                 isFocusable = true
                 contentDescription = "Open ${page.title}"
             }
-            row.addView(label(page.icon, 22f).apply {
-                setTextColor(AppTheme.accentColor)
-                gravity = Gravity.CENTER
-            }, LinearLayout.LayoutParams(dp(42), ViewGroup.LayoutParams.WRAP_CONTENT))
+            val icon = ToolboxIcons.create(context, page.title)
+            val iconParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(16) }
+            row.addView(icon, iconParams)
             val text = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             text.addView(label(page.title, 16f, true))
             text.addView(label(page.subtitle, 13f).apply {

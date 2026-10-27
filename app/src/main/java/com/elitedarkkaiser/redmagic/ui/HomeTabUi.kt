@@ -158,8 +158,20 @@ object HomeTabUi {
                 isFocusable = true
                 contentDescription = "$title, $description"
                 setOnClickListener { deps.openSection(tab) }
-                addView(deps.sectionHeader(icon, title))
-                addView(deps.subtitleText(description))
+                val line = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(ToolboxIcons.create(context, title), LinearLayout.LayoutParams(deps.dp(28), deps.dp(28)))
+                    addView(TextView(context).apply {
+                        text = title
+                        textSize = 15f
+                        setTextColor(AppTheme.textPrimary)
+                        setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                        setPadding(deps.dp(10), 0, 0, 0)
+                    })
+                }
+                addView(line)
+                addView(deps.subtitleText(description).apply { setPadding(deps.dp(38), deps.dp(5), 0, 0) })
             }
         }
 

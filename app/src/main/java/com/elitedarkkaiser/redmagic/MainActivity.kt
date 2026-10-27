@@ -405,6 +405,7 @@ class MainActivity : Activity() {
     }
 
     private fun applyStatusSnapshot(snapshot: MainStatusSnapshot) {
+        coolingController.applyFanRpm(snapshot.telemetry.fanRpm)
         coolingController.applyTemperature(
             snapshot.telemetry.temperatureF
         )

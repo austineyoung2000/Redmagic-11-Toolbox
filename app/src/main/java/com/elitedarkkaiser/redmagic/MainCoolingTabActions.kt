@@ -79,6 +79,10 @@ internal class MainCoolingTabActions(
         return result.view
     }
 
+    fun applyFanRpm(rpm: Int?) {
+        refs?.rpmText?.text = rpm?.let { "Fan speed: $it RPM" } ?: "Fan speed: unavailable"
+    }
+
     fun applyTemperature(temperatureF: Float?) {
         val previous = lastDisplayedTempF
         val trend = when {

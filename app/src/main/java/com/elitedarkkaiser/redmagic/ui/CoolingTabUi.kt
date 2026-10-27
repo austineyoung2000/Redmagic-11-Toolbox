@@ -12,6 +12,7 @@ import com.elitedarkkaiser.redmagic.HardwareController
 object CoolingTabUi {
     data class Refs(
         val tempText: TextView,
+        val rpmText: TextView,
         val curveStatusText: TextView,
         val fanSeek: Slider,
         val autoCurveCheck: CheckBox,
@@ -37,6 +38,12 @@ object CoolingTabUi {
             setPadding(0, deps.dp(6), 0, deps.dp(4))
         }
 
+        val rpmText = TextView(container.context).apply {
+            text = "Fan speed: -- RPM"
+            textSize = 16f
+            setTextColor(AppTheme.textPrimary)
+            setPadding(0, deps.dp(4), 0, deps.dp(8))
+        }
         lateinit var curveStatusText: TextView
         lateinit var autoCurveCheck: CheckBox
 
@@ -169,6 +176,10 @@ object CoolingTabUi {
             applyFanCurve("turbo", "Turbo")
         }
 
+        listOf(quietChip, balancedChip, turboChip).forEach { button ->
+            button.minHeight = deps.dp(72)
+            button.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
         modeRow.addView(quietChip)
         modeRow.addView(deps.space(deps.dp(8)))
         modeRow.addView(balancedChip)
@@ -210,8 +221,9 @@ object CoolingTabUi {
         val pumpCard = pumpSection.card
 
         val coolingCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("❄", "COOLING"))
+            addView(deps.sectionHeader("❄", "COOLING SYSTEM"))
             addView(tempText)
+            addView(rpmText)
             addView(deps.spacer(deps.dp(12)))
             addView(deps.sectionHeader("▦", "FAN PRESET"))
             addView(modeRow)
@@ -286,6 +298,7 @@ object CoolingTabUi {
             view = container,
             refs = Refs(
                 tempText = tempText,
+                rpmText = rpmText,
                 curveStatusText = curveStatusText,
                 fanSeek = fanSeek,
                 autoCurveCheck = autoCurveCheck,
