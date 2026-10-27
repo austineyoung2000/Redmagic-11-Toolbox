@@ -35,6 +35,7 @@ class ThermalHistoryView(
         color = if (compact) AppTheme.accentColor else context.getColor(
             com.elitedarkkaiser.redmagic.R.color.redmagic_graph_line
         )
+        if (compact) alpha = 150
         strokeWidth = 2.25f * density
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -54,6 +55,7 @@ class ThermalHistoryView(
             com.elitedarkkaiser.redmagic.R.color.redmagic_graph_point
         )
         style = Paint.Style.FILL
+        if (compact) alpha = 180
     }
 
     private val labelPaint = Paint(
@@ -203,8 +205,8 @@ class ThermalHistoryView(
             top,
             0f,
             bottom,
-            if (compact) Color.argb(105, 243, 53, 77) else Color.argb(100, 143, 163, 191),
-            if (compact) Color.argb(8, 243, 53, 77) else Color.argb(8, 143, 163, 191),
+            if (compact) Color.argb(55, 243, 53, 77) else Color.argb(100, 143, 163, 191),
+            if (compact) Color.argb(3, 243, 53, 77) else Color.argb(8, 143, 163, 191),
             Shader.TileMode.CLAMP
         )
         canvas.drawPath(fillPath, fillPaint)
