@@ -18,8 +18,8 @@ android {
         applicationId = "com.elitedarkkaiser.redmagic"
         minSdk = 28
         targetSdk = 35
-        versionCode = 12
-        versionName = "2.6.0"
+        versionCode = 13
+        versionName = "2.7.0"
     }
 
     signingConfigs {

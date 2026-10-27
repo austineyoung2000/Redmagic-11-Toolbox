@@ -1,7 +1,7 @@
 # Redmagic 11 Toolbox
 
 [![Android CI](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml/badge.svg?branch=sixteen)](https://github.com/austineyoung2000/Redmagic-11-Toolbox/actions/workflows/android.yml)
-![Version](https://img.shields.io/badge/version-2.6.0-red)
+![Version](https://img.shields.io/badge/version-2.7.0-red)
 ![Android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)
 ![Device](https://img.shields.io/badge/device-RedMagic%2011%20Pro-red)
 ![Root](https://img.shields.io/badge/root-required-orange)
@@ -14,12 +14,22 @@ Redmagic 11 Toolbox combines cooling, liquid-pump, lighting, native shoulder-tri
 > [!WARNING]
 > Several hardware controls write directly to kernel and vendor interfaces through root. Stock vendor gaming features use compatibility-gated system APIs where available and fall back only where explicitly implemented. Do not expose NX809J-only hardware controls on another device without porting and validating every interface.
 
+## Screenshots
+
+| Dashboard | Lighting | Gaming |
+| --- | --- | --- |
+| ![Dashboard](docs/screenshots/dashboard.jpg) | ![Lighting](docs/screenshots/lighting.jpg) | ![Gaming](docs/screenshots/gaming.jpg) |
+
+## What's new in 2.7.0
+
+A redesigned dashboard and focused pages make cooling, lighting, game profiles, trigger mapping, hardware, and system controls easier to navigate. Per-app lighting and notification editors now follow the lighting interface, and navigation and shoulder-trigger intent handling have been updated.
+
 ## Current platform
 
 | Item | Configuration |
 |---|---|
 | Application ID | `com.elitedarkkaiser.redmagic` |
-| Version | `2.6.0` (`versionCode 12`) |
+| Version | `2.7.0` (`versionCode 13`) |
 | Development branch | `sixteen` |
 | Minimum Android | Android 9 / API 28 |
 | Target and compile SDK | API 35 |
