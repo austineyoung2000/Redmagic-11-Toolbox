@@ -212,25 +212,19 @@ object CoolingTabUi {
         val coolingCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("❄", "COOLING"))
             addView(tempText)
-
-            addView(deps.subtleLabel("Fan level"))
+            addView(deps.spacer(deps.dp(12)))
+            addView(deps.sectionHeader("▦", "FAN PRESET"))
+            addView(modeRow)
+            addView(curveStatusText)
+            addView(deps.subtleLabel("Quiet: low noise  •  Balanced: everyday use  •  Turbo: maximum cooling"))
+            addView(deps.spacer(deps.dp(12)))
+            addView(autoCurveCheck)
+            addView(deps.subtleLabel("Automatically adjust fan speed based on temperature"))
+            addView(deps.spacer(deps.dp(12)))
+            addView(deps.subtleLabel("Manual fan level"))
             addView(fanSeek)
             addView(deps.row(fanOnBtn, fanOffBtn))
             addView(deps.singleRow(rpmBtn))
-            addView(deps.spacer(deps.dp(16)))
-            addView(deps.spacer(deps.dp(16)))
-
-
-
-            addView(deps.spacer(deps.dp(16)))
-            addView(deps.sectionHeader("▦", "FAN CURVE"))
-            addView(autoCurveCheck)
-            addView(curveStatusText)
-            addView(modeRow)
-            addView(deps.subtleLabel("Auto mode ramps fan by temperature and disables manual curve cards"))
-            addView(deps.subtleLabel("Quiet → low noise, stays between fan 0-1"))
-            addView(deps.subtleLabel("Balanced → moderate cooling, stays between fan 2-3"))
-            addView(deps.subtleLabel("Turbo → max cooling and sound, stays between fan 4-5"))
         }
 
         if (

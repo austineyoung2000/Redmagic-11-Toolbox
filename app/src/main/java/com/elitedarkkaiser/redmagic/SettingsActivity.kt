@@ -143,12 +143,11 @@ class SettingsActivity : AppCompatActivity() {
 
         val appearancePanel = panel().apply {
             addView(text("APPEARANCE", 12f, secondary = true, bold = true))
-            addView(text("Follow system theme", 14f, bold = true).apply {
+            addView(text("Dark appearance", 14f, bold = true).apply {
                 setPadding(0, dp(10), 0, 0)
             })
             addView(text(
-                "Currently using $appearanceName mode. The app changes " +
-                    "automatically with Android's light/dark setting.",
+                "The Toolbox uses its dark appearance to match the dashboard design.",
                 12f,
                 secondary = true
             ).apply { setPadding(0, dp(4), 0, 0) })

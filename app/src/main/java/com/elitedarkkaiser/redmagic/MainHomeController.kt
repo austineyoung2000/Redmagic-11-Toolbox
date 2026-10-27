@@ -38,6 +38,10 @@ internal class MainHomeController(
         val rpm = snapshot.telemetry.fanRpm?.let { "$it RPM" } ?: "RPM unavailable"
         val fan = snapshot.telemetry.fanEnabled?.let { if (it) "On" else "Off" } ?: "Unknown"
         current.quickStatusText.text = "$tempText     •     $rpm\nFan: $fan"
+        current.rootChip.text = if (snapshot.dashboardSummary.contains("Root: Granted")) "ROOT\nGranted" else "ROOT\nUnavailable"
+        current.fanChip.text = "FAN\n$fan"
+        current.rpmChip.text = "RPM\n${snapshot.telemetry.fanRpm ?: "--"}"
+        current.tempChip.text = "TEMP\n$tempText"
         current.activeModeText.text = snapshot.activeModeSummary
         current.thermalHistoryView.setHistory(
             snapshot.temperatureHistory,

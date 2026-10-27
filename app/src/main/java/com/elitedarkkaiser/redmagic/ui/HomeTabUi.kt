@@ -15,6 +15,10 @@ object HomeTabUi {
         val deviceRamValue: TextView,
         val dashboardText: TextView,
         val quickStatusText: TextView,
+        val rootChip: TextView,
+        val fanChip: TextView,
+        val rpmChip: TextView,
+        val tempChip: TextView,
         val activeModeText: TextView,
         val thermalHistoryView: ThermalHistoryView,
         val gameModeStatusText: TextView?
@@ -79,51 +83,60 @@ object HomeTabUi {
             gameModeStatusText = gameStatus
         }
 
-        val welcomeCard = deps.sectionPanel().apply {
-            val headerRow = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
-
-            val iconView = ImageView(context).apply {
-                setImageResource(R.mipmap.ic_launcher)
-                layoutParams = LinearLayout.LayoutParams(deps.dp(60), deps.dp(60))
-            }
-
-            val titleView = deps.ledTitleText("Redmagic 11 Toolbox")
-
-            titleView.layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f
-            )
-
-            val settingsButton = MaterialButton(context).apply {
+        val header = LinearLayout(container.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, deps.dp(6), 0, deps.dp(14))
+            addView(TextView(context).apply {
+                text = "REDMAGIC Toolbox"
+                textSize = 23f
+                setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                setTextColor(AppTheme.textPrimary)
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(MaterialButton(context).apply {
                 text = "⚙"
-                textSize = 22f
+                textSize = 20f
                 contentDescription = "Open settings"
                 minWidth = deps.dp(48)
                 minHeight = deps.dp(48)
                 insetTop = 0
                 insetBottom = 0
                 setPadding(0, 0, 0, 0)
-                backgroundTintList = ColorStateList.valueOf(
-                    AppTheme.chipOnColor
-                )
-                rippleColor = ColorStateList.valueOf(
-                    AppTheme.rippleColor
-                )
+                backgroundTintList = ColorStateList.valueOf(AppTheme.panelColor)
                 setTextColor(AppTheme.textPrimary)
                 cornerRadius = deps.dp(16)
                 setOnClickListener { deps.openSettings() }
+            })
+        }
+        val deviceCard = deps.sectionPanel().apply {
+            addView(TextView(context).apply {
+                text = "REDMAGIC 11 Pro"
+                textSize = 18f
+                setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                setTextColor(AppTheme.textPrimary)
+            })
+            addView(deps.subtitleText("NX809J  •  Device information"))
+        }
+        fun chip(value: String): TextView = TextView(container.context).apply {
+            text = value
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(AppTheme.textPrimary)
+            setPadding(deps.dp(4), deps.dp(12), deps.dp(4), deps.dp(12))
+            background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(14).toFloat())
+        }
+        val rootChip = chip("ROOT\nChecking")
+        val fanChip = chip("FAN\n--")
+        val rpmChip = chip("RPM\n--")
+        val tempChip = chip("TEMP\n--")
+        val chipRow = LinearLayout(container.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            listOf(rootChip, fanChip, rpmChip, tempChip).forEachIndexed { index, view ->
+                val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                if (index > 0) lp.marginStart = deps.dp(5)
+                addView(view, lp)
             }
-
-            headerRow.addView(iconView)
-            headerRow.addView(titleView)
-            headerRow.addView(settingsButton)
-
-            addView(headerRow)
-            addView(deps.subtitleText("Cooling, lighting, triggers and hardware controls for Redmagic 11 Pro"))
+            setPadding(0, deps.dp(8), 0, deps.dp(12))
         }
 
         fun dashboardTile(title: String, description: String, icon: String, tab: String): LinearLayout {
@@ -138,7 +151,6 @@ object HomeTabUi {
         }
 
         val navigationCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("◈", "EXPLORE"))
             fun tileRow(first: LinearLayout, second: LinearLayout) {
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
                 row.addView(first, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -161,7 +173,9 @@ object HomeTabUi {
             addView(deps.bodyText(deps.deviceScanSummary()))
         }
 
-        container.addView(welcomeCard)
+        container.addView(header)
+        container.addView(deviceCard)
+        container.addView(chipRow)
 
         val dashboardText =
             TextView(container.context).apply {
@@ -260,6 +274,16 @@ object HomeTabUi {
 
         container.addView(quickStatusCard)
         container.addView(navigationCard)
+        val details = deps.actionButton("DEVICE DETAILS & DIAGNOSTICS", false) {
+            val visible = dashboardCard.visibility != android.view.View.VISIBLE
+            dashboardCard.visibility = if (visible) android.view.View.VISIBLE else android.view.View.GONE
+            activeModeCard.visibility = dashboardCard.visibility
+            diagnosticsCard.visibility = dashboardCard.visibility
+        }
+        dashboardCard.visibility = android.view.View.GONE
+        activeModeCard.visibility = android.view.View.GONE
+        diagnosticsCard.visibility = android.view.View.GONE
+        container.addView(deps.singleRow(details))
         container.addView(dashboardCard)
         container.addView(activeModeCard)
         container.addView(diagnosticsCard)
@@ -272,6 +296,10 @@ object HomeTabUi {
                 deviceRamValue = deviceRamValue,
                 dashboardText = dashboardText,
                 quickStatusText = quickStatusText,
+                rootChip = rootChip,
+                fanChip = fanChip,
+                rpmChip = rpmChip,
+                tempChip = tempChip,
                 activeModeText = activeModeText,
                 thermalHistoryView = thermalHistoryView,
                 gameModeStatusText = gameModeStatusText
