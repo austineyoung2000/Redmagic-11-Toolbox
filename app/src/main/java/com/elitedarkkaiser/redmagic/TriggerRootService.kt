@@ -10,13 +10,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class TriggerRootService : Service() {
 
-    private var rightCrossUnlockedUntil: Long = 0L
+    @Volatile private var rightCrossUnlockedUntil: Long = 0L
 
     @Volatile
     private var running = true
 
     private var leftUnlockArmedAt = 0L
-    private var leftUnlockedUntil = 0L
+    @Volatile private var leftUnlockedUntil = 0L
     private var leftUnlockTapCount = 0
     private val held = ConcurrentHashMap<String, AtomicBoolean>()
     private val repeatThreads = ConcurrentHashMap<String, Thread>()
@@ -28,7 +28,7 @@ class TriggerRootService : Service() {
     private var initializationThread: Thread? = null
     private var rightUnlockArmedAt = 0L
     private var rightUnlockTapCount = 0
-    private var rightUnlockedUntil = 0L
+    @Volatile private var rightUnlockedUntil = 0L
 
     private val INTENT_UNLOCK_TAP_WINDOW_MS = 450L
     private val INPUT_DEBOUNCE_MS = 80L
@@ -227,11 +227,13 @@ class TriggerRootService : Service() {
 
     private fun performInitialAction(
         prefKey: String,
-        action: String
+        action: String,
+        unlockedPress: Boolean = false
     ): Boolean {
         val current = now()
         val previous = lastActionAt[prefKey] ?: 0L
-        if (current - previous < ACTION_COOLDOWN_MS) {
+        val cooldown = if (unlockedPress) INPUT_DEBOUNCE_MS else ACTION_COOLDOWN_MS
+        if (current - previous < cooldown) {
             android.util.Log.d(
                 "TRIGGER",
                 "$prefKey action ignored by cooldown"
@@ -276,6 +278,10 @@ class TriggerRootService : Service() {
                         break
                     }
                     performAction(getAction(prefKey))
+                    if (config.leftUnlocksRight && config.usesIntentUnlock()) {
+                        if (prefKey == "right_trigger") unlockLeftFromRight(config)
+                        else if (prefKey == "left_trigger") unlockRightFromLeft(config)
+                    }
                     if (
                         prefKey == "right_trigger" &&
                         config.usesIntentUnlock()
@@ -313,17 +319,14 @@ class TriggerRootService : Service() {
                     return@Thread
                 }
 
-                if (
-                    prefKey == "right_trigger" &&
-                    config.usesIntentUnlock() &&
-                    !isRightUnlocked(config)
-                ) {
-                    return@Thread
-                }
-
                 val action = getAction(prefKey)
                 if (!performInitialAction(prefKey, action)) {
                     return@Thread
+                }
+
+                if (config.usesIntentUnlock()) {
+                    if (prefKey == "left_trigger") leftUnlockedUntil = now() + config.unlockTimeoutMs
+                    else if (prefKey == "right_trigger") extendRightUnlock(config)
                 }
 
                 if (
@@ -331,6 +334,10 @@ class TriggerRootService : Service() {
                     config.leftUnlocksRight
                 ) {
                     unlockRightFromLeft(config)
+                }
+
+                if (prefKey == "right_trigger" && config.leftUnlocksRight && config.usesIntentUnlock()) {
+                    unlockLeftFromRight(config)
                 }
 
                 if (!isRepeatable(action)) {
@@ -357,6 +364,10 @@ class TriggerRootService : Service() {
                     }
 
                     performAction(getAction(prefKey))
+                    if (config.leftUnlocksRight && config.usesIntentUnlock()) {
+                        if (prefKey == "right_trigger") unlockLeftFromRight(config)
+                        else if (prefKey == "left_trigger") unlockRightFromLeft(config)
+                    }
                     if (
                         prefKey == "right_trigger" &&
                         config.usesIntentUnlock()
@@ -418,6 +429,14 @@ class TriggerRootService : Service() {
             "TRIGGER",
             "left trigger unlocked right until=$expiresAt"
         )
+    }
+
+    private fun unlockLeftFromRight(config: TriggerSafetyConfig) {
+        val expiresAt = now() + config.unlockTimeoutMs
+        leftUnlockedUntil = expiresAt
+        leftUnlockArmedAt = 0L
+        leftUnlockTapCount = 0
+        android.util.Log.d("TRIGGER", "right trigger unlocked left until=$expiresAt")
     }
 
     private fun handleRightIntentUnlock(
@@ -518,19 +537,23 @@ class TriggerRootService : Service() {
             return
         }
 
+        val alreadyUnlocked = config.usesIntentUnlock() && now() <= leftUnlockedUntil
         if (!handleLeftIntentUnlock(config)) {
             stopRepeater("left_trigger")
             return
         }
 
-        if (config.usesHold()) {
+        if (config.usesHold() && !alreadyUnlocked) {
+            if (config.usesIntentUnlock()) leftUnlockedUntil = 0L
             startHeldAction("left_trigger", config)
         } else {
             val accepted = performInitialAction(
                 "left_trigger",
-                getAction("left_trigger")
+                getAction("left_trigger"),
+                unlockedPress = config.usesHold() && alreadyUnlocked
             )
             if (accepted) {
+                if (config.usesIntentUnlock()) leftUnlockedUntil = now() + config.unlockTimeoutMs
                 if (config.leftUnlocksRight) {
                     unlockRightFromLeft(config)
                 }
@@ -550,6 +573,8 @@ class TriggerRootService : Service() {
         val crossUnlocked =
             config.leftUnlocksRight &&
                 now() <= rightCrossUnlockedUntil
+        val alreadyUnlocked = config.usesIntentUnlock() &&
+            (crossUnlocked || now() <= rightUnlockedUntil)
 
         if (
             !crossUnlocked &&
@@ -563,14 +588,19 @@ class TriggerRootService : Service() {
             extendRightUnlock(config)
         }
 
-        if (config.usesHold()) {
+        if (config.usesHold() && !alreadyUnlocked) {
+            if (config.usesIntentUnlock()) rightUnlockedUntil = 0L
             startHeldAction("right_trigger", config)
         } else {
             val accepted = performInitialAction(
                 "right_trigger",
-                getAction("right_trigger")
+                getAction("right_trigger"),
+                unlockedPress = config.usesHold() && alreadyUnlocked
             )
             if (accepted) {
+                if (config.leftUnlocksRight && config.usesIntentUnlock()) {
+                    unlockLeftFromRight(config)
+                }
                 startRepeater("right_trigger", config)
             }
         }

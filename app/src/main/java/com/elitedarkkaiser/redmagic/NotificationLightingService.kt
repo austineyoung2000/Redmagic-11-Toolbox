@@ -133,12 +133,7 @@ class NotificationLightingService : NotificationListenerService() {
             try {
                 trace("setup deadline armed; requesting NOTIFICATION ownership")
                 val applied = ModeTransitionCoordinator.applyLedProfile(this,LedOwner.NOTIFICATION,sbn.key,force=true) {
-                    val effect = p.effect
-                    val zones = buildList {
-                        if (p.logo) add(NotificationLedBatch.Zone("logo", effect, p.color))
-                        if (p.triggers) add(NotificationLedBatch.Zone("triggers", effect, p.color))
-                        if (p.fan) add(NotificationLedBatch.Zone("fan", effect, p.color))
-                    }
+                    val zones = NotificationLightingZones.fromProfile(p)
                     if (NotificationProfileReplayPolicy.shouldWrite(appliedZones, zones)) {
                         trace("ownership accepted; reading cooling temperature")
                         val stopCooling = !HardwareScreenPolicy.isScreenInteractive(this) &&

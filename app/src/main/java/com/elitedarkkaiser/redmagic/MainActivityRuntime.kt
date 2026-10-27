@@ -180,9 +180,7 @@ internal class MainActivityRuntime(
     }
 
     private fun collectStatusSnapshot(): MainStatusSnapshot {
-        val rooted =
-            hasCachedRootAccessStorage(appContext) ||
-                RootShell.hasRoot()
+        val rooted = RootShell.hasRoot()
         val telemetry = HardwareTelemetry.read()
         val deviceInfo =
             loadDeviceInfoCacheStorage(appContext)

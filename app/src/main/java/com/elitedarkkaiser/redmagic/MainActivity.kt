@@ -72,6 +72,7 @@ class MainActivity : Activity() {
             activity = this,
             uiKit = uiKit,
             requestStatusRefresh = ::refreshStatus,
+            openSection = { id -> tabHost.select(id) },
             gameModeActions = gameModeActions
         )
     }
@@ -157,6 +158,10 @@ class MainActivity : Activity() {
                 gameModeActions.showProfileDialog()
             }
         )
+    }
+
+    internal fun openMagicKeyFromGaming() {
+        tabHost.openMagicKeyFromHardware()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -274,6 +279,44 @@ class MainActivity : Activity() {
             )
         }
         super.onStop()
+    }
+
+    private val gamingPages = mutableListOf<android.view.View>()
+
+    internal fun showGamingPage(title: String, content: android.view.View): () -> Unit {
+        val host = findViewById<android.view.ViewGroup>(android.R.id.content)
+        val page = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setBackgroundColor(AppTheme.bgColor)
+            val header = android.widget.TextView(this@MainActivity).apply {
+                text = "‹    $title"
+                textSize = 24f
+                setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                setTextColor(AppTheme.textPrimary)
+                setPadding(24, 24, 24, 24)
+                setOnClickListener { closeGamingPage() }
+            }
+            addView(header)
+            (content.parent as? android.view.ViewGroup)?.removeView(content)
+            addView(content, android.widget.LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        host.addView(page, android.view.ViewGroup.LayoutParams(-1, -1))
+        gamingPages.add(page)
+        return { if (gamingPages.lastOrNull() === page) closeGamingPage() }
+    }
+
+    private fun closeGamingPage(): Boolean {
+        if (gamingPages.isEmpty()) return false
+        val page = gamingPages.removeAt(gamingPages.lastIndex)
+        (page.parent as? android.view.ViewGroup)?.removeView(page)
+        return true
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (closeGamingPage()) return
+        if (::tabHost.isInitialized && tabHost.handleBack()) return
+        super.onBackPressed()
     }
 
     override fun onDestroy() {
@@ -398,6 +441,8 @@ class MainActivity : Activity() {
     }
 
     private fun applyStatusSnapshot(snapshot: MainStatusSnapshot) {
+        coolingController.applyFanPower(snapshot.telemetry.fanEnabled)
+        coolingController.applyFanRpm(snapshot.telemetry.fanRpm)
         coolingController.applyTemperature(
             snapshot.telemetry.temperatureF
         )

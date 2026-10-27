@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.RedMagicRootControl" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.RedMagicRootControl" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/redmagic_primary</item>
         <item name="colorOnPrimary">@color/redmagic_on_primary</item>
         <item name="colorPrimaryContainer">@color/redmagic_primary_container</item>
@@ -19,8 +19,8 @@
         <item name="android:windowBackground">@color/redmagic_background</item>
         <item name="android:statusBarColor">@color/redmagic_background</item>
         <item name="android:navigationBarColor">@color/redmagic_background</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:fontFamily">sans</item>
     </style>
 </resources>

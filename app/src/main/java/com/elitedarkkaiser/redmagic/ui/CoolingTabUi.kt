@@ -2,19 +2,22 @@ package com.elitedarkkaiser.redmagic.ui
 
 import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.widget.Button
-import android.widget.CheckBox
-import com.google.android.material.checkbox.MaterialCheckBox
+import android.widget.CompoundButton
+import com.google.android.material.materialswitch.MaterialSwitch
 import android.widget.LinearLayout
 import com.google.android.material.slider.Slider
 import android.widget.TextView
+import android.graphics.Typeface
 import com.elitedarkkaiser.redmagic.HardwareController
 
 object CoolingTabUi {
     data class Refs(
         val tempText: TextView,
+        val rpmText: TextView,
         val curveStatusText: TextView,
         val fanSeek: Slider,
-        val autoCurveCheck: CheckBox,
+        val fanPowerSwitch: CompoundButton,
+        val autoCurveCheck: CompoundButton,
         val quietCurveButton: Button,
         val balancedCurveButton: Button,
         val turboCurveButton: Button,
@@ -31,14 +34,22 @@ object CoolingTabUi {
         val container = deps.scrollTabContainer()
 
         val tempText = TextView(container.context).apply {
-            text = "Current temp: --"
-            textSize = 13f
-            setTextColor(AppTheme.textSecondary)
+            text = "--"
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(AppTheme.textPrimary)
             setPadding(0, deps.dp(6), 0, deps.dp(4))
         }
 
+        val rpmText = TextView(container.context).apply {
+            text = "-- RPM"
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(AppTheme.textPrimary)
+            setPadding(0, deps.dp(4), 0, deps.dp(8))
+        }
         lateinit var curveStatusText: TextView
-        lateinit var autoCurveCheck: CheckBox
+        lateinit var autoCurveCheck: CompoundButton
 
         val fanSeek = SelectionControlStyle.slider(container.context).apply {
             valueFrom = 0f
@@ -69,23 +80,24 @@ object CoolingTabUi {
             )
         }
 
-        val fanOnBtn = deps.actionButton("FAN ON", false) {
-            deps.runBackground {
-                HardwareController.enableFan(true)
-                deps.refreshStatus()
+        val fanPowerSwitch = MaterialSwitch(container.context).apply {
+            text = "Fan power"
+            setTextColor(AppTheme.textPrimary)
+            isEnabled = false // Enabled when the first real fan state arrives.
+            setOnCheckedChangeListener { button, checked ->
+                if (button.tag == "rendering") return@setOnCheckedChangeListener
+                if (autoCurveCheck.isChecked) autoCurveCheck.isChecked = false
+                deps.runBackground {
+                    if (checked && (HardwareController.readFanLevel() ?: 0) == 0) {
+                        HardwareController.setFanLevel(1)
+                    } else {
+                        HardwareController.enableFan(checked)
+                    }
+                    deps.refreshStatus()
+                }
             }
         }
-
-        val fanOffBtn = deps.actionButton("FAN OFF", true) {
-            deps.runBackground {
-                HardwareController.enableFan(false)
-                deps.refreshStatus()
-            }
-        }
-
-        val rpmBtn = deps.actionButton("READ RPM", false) {
-            deps.refreshStatus()
-        }
+        val rpmBtn = deps.actionButton("Refresh RPM", false) { deps.refreshStatus() }
 
         val modeRow = LinearLayout(container.context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -149,26 +161,36 @@ object CoolingTabUi {
         }
 
         quietChip = deps.segmentedChip(
-            "Quiet",
+            "Quiet\nLow noise",
             deps.getSelectedCurve() == "quiet"
         ) {
             applyFanCurve("quiet", "Quiet")
         }
 
         balancedChip = deps.segmentedChip(
-            "Balanced",
+            "Balanced\nEveryday use",
             deps.getSelectedCurve() == "balanced"
         ) {
             applyFanCurve("balanced", "Balanced")
         }
 
         turboChip = deps.segmentedChip(
-            "Turbo",
+            "Turbo\nMaximum cooling",
             deps.getSelectedCurve() == "turbo"
         ) {
             applyFanCurve("turbo", "Turbo")
         }
 
+        listOf(quietChip, balancedChip, turboChip).forEachIndexed { index, button ->
+            button.tag = "cooling_preset"
+            SelectionControlStyle.apply(button, button.isSelected)
+            val icon = androidx.core.content.ContextCompat.getDrawable(container.context, listOf(com.elitedarkkaiser.redmagic.R.drawable.ic_preset_quiet, com.elitedarkkaiser.redmagic.R.drawable.ic_preset_balanced, com.elitedarkkaiser.redmagic.R.drawable.ic_preset_turbo)[index])?.mutate()
+            icon?.setTint(AppTheme.accentColor)
+            icon?.setBounds(0, 0, deps.dp(24), deps.dp(24))
+            button.setCompoundDrawables(null, icon, null, null)
+            button.compoundDrawablePadding = deps.dp(6)
+            button.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
         modeRow.addView(quietChip)
         modeRow.addView(deps.space(deps.dp(8)))
         modeRow.addView(balancedChip)
@@ -182,8 +204,8 @@ object CoolingTabUi {
             setPadding(0, deps.dp(6), 0, deps.dp(4))
         }
 
-        autoCurveCheck = MaterialCheckBox(container.context).apply {
-            text = "Automatic fan control based on temperature"
+        autoCurveCheck = MaterialSwitch(container.context).apply {
+            text = "Automatic fan curve"
             setTextColor(AppTheme.textPrimary)
             textSize = 13f
             setPadding(0, deps.dp(6), 0, deps.dp(4))
@@ -209,28 +231,59 @@ object CoolingTabUi {
         val smartPumpSpeedView = pumpSection.speedView
         val pumpCard = pumpSection.card
 
+        val telemetryCard = deps.sectionPanel().apply {
+            val metrics = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                fun metric(iconName: String, value: TextView, label: String) {
+                    val column = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(value)
+                        addView(deps.subtleLabel(label))
+                    }
+                    val icon = ToolboxIcons.create(context, iconName)
+                    addView(icon, LinearLayout.LayoutParams(deps.dp(42), deps.dp(42)).apply {
+                        marginEnd = deps.dp(8)
+                    })
+                    addView(column, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                }
+                metric("temp", tempText, "Current temperature")
+                metric("fan", rpmText, "Fan speed")
+            }
+            addView(metrics)
+            addView(rpmBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(42)))
+        }
+
         val coolingCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("❄", "COOLING"))
-            addView(tempText)
-
-            addView(deps.subtleLabel("Fan level"))
-            addView(fanSeek)
-            addView(deps.row(fanOnBtn, fanOffBtn))
-            addView(deps.singleRow(rpmBtn))
-            addView(deps.spacer(deps.dp(16)))
-            addView(deps.spacer(deps.dp(16)))
-
-
-
-            addView(deps.spacer(deps.dp(16)))
-            addView(deps.sectionHeader("▦", "FAN CURVE"))
-            addView(autoCurveCheck)
-            addView(curveStatusText)
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                addView(ToolboxIcons.create(context, "fan"), LinearLayout.LayoutParams(deps.dp(32), deps.dp(32)).apply {
+                    marginEnd = deps.dp(12)
+                })
+                addView(TextView(context).apply {
+                    text = "Fan cooling"
+                    textSize = 18f
+                    setTextColor(AppTheme.textPrimary)
+                    typeface = Typeface.create(AppTheme.appTypeface, Typeface.BOLD)
+                })
+            })
+            addView(deps.spacer(deps.dp(8)))
+            addView(fanPowerSwitch)
+            addView(deps.bodyText("Fan preset"))
             addView(modeRow)
-            addView(deps.subtleLabel("Auto mode ramps fan by temperature and disables manual curve cards"))
-            addView(deps.subtleLabel("Quiet → low noise, stays between fan 0-1"))
-            addView(deps.subtleLabel("Balanced → moderate cooling, stays between fan 2-3"))
-            addView(deps.subtleLabel("Turbo → max cooling and sound, stays between fan 4-5"))
+            addView(curveStatusText)
+            addView(deps.spacer(deps.dp(12)))
+            addView(autoCurveCheck)
+            addView(deps.subtleLabel("Automatically adjust fan speed based on temperature"))
+            addView(deps.spacer(deps.dp(12)))
+            addView(deps.subtleLabel("Automatic fan curve • estimated RPM by temperature (°F)"))
+            addView(AutoFanCurveView(context), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(150)))
+            addView(deps.subtleLabel("Estimated RPM; actual speed varies. Fan levels drop after a 5°F cooldown buffer."))
+            addView(deps.spacer(deps.dp(12)))
+            addView(deps.bodyText("Manual fan control"))
+            addView(deps.subtleLabel("Manual fan level"))
+            addView(fanSeek)
         }
 
         if (
@@ -247,8 +300,7 @@ object CoolingTabUi {
 
             listOf(
                 fanSeek,
-                fanOnBtn,
-                fanOffBtn,
+                fanPowerSwitch,
                 rpmBtn,
                 autoCurveCheck,
                 modeRow
@@ -284,16 +336,40 @@ object CoolingTabUi {
             CapabilityUi.disableInteractions(pumpCard)
         }
 
+        val hero = android.widget.FrameLayout(container.context).apply {
+            val image = android.widget.ImageView(context).apply {
+                setImageResource(com.elitedarkkaiser.redmagic.R.drawable.cooling_hero)
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Ice-covered REDMAGIC 11 Pro"
+            }
+            addView(image, android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT))
+            val fade = android.view.View(context).apply {
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+            }
+            addView(fade, android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        container.addView(hero, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(130)))
+        container.addView(telemetryCard)
+        container.addView(deps.spacer(deps.dp(12)))
         container.addView(coolingCard)
-        container.addView(deps.spacer(deps.dp(16)))
+        container.addView(deps.spacer(deps.dp(12)))
         container.addView(pumpCard)
 
         return Result(
             view = container,
             refs = Refs(
                 tempText = tempText,
+                rpmText = rpmText,
                 curveStatusText = curveStatusText,
                 fanSeek = fanSeek,
+                fanPowerSwitch = fanPowerSwitch,
                 autoCurveCheck = autoCurveCheck,
                 quietCurveButton = quietChip,
                 balancedCurveButton = balancedChip,

@@ -85,9 +85,7 @@ object DashboardSnapshot {
         context: Context
     ): String {
         val hardware = HardwareTelemetry.read()
-        val rooted =
-            hasCachedRootAccessStorage(context) ||
-                RootShell.hasRoot()
+        val rooted = RootShell.hasRoot()
 
         return buildSummary(
             context = context,

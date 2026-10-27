@@ -13,6 +13,7 @@ internal class MainHomeController(
     private val activity: MainActivity,
     private val uiKit: MainActivityUiKit,
     private val requestStatusRefresh: () -> Unit,
+    private val openSection: (String) -> Unit,
     private val gameModeActions: MainGameModeActions
 ) {
     private var refs: HomeTabUi.Refs? = null
@@ -31,12 +32,35 @@ internal class MainHomeController(
         current.deviceRomValue.text = snapshot.deviceInfo.rom
         current.deviceCpuValue.text = snapshot.deviceInfo.cpu
         current.deviceRamValue.text = snapshot.deviceInfo.ram
-        current.dashboardText.text = snapshot.dashboardSummary
+        val temp = if (useFahrenheit) snapshot.telemetry.temperatureF else snapshot.telemetry.temperatureC
+        val tempText = temp?.let { String.format("%.1f°%s", it, if (useFahrenheit) "F" else "C") } ?: "Unavailable"
+        val rpm = snapshot.telemetry.fanRpm?.let { "$it RPM" } ?: "RPM unavailable"
+        val fan = snapshot.telemetry.fanEnabled?.let { if (it) "On" else "Off" } ?: "Unknown"
+        current.coolingTemp.text = tempText
+        current.coolingRpm.text = rpm
+        current.rootChip.text = if (snapshot.dashboardSummary.contains("Root: Granted")) "ROOT\nGranted" else "ROOT\nUnavailable"
+        current.fanChip.text = "FAN\n$fan"
+        current.rpmChip.text = "RPM\n${snapshot.telemetry.fanRpm ?: "--"}"
+        current.tempChip.text = "TEMP\n$tempText"
         current.activeModeText.text = snapshot.activeModeSummary
         current.thermalHistoryView.setHistory(
             snapshot.temperatureHistory,
             useFahrenheit
         )
+        val temperatures = snapshot.temperatureHistory.map {
+            if (useFahrenheit) it.temperatureC * 9f / 5f + 32f else it.temperatureC
+        }
+        val latest = temperatures.lastOrNull()
+        if (latest == null) {
+            current.historySummary.text = "Now --   Min --   Max --"
+            current.historySummary.contentDescription = "Temperature history is collecting samples"
+        } else {
+            val unit = if (useFahrenheit) "°F" else "°C"
+            val summary = String.format(java.util.Locale.getDefault(), "Now %.1f%s   Min %.1f%s   Max %.1f%s",
+                latest, unit, temperatures.minOrNull() ?: latest, unit, temperatures.maxOrNull() ?: latest, unit)
+            current.historySummary.text = summary
+            current.historySummary.contentDescription = summary
+        }
     }
 
     private fun createDependencies(): HomeTabDeps {
@@ -64,6 +88,7 @@ internal class MainHomeController(
             space = { width -> uiKit.space(width) },
             dp = { value -> uiKit.dp(value) },
             requestStatusRefresh = requestStatusRefresh,
+            openSection = openSection,
             hasUsageStatsPermission = {
                 PermissionActions.hasUsageStatsPermission(activity)
             },

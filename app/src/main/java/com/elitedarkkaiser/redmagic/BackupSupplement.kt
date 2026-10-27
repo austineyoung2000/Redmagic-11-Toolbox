@@ -40,7 +40,7 @@ internal object BackupSupplement {
             require(p.getString("effect") in listOf("steady","breathe","flashing","rapid")) { "Invalid notification effect" }
             require(p.getInt("seconds") in 3..30 && p.optInt("brightness",128) in 32..255) { "Invalid notification duration or brightness" }
             listOf("logo","triggers","fan").forEach { if (p.has(it)) require(p.get(it) is Boolean) { "Invalid notification zone" } }
-            listOf("logoState","triggerState").forEach { key ->
+            listOf("logoState","triggerState","fanState").forEach { key ->
                 if (p.has(key)) {
                     val state = p.getJSONObject(key)
                     require(state.get("enabled") is Boolean && state.getInt("color") in listOf(1,3,4,5,6,7,8,9)) { "Invalid split-zone state" }

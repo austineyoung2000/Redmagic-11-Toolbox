@@ -140,13 +140,16 @@ internal class MainLightingController(
             saveRealTimePreviewEnabled = {
                 saveRealTimePreviewEnabledStorage(activity, it)
             },
+            saveInlineFan = { zoneDialogs.saveInlineFan(it) },
+            saveInlineLogo = { zoneDialogs.saveInlineLogo(it) },
+            saveInlineShoulder = { zoneDialogs.saveInlineShoulder(it) },
             showFanLedDialog = { zoneDialogs.showFan() },
             showLogoLedDialog = { zoneDialogs.showLogo() },
             showGameModeBarDialog = { zoneDialogs.showLogo(bar = true) },
             showShoulderLedDialog = { zoneDialogs.showShoulder() },
             rgbStudioSummary = { actions.rgbStudioSummary() },
-            showRgbStudioDialog = { onUpdated ->
-                actions.showRgbStudioDialog(
+            createRgbStudioPage = { onUpdated ->
+                actions.createRgbStudioPage(
                     onUpdated = onUpdated,
                     onAllLedStateApplied = ::applyAllLedState
                 )

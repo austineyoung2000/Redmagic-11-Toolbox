@@ -31,11 +31,37 @@ object SelectionControlStyle {
             button.minHeight = AppTheme.dp(context, 48)
             button.setPadding(AppTheme.dp(context, 8), 0, AppTheme.dp(context, 8), 0)
         }
+        if (button.tag == "pump_preset" && button is MaterialButton) {
+            button.textSize = 12f
+            button.gravity = android.view.Gravity.CENTER
+            button.setPadding(AppTheme.dp(context, 4), AppTheme.dp(context, 10), AppTheme.dp(context, 4), AppTheme.dp(context, 10))
+            button.cornerRadius = AppTheme.dp(context, 12)
+            button.strokeWidth = AppTheme.dp(context, 1)
+            button.strokeColor = ColorStateList.valueOf(if (selected) AppTheme.accentColor else AppTheme.borderColor)
+            button.backgroundTintList = ColorStateList.valueOf(if (selected) AppTheme.dangerColor else AppTheme.panelPressed)
+        }
+        if (button.tag == "cooling_preset") {
+            button.setSingleLine(false)
+            button.maxLines = 2
+            button.ellipsize = null
+            button.textSize = 12f
+            button.minHeight = AppTheme.dp(context, 100)
+            button.setPadding(AppTheme.dp(context, 3), AppTheme.dp(context, 8), AppTheme.dp(context, 3), AppTheme.dp(context, 8))
+            if (button is MaterialButton) {
+                button.cornerRadius = AppTheme.dp(context, 12)
+                button.strokeWidth = AppTheme.dp(context, 1)
+                button.strokeColor = ColorStateList.valueOf(if (selected) AppTheme.accentColor else AppTheme.borderColor)
+                button.backgroundTintList = ColorStateList.valueOf(if (selected) AppTheme.dangerColor else AppTheme.panelPressed)
+            }
+        }
     }
 
     fun slider(context: Context): Slider = Slider(context).apply {
         val primary = ColorStateList.valueOf(context.getColor(R.color.redmagic_primary))
         thumbTintList = primary
+        isTickVisible = false
+        thumbRadius = AppTheme.dp(context, 8)
+        trackHeight = AppTheme.dp(context, 4)
         trackActiveTintList = primary
         trackInactiveTintList = ColorStateList.valueOf(context.getColor(R.color.redmagic_surface_variant))
     }

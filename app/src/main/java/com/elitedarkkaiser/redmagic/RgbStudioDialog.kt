@@ -46,11 +46,11 @@ object RgbStudioDialog {
         ColorChoice(9, "Pink", "#FF69B4")
     )
 
-    fun show(
+    fun createView(
         activity: Activity,
         initial: RgbStudioState,
         deps: Deps
-    ) {
+    ): LinearLayout {
         var enabled = initial.enabled
         var syncZones = initial.syncZones
         var effect = initial.effect
@@ -70,12 +70,7 @@ object RgbStudioDialog {
 
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(
-                deps.dp(18),
-                deps.dp(8),
-                deps.dp(18),
-                deps.dp(12)
-            )
+            setPadding(0, 0, 0, deps.dp(12))
         }
 
         fun label(text: String): TextView {
@@ -157,6 +152,7 @@ object RgbStudioDialog {
         addEffect("Flashing", "flashing")
         addEffect("Rapid", "rapid")
         content.addView(effectRow)
+        val cycleBoundary = content.childCount
         content.addView(label("Zone brightness"))
         content.addView(MaterialCheckBox(activity).apply {
             text = "Enable logo LED"; isChecked = logoEnabled; setTextColor(AppTheme.textPrimary)
@@ -165,6 +161,7 @@ object RgbStudioDialog {
         content.addView(label("Logo"))
         LedBrightnessUi(activity, content, "logo", { LedBrightness.encode(logoBrightness, effect) }, { 7 },
             { logoBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+        val logoBrightnessBoundary = content.childCount
         content.addView(MaterialCheckBox(activity).apply {
             text = "Enable GAME MODE bar"; isChecked = barEnabled; setTextColor(AppTheme.textPrimary)
             setOnCheckedChangeListener { _, checked -> barEnabled = checked }
@@ -172,13 +169,15 @@ object RgbStudioDialog {
         content.addView(label("GAME MODE bar"))
         LedBrightnessUi(activity, content, "logo", { LedBrightness.encode(barBrightness, effect) }, { 7 },
             { barBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+        val barBrightnessBoundary = content.childCount
         content.addView(label("Triggers (top and bottom)"))
         LedBrightnessUi(activity, content, "triggers", { LedBrightness.encode(shoulderBrightness, effect) }, { 7 },
             { shoulderBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
+        val triggerBrightnessBoundary = content.childCount
         content.addView(label("Fan"))
         LedBrightnessUi(activity, content, "fan", { LedBrightness.encode(fanBrightness, effect) }, { 7 },
             { fanBrightness = LedBrightness.level(it) }, {}, AppTheme.textSecondary, AppTheme.accentColor, deps.dp)
-
+        val brightnessBoundary = content.childCount
 
         content.addView(label("Logo / fan / matching triggers color sequence"))
         content.addView(TextView(activity).apply {
@@ -190,35 +189,34 @@ object RgbStudioDialog {
 
         fun addPalette(parent: LinearLayout, selectedColors: MutableList<Int>) {
             val swatches = LedControlViewFactory(activity)
-            colorChoices.chunked(4).forEach { choices ->
-                val row = LinearLayout(activity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    setPadding(0, deps.dp(6), 0, deps.dp(4))
-                }
-                choices.forEachIndexed { index, choice ->
-                    if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(deps.dp(10), 1))
-                    lateinit var dot: View
-                    dot = swatches.colorDot(choice.hex, choice.id in selectedColors) {
-                        if (choice.id in selectedColors) {
-                            if (selectedColors.size > 1) selectedColors.remove(choice.id)
-                            else Toast.makeText(activity, "Keep at least one cycle color", Toast.LENGTH_SHORT).show()
-                        } else {
-                            selectedColors.add(choice.id)
-                            selectedColors.sortBy { id -> colorChoices.indexOfFirst { it.id == id } }
-                        }
-                        val selected = choice.id in selectedColors
-                        dot.background = swatches.colorDotDrawable(choice.hex, selected)
-                        dot.isSelected = selected
-                        dot.contentDescription = "${choice.label}: ${if (selected) "selected" else "not selected"}"
-                    }.apply {
-                        isSelected = choice.id in selectedColors
-                        isFocusable = true
-                        contentDescription = "${choice.label}: ${if (isSelected) "selected" else "not selected"}"
-                    }
-                    row.addView(dot)
-                }
-                parent.addView(row)
+            val row = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, deps.dp(6), 0, deps.dp(4))
             }
+            colorChoices.forEachIndexed { index, choice ->
+                if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                lateinit var dot: View
+                dot = swatches.colorDot(choice.hex, choice.id in selectedColors) {
+                    if (choice.id in selectedColors) {
+                        if (selectedColors.size > 1) selectedColors.remove(choice.id)
+                        else Toast.makeText(activity, "Keep at least one cycle color", Toast.LENGTH_SHORT).show()
+                    } else {
+                        selectedColors.add(choice.id)
+                        selectedColors.sortBy { id -> colorChoices.indexOfFirst { it.id == id } }
+                    }
+                    val selected = choice.id in selectedColors
+                    dot.background = swatches.colorDotDrawable(choice.hex, selected)
+                    dot.isSelected = selected
+                    dot.contentDescription = "${choice.label}: ${if (selected) "selected" else "not selected"}"
+                }.apply {
+                    isSelected = choice.id in selectedColors
+                    isFocusable = true
+                    contentDescription = "${choice.label}: ${if (isSelected) "selected" else "not selected"}"
+                }
+                row.addView(dot, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
+            }
+            parent.addView(row)
         }
         addPalette(content, colors)
         content.addView(label("GAME MODE bar color sequence"))
@@ -248,6 +246,7 @@ object RgbStudioDialog {
         })
         splitPanel.visibility = if (splitTriggers) View.VISIBLE else View.GONE
         content.addView(splitPanel)
+        val sequenceBoundary = content.childCount
 
         fun speedControl(
             title: String,
@@ -321,6 +320,36 @@ object RgbStudioDialog {
             setTextColor(AppTheme.textSecondary)
         })
 
+        // Keep the existing controls and listeners, grouped into the same surface cards
+        // as the Lighting page. The stored state and save callbacks remain unchanged.
+        val children = (0 until content.childCount).map { content.getChildAt(it) }
+        val timingBoundary = children.size
+        content.removeAllViews()
+        fun group(title: String, start: Int, end: Int) {
+            val card = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(deps.dp(18), deps.dp(16), deps.dp(18), deps.dp(16))
+                background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(20).toFloat())
+            }
+            card.addView(TextView(activity).apply {
+                text = title
+                textSize = 17f
+                setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                setTextColor(AppTheme.textPrimary)
+            })
+            children.subList(start, end).forEach { card.addView(it) }
+            content.addView(card, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = deps.dp(12)
+            })
+        }
+        group("RGB cycle", 0, cycleBoundary)
+        group("Logo lighting", cycleBoundary, logoBrightnessBoundary)
+        group("GAME MODE bar", logoBrightnessBoundary, barBrightnessBoundary)
+        group("Trigger lighting", barBrightnessBoundary, triggerBrightnessBoundary)
+        group("Fan lighting", triggerBrightnessBoundary, brightnessBoundary)
+        group("Color sequences", brightnessBoundary, sequenceBoundary)
+        group("Cycle timing", sequenceBoundary, timingBoundary)
+
         fun buildState(forceEnabled: Boolean? = null): RgbStudioState {
             val logoMs = (logoSpeed.value * 1000f).toLong()
             val shoulderMs = if (syncZones) {
@@ -358,26 +387,18 @@ object RgbStudioDialog {
             )
         }
 
-        val scroll = ScrollView(activity).apply {
-            addView(content)
+        val applyAll = deps.filterChip("Apply to all", false) {
+            deps.onApplyToAll(buildState())
         }
-
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle("RGB Studio")
-            .setView(scroll)
-            .setNegativeButton("CANCEL", null)
-            .setNeutralButton("APPLY TO ALL") { _, _ ->
-                deps.onApplyToAll(buildState())
-            }
-            .setPositiveButton("SAVE & APPLY") { _, _ ->
-                deps.onSaveAndApply(buildState())
-            }
-            .create()
+        val save = deps.filterChip("Save & apply", false) {
+            deps.onSaveAndApply(buildState())
+        }
+        content.addView(applyAll)
+        content.addView(save)
         refreshApplyButton = {
-            dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).visibility =
-                if (splitTriggers) View.GONE else View.VISIBLE
+            applyAll.visibility = if (splitTriggers) View.GONE else View.VISIBLE
         }
-        dialog.setOnShowListener { refreshApplyButton?.invoke() }
-        dialog.show()
+        refreshApplyButton?.invoke()
+        return content
     }
 }

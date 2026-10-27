@@ -1,34 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Material 3 light palette. Dark overrides live in values-night. -->
-    <color name="redmagic_primary">#A52A35</color>
+    <color name="redmagic_primary">#FF5260</color>
     <color name="redmagic_on_primary">#FFFFFF</color>
-    <color name="redmagic_primary_container">#FFDADD</color>
-    <color name="redmagic_on_primary_container">#410008</color>
+    <color name="redmagic_primary_container">#5C1720</color>
+    <color name="redmagic_on_primary_container">#FFDADC</color>
 
-    <color name="redmagic_secondary">#526071</color>
-    <color name="redmagic_on_secondary">#FFFFFF</color>
+    <color name="redmagic_secondary">#B8C7DD</color>
+    <color name="redmagic_on_secondary">#243141</color>
 
-    <color name="redmagic_background">#F6F7FA</color>
-    <color name="redmagic_surface">#FFFFFF</color>
-    <color name="redmagic_surface_variant">#E7EBF1</color>
-    <color name="redmagic_on_surface">#191C20</color>
-    <color name="redmagic_on_surface_variant">#42474E</color>
-    <color name="redmagic_outline">#73777F</color>
-    <color name="redmagic_error">#BA1A1A</color>
+    <color name="redmagic_background">#0A0D12</color>
+    <color name="redmagic_surface">#11151C</color>
+    <color name="redmagic_surface_variant">#1B212B</color>
+    <color name="redmagic_on_surface">#E5EAF2</color>
+    <color name="redmagic_on_surface_variant">#BFC7D4</color>
+    <color name="redmagic_outline">#89919D</color>
+    <color name="redmagic_error">#FFB4AB</color>
 
-    <color name="redmagic_panel">#FFFFFF</color>
-    <color name="redmagic_panel_pressed">#E9EDF3</color>
-    <color name="redmagic_border">#CDD4DE</color>
-    <color name="redmagic_accent">#52677F</color>
-    <color name="redmagic_chip_on">#E4EAF1</color>
-    <color name="redmagic_chip_active">#D4DFEB</color>
-    <color name="redmagic_danger">#F5DADD</color>
-    <color name="redmagic_text_primary">#1B1F24</color>
-    <color name="redmagic_text_secondary">#586473</color>
-    <color name="redmagic_highlight_border">#66788E</color>
-    <color name="redmagic_ripple">#CBD7E5</color>
-    <color name="redmagic_graph_grid">#D8DEE7</color>
-    <color name="redmagic_graph_line">#526F91</color>
-    <color name="redmagic_graph_point">#26384E</color>
+    <color name="redmagic_panel">#121720</color>
+    <color name="redmagic_panel_pressed">#1A2230</color>
+    <color name="redmagic_border">#232C3B</color>
+    <color name="redmagic_accent">#F3354D</color>
+    <color name="redmagic_chip_on">#202B38</color>
+    <color name="redmagic_chip_active">#2B3A4F</color>
+    <color name="redmagic_danger">#5B2C33</color>
+    <color name="redmagic_text_primary">#E8EEF7</color>
+    <color name="redmagic_text_secondary">#9AA8BA</color>
+    <color name="redmagic_highlight_border">#7F8EA3</color>
+    <color name="redmagic_ripple">#33445A</color>
+    <color name="redmagic_graph_grid">#2A3443</color>
+    <color name="redmagic_graph_line">#AFC6E5</color>
+    <color name="redmagic_graph_point">#E8EEF7</color>
 </resources>

@@ -228,6 +228,40 @@ internal class MainLightingZoneDialogs(
         )
     }
 
+    /** Commits a complete normal-zone selection through the existing ownership path. */
+    fun saveInlineFan(selection: LedState) {
+        disableRgbStudioForManualControl()
+        state.fanEnabled = selection.enabled
+        state.fanEffect = selection.effect
+        state.fanColor = selection.color
+        saveFanLedStateStorage(activity, selection)
+        if (selection.enabled) applyFanSelection(selection.effect, selection.color)
+        else runLedPreview { HardwareController.setFanLedEnabled(false) }
+        startFanLedService()
+    }
+
+    fun saveInlineLogo(selection: LedState) {
+        disableRgbStudioForManualControl()
+        state.logoEnabled = selection.enabled
+        state.logoEffect = selection.effect
+        state.logoColor = selection.color
+        saveLogoLedStateStorage(activity, selection)
+        if (selection.enabled) applyLogoSelection(selection.effect, selection.color)
+        else runLedPreview { HardwareController.setLogoLedEnabled(false) }
+        startFanLedService()
+    }
+
+    fun saveInlineShoulder(selection: LedState) {
+        disableRgbStudioForManualControl()
+        state.shoulderEnabled = selection.enabled
+        state.shoulderEffect = selection.effect
+        state.shoulderColor = selection.color
+        saveShoulderLedStateStorage(activity, selection)
+        if (selection.enabled) applyShoulderSelection(selection.effect, selection.color)
+        else runLedPreview { HardwareController.setShoulderLedEnabled(false) }
+        startFanLedService()
+    }
+
     fun selectedFanPresetBubble(
         c1: String,
         c2: String,

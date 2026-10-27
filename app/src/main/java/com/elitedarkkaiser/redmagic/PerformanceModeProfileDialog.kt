@@ -23,6 +23,29 @@ object PerformanceModeProfileDialog {
         val label: String
     )
 
+    /** Opens the existing verified mode choices for the specified game. */
+    fun showForApp(activity: Activity, packageName: String, label: String, onSaved: () -> Unit = {}) {
+        val probe = PerformanceModeController.probe(activity)
+        if (!probe.compatible) {
+            Toast.makeText(activity, probe.message, Toast.LENGTH_LONG).show()
+            return
+        }
+        val existing = PerformanceModeStorage.getProfile(activity, packageName)
+        val modes = RedmagicPerformanceMode.entries
+        val labels = arrayOf("Eco — lower power and heat", "Balance — stock balanced tuning", "Rise — higher performance")
+        val selected = modes.indexOf(existing?.mode ?: RedmagicPerformanceMode.BALANCE).coerceAtLeast(0)
+        MaterialAlertDialogBuilder(activity).setTitle("$label performance")
+            .setSingleChoiceItems(labels, selected) { picker, which ->
+                val saved = PerformanceModeStorage.saveProfile(activity,
+                    PerformanceModeProfile(packageName, label, modes[which], existing?.enabled ?: true))
+                if (saved) {
+                    PerformanceModeCoordinator.clearRuntimeState()
+                    picker.dismiss()
+                    onSaved()
+                } else Toast.makeText(activity, "Could not save the performance profile", Toast.LENGTH_LONG).show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
     fun show(activity: Activity) {
         AppTheme.configure(activity)
         val probe = PerformanceModeController.probe(activity)

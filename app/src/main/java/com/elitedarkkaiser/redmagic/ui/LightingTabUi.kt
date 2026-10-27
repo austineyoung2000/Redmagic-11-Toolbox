@@ -38,37 +38,8 @@ object LightingTabUi {
         }
 
         val zonesCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("✦", "LED ZONES"))
-            addView(deps.bodyText("Configure fan, logo, GAME MODE bar, and trigger lighting."))
+            addView(deps.sectionHeader("✦", "LIGHTING SETTINGS"))
             addView(previewRow)
-            addView(deps.singleRow(deps.actionButton("FAN LED", false) {
-                deps.showFanLedDialog()
-            }))
-            addView(deps.singleRow(deps.actionButton("LOGO LED", false) { deps.showLogoLedDialog() }))
-            addView(deps.singleRow(deps.actionButton("GAME MODE BAR", false) { deps.showGameModeBarDialog() }))
-            addView(deps.singleRow(deps.actionButton("TRIGGER LEDs", false) { deps.showShoulderLedDialog() }))
-        }
-
-        val rgbStudioStatus = deps.subtleLabel(deps.rgbStudioSummary())
-        val rgbStudioCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("◈", "RGB STUDIO"))
-            addView(deps.bodyText("Synchronize all LED zones or build a selectable color cycle with independent zone speeds."))
-            addView(deps.infoRow("Cycle", rgbStudioStatus))
-            addView(deps.singleRow(deps.actionButton("OPEN RGB STUDIO", false) {
-                deps.showRgbStudioDialog {
-                    rgbStudioStatus.text = deps.rgbStudioSummary()
-                }
-            }))
-        }
-
-        val gameModeCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("🎮", "GAME MODE"))
-            addView(deps.bodyText("Select apps, then edit cooling and lighting separately for each app. Profiles apply only while that app is foreground."))
-            addView(deps.infoRow("Apps", deps.subtleLabel(deps.gameModeAppsSummary())))
-            addView(deps.row(
-                deps.actionButton("SELECT APPS", false) { deps.showGameModeAppPicker() },
-                deps.actionButton("APP PROFILES", false) { deps.showGameModeProfileDialog() }
-            ))
         }
 
         val chargingModeCard = deps.sectionPanel().apply {
@@ -94,15 +65,6 @@ object LightingTabUi {
             }
 
             addView(chargingRow)
-            addView(deps.infoRow("Priority", deps.subtleLabel("Incoming Call > Charging > Game Mode > Normal LEDs")))
-            addView(deps.singleRow(deps.actionButton("CHARGING FAN LED", false) {
-                deps.showChargingFanLedDialog()
-            }))
-            addView(deps.row(
-                deps.actionButton("CHARGING LOGO LED", false) { deps.showChargingLogoLedDialog() },
-                deps.actionButton("CHARGING SHOULDER LEDS", false) { deps.showChargingShoulderLedDialog() }
-            ))
-            addView(deps.singleRow(deps.actionButton("CHARGING GAME MODE BAR", false) { deps.showChargingGameModeBarDialog() }))
         }
 
         if (
@@ -113,8 +75,6 @@ object LightingTabUi {
                 zonesCard to
                     "LED controls unavailable: required vendor " +
                     "interfaces were not detected.",
-                rgbStudioCard to
-                    "RGB Studio is unavailable on this ROM.",
                 chargingModeCard to
                     "Charging lighting is unavailable on this ROM."
             ).forEach { (card, message) ->
@@ -126,15 +86,13 @@ object LightingTabUi {
             }
         }
 
-        container.addView(zonesCard)
-        container.addView(rgbStudioCard)
-        container.addView(deps.sectionPanel().apply {
+        val notificationCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("✉", "SCREEN-OFF NOTIFICATIONS"))
             addView(deps.bodyText("Choose a color and a limited lighting window for each app. Incoming calls and charging take priority."))
             addView(deps.singleRow(deps.actionButton("NOTIFICATION LIGHTING", false) {
                 com.elitedarkkaiser.redmagic.NotificationLightingDialog.show(activity)
             }))
-        })
+        }
         val callLightingCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("☎", "CALL LIGHTING"))
             addView(deps.bodyText("Applies while an incoming call is ringing; answering or dismissing restores the previous lighting. Priority: Incoming Call > Charging > Notification > Game Mode > Normal LEDs."))
@@ -179,7 +137,6 @@ object LightingTabUi {
             addView(callRow)
             addView(pauseFanRow)
             addView(deps.bodyText("Temporarily turns the fan off while an incoming call rings, then restores it when answered or dismissed."))
-            addView(deps.singleRow(deps.actionButton("INCOMING CALL PROFILE", false) { deps.showIncomingCallProfileDialog() }))
         }
 
         if (
@@ -198,10 +155,48 @@ object LightingTabUi {
             )
         }
 
-        container.addView(gameModeCard)
-        container.addView(callLightingCard)
-        container.addView(chargingModeCard)
-
+        InsidePages.install(container, "Lighting", listOf(
+            InsidePages.Page("RGB Studio", "Color sequences and timing", emptyList(), factory = {
+                val editor = deps.createRgbStudioPage { }
+                if (deps.capabilities.scanComplete && !deps.capabilities.ledAvailable) {
+                    editor.addView(deps.bodyText("RGB Studio is unavailable on this ROM."), 0)
+                    CapabilityUi.disableInteractions(editor)
+                }
+                val hero = android.widget.FrameLayout(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))
+                    addView(android.widget.ImageView(context).apply {
+                        setImageResource(com.elitedarkkaiser.redmagic.R.drawable.rgb_silver_hero)
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        contentDescription = "Silver REDMAGIC phone with illuminated triggers and logo"
+                    }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                    addView(android.view.View(context).apply {
+                        background = android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                            intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+                    }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                }
+                listOf(hero, editor)
+            }),
+            InsidePages.Page("Charging", "Charging lighting profile", emptyList(), factory = { listOf(chargingModeCard) + com.elitedarkkaiser.redmagic.ModeLightingUi.charging(activity, deps) }),
+            InsidePages.Page("Calls", "Incoming call lighting", emptyList(), factory = { listOf(callLightingCard) + com.elitedarkkaiser.redmagic.ModeLightingUi.calls(activity, deps) }),
+            InsidePages.Page("Notifications", "Screen-off notification lighting", emptyList(), factory = { listOf(com.elitedarkkaiser.redmagic.NotificationLightingPage.create(activity, deps)) }),
+            InsidePages.Page("Lighting settings", "Preview preferences", listOf(zonesCard), icon = "⚙")
+        ), prefix = {
+            val hero = android.widget.FrameLayout(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))
+                addView(android.widget.ImageView(context).apply {
+                    setImageResource(com.elitedarkkaiser.redmagic.R.drawable.rgb_silver_hero)
+                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    contentDescription = "Silver REDMAGIC phone with illuminated triggers and logo"
+                }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                addView(android.view.View(context).apply {
+                    background = android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+                }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            }
+            listOf(hero) + com.elitedarkkaiser.redmagic.InlineLightingUi.create(activity, deps)
+        })
         return container
     }
 }

@@ -16,11 +16,11 @@ internal class MainLightingTabActions(
         return RgbStudioStorage.summary(activity)
     }
 
-    fun showRgbStudioDialog(
+    fun createRgbStudioPage(
         onUpdated: () -> Unit,
         onAllLedStateApplied: (RgbStudioState, Int) -> Unit
-    ) {
-        RgbStudioDialog.show(
+    ): android.widget.LinearLayout {
+        return RgbStudioDialog.createView(
             activity = activity,
             initial = RgbStudioStorage.read(activity),
             deps = RgbStudioDialog.Deps(

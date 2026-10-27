@@ -20,6 +20,7 @@ data class HomeTabDeps(
     val space: (Int) -> TextView,
     val dp: (Int) -> Int,
     val requestStatusRefresh: () -> Unit,
+    val openSection: (String) -> Unit,
     val hasUsageStatsPermission: () -> Boolean,
     val openUsageStatsAccessSettings: () -> Unit,
     val showGamePickerDialog: () -> Unit,
