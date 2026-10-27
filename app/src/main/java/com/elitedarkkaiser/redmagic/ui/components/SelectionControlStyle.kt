@@ -31,6 +31,20 @@ object SelectionControlStyle {
             button.minHeight = AppTheme.dp(context, 48)
             button.setPadding(AppTheme.dp(context, 8), 0, AppTheme.dp(context, 8), 0)
         }
+        if (button.tag == "cooling_preset") {
+            button.setSingleLine(false)
+            button.maxLines = 2
+            button.ellipsize = null
+            button.textSize = 12f
+            button.minHeight = AppTheme.dp(context, 100)
+            button.setPadding(AppTheme.dp(context, 3), AppTheme.dp(context, 8), AppTheme.dp(context, 3), AppTheme.dp(context, 8))
+            if (button is MaterialButton) {
+                button.cornerRadius = AppTheme.dp(context, 12)
+                button.strokeWidth = AppTheme.dp(context, 1)
+                button.strokeColor = ColorStateList.valueOf(if (selected) AppTheme.accentColor else AppTheme.borderColor)
+                button.backgroundTintList = ColorStateList.valueOf(if (selected) AppTheme.dangerColor else AppTheme.panelPressed)
+            }
+        }
     }
 
     fun slider(context: Context): Slider = Slider(context).apply {

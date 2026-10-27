@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Color
 import android.view.View
 import com.elitedarkkaiser.redmagic.HardwareController
 
@@ -39,11 +40,16 @@ class AutoFanCurveView(context: Context) : View(context) {
             path.lineTo(x(t), y(HardwareController.chooseAutoFanLevelForTempF(t)))
         }
         path.lineTo(x(max), y(HardwareController.chooseAutoFanLevelForTempF(max)))
+        val fill = Path(path).apply { lineTo(x(max), bottom); lineTo(x(min), bottom); close() }
+        paint.color = Color.argb(50, Color.red(AppTheme.accentColor), Color.green(AppTheme.accentColor), Color.blue(AppTheme.accentColor))
+        paint.style = Paint.Style.FILL
+        canvas.drawPath(fill, paint)
         paint.color = AppTheme.accentColor
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2f * d
         canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
+        thresholds.forEach { t -> canvas.drawCircle(x(t), y(HardwareController.chooseAutoFanLevelForTempF(t)), 2.5f * d, paint) }
         paint.color = AppTheme.textSecondary
         listOf(86, 104, 122, 140).forEach { t ->
             canvas.drawText(t.toString(), x(t.toFloat()) - 8f * d, height - 5f * d, paint)

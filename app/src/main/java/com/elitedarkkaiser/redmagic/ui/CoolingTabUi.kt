@@ -16,6 +16,7 @@ object CoolingTabUi {
         val rpmText: TextView,
         val curveStatusText: TextView,
         val fanSeek: Slider,
+        val fanPowerSwitch: CompoundButton,
         val autoCurveCheck: CompoundButton,
         val quietCurveButton: Button,
         val balancedCurveButton: Button,
@@ -79,23 +80,19 @@ object CoolingTabUi {
             )
         }
 
-        val fanOnBtn = deps.actionButton("FAN ON", false) {
-            deps.runBackground {
-                HardwareController.enableFan(true)
-                deps.refreshStatus()
+        val fanPowerSwitch = MaterialSwitch(container.context).apply {
+            text = "Fan power"
+            setTextColor(AppTheme.textPrimary)
+            isEnabled = false // Enabled when the first real fan state arrives.
+            setOnCheckedChangeListener { button, checked ->
+                if (button.tag == "rendering") return@setOnCheckedChangeListener
+                deps.runBackground {
+                    HardwareController.enableFan(checked)
+                    deps.refreshStatus()
+                }
             }
         }
-
-        val fanOffBtn = deps.actionButton("FAN OFF", true) {
-            deps.runBackground {
-                HardwareController.enableFan(false)
-                deps.refreshStatus()
-            }
-        }
-
-        val rpmBtn = deps.actionButton("READ RPM", false) {
-            deps.refreshStatus()
-        }
+        val rpmBtn = deps.actionButton("Refresh RPM", false) { deps.refreshStatus() }
 
         val modeRow = LinearLayout(container.context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -159,30 +156,34 @@ object CoolingTabUi {
         }
 
         quietChip = deps.segmentedChip(
-            "♧\nQuiet\nLow noise",
+            "Quiet\nLow noise",
             deps.getSelectedCurve() == "quiet"
         ) {
             applyFanCurve("quiet", "Quiet")
         }
 
         balancedChip = deps.segmentedChip(
-            "✿\nBalanced\nEveryday use",
+            "Balanced\nEveryday use",
             deps.getSelectedCurve() == "balanced"
         ) {
             applyFanCurve("balanced", "Balanced")
         }
 
         turboChip = deps.segmentedChip(
-            "✣\nTurbo\nMaximum cooling",
+            "Turbo\nMaximum cooling",
             deps.getSelectedCurve() == "turbo"
         ) {
             applyFanCurve("turbo", "Turbo")
         }
 
         listOf(quietChip, balancedChip, turboChip).forEach { button ->
-            button.maxLines = 3
-            button.textSize = 12f
-            button.minHeight = deps.dp(88)
+            button.tag = "cooling_preset"
+            SelectionControlStyle.apply(button, button.isSelected)
+            val icon = androidx.core.content.ContextCompat.getDrawable(container.context, com.elitedarkkaiser.redmagic.R.drawable.ic_toolbox_fan)?.mutate()
+            icon?.setTint(AppTheme.accentColor)
+            icon?.setBounds(0, 0, deps.dp(24), deps.dp(24))
+            button.setCompoundDrawables(null, icon, null, null)
+            button.compoundDrawablePadding = deps.dp(6)
             button.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         modeRow.addView(quietChip)
@@ -199,7 +200,7 @@ object CoolingTabUi {
         }
 
         autoCurveCheck = MaterialSwitch(container.context).apply {
-            text = "Automatic fan control based on temperature"
+            text = "Automatic fan curve"
             setTextColor(AppTheme.textPrimary)
             textSize = 13f
             setPadding(0, deps.dp(6), 0, deps.dp(4))
@@ -244,13 +245,14 @@ object CoolingTabUi {
                 metric("fan", rpmText, "Fan speed")
             }
             addView(metrics)
+            addView(rpmBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(42)))
         }
 
         val coolingCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("▦", "FAN PRESET"))
+            addView(fanPowerSwitch)
+            addView(deps.bodyText("Fan preset"))
             addView(modeRow)
             addView(curveStatusText)
-            addView(deps.subtleLabel("Quiet: low noise  •  Balanced: everyday use  •  Turbo: maximum cooling"))
             addView(deps.spacer(deps.dp(12)))
             addView(autoCurveCheck)
             addView(deps.subtleLabel("Automatically adjust fan speed based on temperature"))
@@ -259,11 +261,11 @@ object CoolingTabUi {
             addView(AutoFanCurveView(context), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(150)))
             addView(deps.subtleLabel("Estimated RPM; actual speed varies. Fan levels drop after a 5°F cooldown buffer."))
-            addView(deps.spacer(deps.dp(12)))
+        }
+        val manualCard = deps.sectionPanel().apply {
+            addView(deps.bodyText("Manual fan control"))
             addView(deps.subtleLabel("Manual fan level"))
             addView(fanSeek)
-            addView(deps.row(fanOnBtn, fanOffBtn))
-            addView(deps.singleRow(rpmBtn))
         }
 
         if (
@@ -280,8 +282,7 @@ object CoolingTabUi {
 
             listOf(
                 fanSeek,
-                fanOnBtn,
-                fanOffBtn,
+                fanPowerSwitch,
                 rpmBtn,
                 autoCurveCheck,
                 modeRow
@@ -320,8 +321,10 @@ object CoolingTabUi {
         container.addView(telemetryCard)
         container.addView(deps.spacer(deps.dp(12)))
         container.addView(coolingCard)
-        container.addView(deps.spacer(deps.dp(16)))
+        container.addView(deps.spacer(deps.dp(12)))
         container.addView(pumpCard)
+        container.addView(deps.spacer(deps.dp(12)))
+        container.addView(manualCard)
 
         return Result(
             view = container,
@@ -330,6 +333,7 @@ object CoolingTabUi {
                 rpmText = rpmText,
                 curveStatusText = curveStatusText,
                 fanSeek = fanSeek,
+                fanPowerSwitch = fanPowerSwitch,
                 autoCurveCheck = autoCurveCheck,
                 quietCurveButton = quietChip,
                 balancedCurveButton = balancedChip,

@@ -79,6 +79,15 @@ internal class MainCoolingTabActions(
         return result.view
     }
 
+    fun applyFanPower(enabled: Boolean?) {
+        refs?.fanPowerSwitch?.apply {
+            tag = "rendering"
+            if (enabled != null) isChecked = enabled
+            isEnabled = enabled != null && (!capabilities().scanComplete || capabilities().fanAvailable)
+            tag = null
+        }
+    }
+
     fun applyFanRpm(rpm: Int?) {
         refs?.rpmText?.text = rpm?.let { "$it RPM" } ?: "Unavailable"
     }
@@ -235,7 +244,7 @@ internal class MainCoolingTabActions(
                 currentCapabilities.fanAvailable
         val manualEnabled =
             fanAvailable && !autoFanCurveEnabled
-        val alpha = if (manualEnabled) 1f else 0.40f
+        val alpha = if (fanAvailable) 1f else 0.40f
 
         listOf(
             currentRefs.quietCurveButton,
