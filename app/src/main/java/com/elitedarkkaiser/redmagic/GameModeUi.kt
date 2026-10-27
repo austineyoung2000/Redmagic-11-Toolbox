@@ -246,6 +246,13 @@ internal object GameModeUi {
         fun addCard(view: View) = container.addView(view, LinearLayout.LayoutParams(-1, -2).apply {
             bottomMargin = deps.dp(12)
         })
+        if (presentPage != null) {
+            container.addView(android.widget.ImageView(activity).apply {
+                setImageResource(R.drawable.rgb_silver_hero)
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                contentDescription = "REDMAGIC 11 Pro with illuminated shoulder triggers"
+            }, LinearLayout.LayoutParams(-1, deps.dp(130)))
+        }
         container.addView(titleView)
         container.addView(subtitleView)
         val coolingCard = card()
