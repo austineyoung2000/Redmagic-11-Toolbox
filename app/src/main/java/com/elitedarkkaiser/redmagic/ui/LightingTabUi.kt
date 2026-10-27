@@ -189,7 +189,7 @@ object LightingTabUi {
             InsidePages.Page("Calls", "Incoming call lighting", listOf(callLightingCard)),
             InsidePages.Page("Notifications", "Screen-off notification lighting", listOf(notificationCard)),
             InsidePages.Page("Lighting settings", "Preview preferences", listOf(zonesCard), icon = "⚙")
-        ), prefix = com.elitedarkkaiser.redmagic.InlineLightingUi.create(activity, deps))
+        ), prefix = { com.elitedarkkaiser.redmagic.InlineLightingUi.create(activity, deps) })
         return container
     }
 }

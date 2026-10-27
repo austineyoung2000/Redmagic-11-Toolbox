@@ -11,13 +11,14 @@ import android.widget.TextView
 internal object InsidePages {
     data class Page(val title: String, val subtitle: String, val cards: List<View>, val action: (() -> Unit)? = null, val icon: String = "✦", val palette: (() -> Int?)? = null)
 
-    private data class Navigation(val open: (Int) -> Unit, val back: () -> Boolean)
+    private data class Navigation(val open: (Int) -> Unit, val back: () -> Boolean, val refresh: () -> Unit)
     fun open(container: LinearLayout, index: Int) {
         (container.tag as? Navigation)?.open?.invoke(index)
     }
     fun back(container: LinearLayout): Boolean = (container.tag as? Navigation)?.back?.invoke() ?: false
+    fun refresh(container: LinearLayout) { (container.tag as? Navigation)?.refresh?.invoke() }
 
-    fun install(container: LinearLayout, title: String, pages: List<Page>, prefix: List<View> = emptyList()) {
+    fun install(container: LinearLayout, title: String, pages: List<Page>, prefix: (() -> List<View>)? = null) {
         val context = container.context
         val dp: (Int) -> Int = { AppTheme.dp(context, it) }
         container.removeAllViews()
@@ -33,7 +34,16 @@ internal object InsidePages {
             if (bold) setTypeface(AppTheme.appTypeface, Typeface.BOLD)
         }
         menu.addView(label(title, 26f, true).apply { setPadding(0, dp(8), 0, dp(18)) })
-        prefix.forEach { menu.addView(it) }
+        val prefixViews = mutableListOf<View>()
+        fun refreshPrefix() {
+            prefixViews.forEach { menu.removeView(it) }
+            prefixViews.clear()
+            prefix?.invoke()?.forEachIndexed { index, view ->
+                menu.addView(view, index + 1)
+                prefixViews.add(view)
+            }
+        }
+        refreshPrefix()
         val menuRows = mutableListOf<View>()
         pages.forEach { page ->
             val row = LinearLayout(context).apply {
@@ -114,10 +124,12 @@ internal object InsidePages {
             back = {
                 if (detail.visibility == View.VISIBLE) {
                     detail.visibility = View.GONE
+                    refreshPrefix()
                     menu.visibility = View.VISIBLE
                     true
                 } else false
-            }
+            },
+            refresh = { if (menu.visibility == View.VISIBLE) refreshPrefix() }
         )
     }
 }
