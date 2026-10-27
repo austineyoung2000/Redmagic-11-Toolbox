@@ -22,7 +22,21 @@ object HardwareTabUi {
             InsidePages.Page("Charge separation", "Charging controls", listOf(performance[0]), icon = "⚡"),
             InsidePages.Page("Profiles & automation", "Master profiles and rules", profiles, icon = "◆"),
             InsidePages.Page("Magic Key", "Button and slider functions", emptyList(), action = { (activity as? MainActivity)?.openMagicKeyFromGaming() }, icon = "⌘")
-        ))
+        ), prefix = {
+            listOf(android.widget.FrameLayout(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))
+                addView(android.widget.ImageView(activity).apply {
+                    setImageResource(com.elitedarkkaiser.redmagic.R.drawable.hardware_hero)
+                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    contentDescription = "Silver REDMAGIC 11 Pro with hardware circuit details"
+                }, android.widget.FrameLayout.LayoutParams(-1, -1))
+                addView(android.view.View(activity).apply {
+                    background = android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+                }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            })
+        })
         return container
     }
 }
