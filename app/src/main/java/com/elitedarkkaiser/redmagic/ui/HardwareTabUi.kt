@@ -16,12 +16,12 @@ object HardwareTabUi {
         val profiles = HardwareProfileSections.createCards(activity, deps)
         InsidePages.install(container, "Hardware", listOf(
             InsidePages.Page("Gaming", "Trigger mapping and game performance", emptyList(), icon = "🎮", factory = { listOf(GamingHubUi.create(activity, deps)) }, hidden = true),
-            InsidePages.Page("Shoulder triggers", "Mapping, controls and safety", triggers, icon = "⌥"),
+            InsidePages.Page("Shoulder triggers", "Controls and safety", triggers, icon = "⌥"),
+            InsidePages.Page("Magic Key", "Button and slider functions", emptyList(), action = { (activity as? MainActivity)?.openMagicKeyFromGaming() }, icon = "⌘"),
             InsidePages.Page("Gaming performance", "Refresh rate, touch response and performance mode", performance.subList(1, 4), icon = "🎮", hidden = true),
             InsidePages.Page("Haptic feedback", "Vibration controls", listOf(performance[4]), icon = "〰"),
             InsidePages.Page("Charge separation", "Charging controls", listOf(performance[0]), icon = "⚡"),
-            InsidePages.Page("Profiles & automation", "Master profiles and rules", profiles, icon = "◆"),
-            InsidePages.Page("Magic Key", "Button and slider functions", emptyList(), action = { (activity as? MainActivity)?.openMagicKeyFromGaming() }, icon = "⌘")
+            InsidePages.Page("Profiles & automation", "Master profiles and rules", profiles, icon = "◆")
         ), prefix = {
             listOf(android.widget.FrameLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))

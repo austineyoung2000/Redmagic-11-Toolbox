@@ -139,7 +139,7 @@ internal class MainTabHost(
         if (resolved == "lighting") com.elitedarkkaiser.redmagic.ui.InsidePages.refresh(selected.view)
         when (tabId) {
             "gaming" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 0)
-            "profiles" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 5)
+            "profiles" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 6)
         }
     }
 

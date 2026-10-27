@@ -7,7 +7,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import com.elitedarkkaiser.redmagic.TriggerMappingBackend
 import com.google.android.material.materialswitch.MaterialSwitch
 
 internal object HardwareTriggerSections {
@@ -16,22 +15,35 @@ internal object HardwareTriggerSections {
         deps: HardwareTabDeps
     ): List<LinearLayout> {
         return listOf(
+            createHero(activity, deps),
             createTriggerControls(activity, deps),
-            createMappingCard(deps),
-            createSafetyCard(deps)
+            createQuickActions(deps),
+            createSafetyCard(deps),
+            createDiagnostics(deps)
         )
     }
+
+    private fun createHero(activity: Activity, deps: HardwareTabDeps): LinearLayout =
+        LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val frame = android.widget.FrameLayout(activity)
+            frame.addView(android.widget.ImageView(activity).apply {
+                setImageResource(com.elitedarkkaiser.redmagic.R.drawable.rgb_silver_hero)
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Silver REDMAGIC phone with illuminated shoulder triggers"
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            frame.addView(android.view.View(activity).apply {
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            addView(frame, LinearLayout.LayoutParams(-1, deps.dp(130)))
+        }
 
     private fun createTriggerControls(
         activity: Activity,
         deps: HardwareTabDeps
     ): LinearLayout {
-        val configureButton = deps.actionButton(
-            "CONFIGURE TRIGGERS",
-            false,
-            deps.showTriggerSetupDialog
-        )
-
         lateinit var enableButton: Button
         enableButton = deps.actionButton("ENABLE TRIGGERS", false) {
             enableButton.isEnabled = false
@@ -74,13 +86,7 @@ internal object HardwareTriggerSections {
         }
 
         val card = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("⌥", "TRIGGERS"))
-            addView(
-                deps.bodyText(
-                    "Map shoulder triggers to quick actions or " +
-                        "re-enable them if the system has disabled them."
-                )
-            )
+            addView(deps.sectionHeader("⌥", "TRIGGER CONTROL"))
             addView(deps.space(deps.dp(10)))
             addView(
                 switchRow(
@@ -121,7 +127,6 @@ internal object HardwareTriggerSections {
                         "Triggers is pressed or the phone restarts."
                 )
             )
-            addView(deps.singleRow(configureButton))
             addView(deps.space(deps.dp(8)))
             addView(deps.row(enableButton, disableButton))
         }
@@ -143,54 +148,22 @@ internal object HardwareTriggerSections {
         return card
     }
 
-    private fun createMappingCard(
-        deps: HardwareTabDeps
-    ): LinearLayout {
-        val mappingButton = deps.actionButton(
-            "MANAGE GAME TRIGGER MAPPINGS",
-            false,
-            deps.showNativeTgkProfileDialog
-        )
-        val diagnosticsButton = deps.actionButton(
-            "TRIGGER BACKEND DIAGNOSTICS",
-            false,
-            deps.showNativeTgkDiagnosticsDialog
-        )
-        val card = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("🎯", "GAME TRIGGER MAPPING"))
-            addView(
-                deps.bodyText(
-                    "Place L and R touch targets for individual " +
-                        "apps. Portrait and landscape mappings are " +
-                        "stored separately. Stock firmware uses Native " +
-                        "TGK; compatible custom ROMs can use the optional " +
-                        "Trigger Bridge module."
-                )
-            )
+    private fun createQuickActions(deps: HardwareTabDeps): LinearLayout {
+        val button = deps.actionButton("CONFIGURE TRIGGERS", false, deps.showTriggerSetupDialog)
+        return deps.sectionPanel().apply {
+            addView(deps.sectionHeader("⌥", "QUICK ACTIONS"))
+            addView(deps.bodyText("Map shoulder triggers to quick actions."))
             addView(deps.space(deps.dp(8)))
-            addView(deps.singleRow(mappingButton))
-            addView(deps.space(deps.dp(8)))
-            addView(deps.singleRow(diagnosticsButton))
+            addView(deps.singleRow(button))
+            if (deps.capabilities.scanComplete && !deps.capabilities.triggersAvailable) {
+                CapabilityUi.disableInteractions(this)
+            }
         }
+    }
 
-        if (
-            deps.capabilities.scanComplete &&
-            !deps.capabilities.nativeTgkAvailable &&
-            !deps.capabilities.triggerBridgeAvailable
-        ) {
-            card.addView(
-                deps.bodyText(
-                    "No trigger-mapping backend is available. Stock " +
-                        "firmware requires Native TGK; compatible custom " +
-                        "ROMs require Trigger Bridge " +
-                        "v${TriggerMappingBackend.MINIMUM_MODULE_VERSION} " +
-                        "or newer."
-                )
-            )
-            CapabilityUi.disableInteractions(card)
-        }
-
-        return card
+    private fun createDiagnostics(deps: HardwareTabDeps): LinearLayout {
+        val button = deps.actionButton("TRIGGER BACKEND DIAGNOSTICS", false, deps.showNativeTgkDiagnosticsDialog)
+        return deps.sectionPanel().apply { addView(deps.singleRow(button)) }
     }
 
     private fun createSafetyCard(
