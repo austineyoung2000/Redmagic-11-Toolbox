@@ -56,7 +56,7 @@ internal object InsidePages {
             page.palette?.let { selectedColor ->
                 val palette = object : LinearLayout(context) {
                     private val ids = listOf(1, 3, 4, 5, 6, 7, 8, 9)
-                    private val colors = listOf("#FF0000", "#FF8C00", "#FFD600", "#00E676", "#00E5FF", "#1565FF", "#A020F0", "#FF69B4")
+                    private val paletteColors = listOf("#FF0000", "#FF8C00", "#FFD600", "#00E676", "#00E5FF", "#1565FF", "#A020F0", "#FF69B4")
                     init {
                         orientation = HORIZONTAL
                         setPadding(0, dp(10), 0, 0)
@@ -75,7 +75,7 @@ internal object InsidePages {
                         ids.forEachIndexed { index, id ->
                             getChildAt(index).background = android.graphics.drawable.GradientDrawable().apply {
                                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                                setColor(android.graphics.Color.parseColor(colors[index]))
+                                setColor(android.graphics.Color.parseColor(paletteColors[index]))
                                 if (selected == id) setStroke(dp(2), android.graphics.Color.WHITE)
                             }
                         }
