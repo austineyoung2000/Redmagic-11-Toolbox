@@ -15,7 +15,7 @@ import com.elitedarkkaiser.redmagic.ui.components.MainActivityUiKit
 internal object GamingHubUi {
     fun create(activity: Activity, deps: HardwareTabDeps): LinearLayout {
         val d = deps.dp
-        val gameActions = MainGameModeActions(activity, MainActivityUiKit(activity), LedControlViewFactory(activity))
+        val gameActions = MainGameModeActions(activity as MainActivity, MainActivityUiKit(activity), LedControlViewFactory(activity))
         lateinit var render: (LinearLayout) -> Unit
         val root = object : LinearLayout(activity) {
             override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
