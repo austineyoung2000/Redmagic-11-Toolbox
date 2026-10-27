@@ -72,7 +72,8 @@ internal class MainGameModeActions(
                 GameModeActions.applySavedProfileThroughService(activity)
             },
             appLabel = label.takeIf { pkg != null },
-            appPackage = pkg
+            appPackage = pkg,
+            presentPage = { view -> activity.showGamingPage(label, view) }
         )
     }
 }

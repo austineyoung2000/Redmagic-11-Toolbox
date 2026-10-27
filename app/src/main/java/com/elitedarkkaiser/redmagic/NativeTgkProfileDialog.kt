@@ -153,6 +153,8 @@ object NativeTgkProfileDialog {
         }
 
         lateinit var managerDialog: AlertDialog
+        var closePage: (() -> Unit)? = null
+        fun closeManager() { if (closePage != null) closePage?.invoke() else managerDialog.dismiss() }
 
         fun launchEditor(
             profile: NativeTgkProfile,
@@ -207,7 +209,7 @@ object NativeTgkProfileDialog {
                 return
             }
 
-            managerDialog.dismiss()
+            closeManager()
         }
 
         fun showOrientationPicker(
@@ -1035,7 +1037,7 @@ object NativeTgkProfileDialog {
                     primary = false
                 ).apply {
                     setOnClickListener {
-                        managerDialog.dismiss()
+                        closeManager()
                         NativeTgkDocumentTransfer.requestExport(
                             activity,
                             profile.packageName,
@@ -1111,22 +1113,26 @@ object NativeTgkProfileDialog {
             showAppPicker()
         }
         importButton.setOnClickListener {
-            managerDialog.dismiss()
+            closeManager()
             NativeTgkDocumentTransfer.requestImport(activity)
         }
         exportAllButton.setOnClickListener {
-            managerDialog.dismiss()
+            closeManager()
             NativeTgkDocumentTransfer.requestExport(activity)
         }
 
         renderProfiles()
 
         managerDialog = MaterialAlertDialogBuilder(activity)
-            .setView(scroll)
+            .setView(if (activity is MainActivity) android.view.View(activity) else scroll)
             .setNegativeButton("Close", null)
             .create()
 
-        managerDialog.show()
+        if (activity is MainActivity) {
+            closePage = activity.showGamingPage("Game Trigger Mapping", scroll)
+        } else {
+            managerDialog.show()
+        }
         if (selectedPackage != null) {
             NativeTgkStorage.getProfile(activity, selectedPackage)?.let { showOrientationPicker(it) }
         }

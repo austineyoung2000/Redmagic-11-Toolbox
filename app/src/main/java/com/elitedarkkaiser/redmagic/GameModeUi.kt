@@ -43,7 +43,8 @@ internal object GameModeUi {
         deps: Deps,
         onSaveProfile: (GameModeProfile) -> Unit,
         appLabel: String? = null,
-        appPackage: String? = null
+        appPackage: String? = null,
+        presentPage: ((View) -> (() -> Unit))? = null
     ) {
         var gmFanEnabled = current.fanEnabled
         var gmFanLevel = current.fanLevel
@@ -553,16 +554,13 @@ internal object GameModeUi {
         refreshLedColorDots()
         refreshPresetBubbles()
 
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setView(scroll)
-            .setCancelable(true)
-            .create()
-
-        dialog.window?.setBackgroundDrawable(
-            android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
-        )
-
-        cancelBtn.setOnClickListener { dialog.dismiss() }
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+        var closePage: (() -> Unit)? = null
+        if (presentPage == null) {
+            dialog = MaterialAlertDialogBuilder(activity).setView(scroll).setCancelable(true).create()
+        }
+        val closeEditor = { if (presentPage == null) dialog?.dismiss() else closePage?.invoke(); Unit }
+        cancelBtn.setOnClickListener { closeEditor() }
 
         saveBtn.setOnClickListener {
             runCatching {
@@ -584,19 +582,21 @@ internal object GameModeUi {
                     shoulderLedColor = gmShoulderLedColor
                 ),
                 persistProfile = onSaveProfile,
-                onSaved = { dialog.dismiss() }
+                onSaved = { closeEditor() }
             )
             }.onFailure {
                 android.widget.Toast.makeText(activity, "Profile could not be saved. Try again.", android.widget.Toast.LENGTH_LONG).show()
             }
         }
 
-        dialog.show()
-        dialog.window?.apply {
-            setBackgroundDrawable(
-                android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
-            )
-            setDimAmount(0.65f)
+        if (presentPage != null) {
+            closePage = presentPage(scroll)
+        } else {
+            dialog?.show()
+            dialog?.window?.apply {
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                setDimAmount(0.65f)
+            }
         }
     }
 }
