@@ -257,7 +257,7 @@ internal object TriggerSafetyDialog {
             saved.gameModeOnly
         )
         val leftUnlockSwitch = safetySwitch(
-            "Left trigger also unlocks right",
+            "Either trigger unlocks both",
             saved.leftUnlocksRight
         )
         restrictionsSection.addView(lockScreenSwitch)

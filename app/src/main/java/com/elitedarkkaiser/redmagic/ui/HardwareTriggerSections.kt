@@ -229,7 +229,7 @@ internal object HardwareTriggerSections {
             card.addView(deps.subtleLabel("Additional guards"))
             card.addView(switchRow(activity, "Block actions on lock screen", config.blockOnLockScreen, deps) { update(config.copy(blockOnLockScreen = it)) })
             card.addView(switchRow(activity, "Only while Game Mode is active", config.gameModeOnly, deps) { update(config.copy(gameModeOnly = it)) })
-            card.addView(switchRow(activity, "Left trigger also unlocks right", config.leftUnlocksRight, deps) { update(config.copy(leftUnlocksRight = it)) })
+            card.addView(switchRow(activity, "Either trigger unlocks both", config.leftUnlocksRight, deps) { update(config.copy(leftUnlocksRight = it)) })
             if (deps.capabilities.scanComplete && !deps.capabilities.triggersAvailable) CapabilityUi.disableInteractions(card)
         }
         render()

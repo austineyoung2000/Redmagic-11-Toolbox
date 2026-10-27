@@ -276,6 +276,10 @@ class TriggerRootService : Service() {
                         break
                     }
                     performAction(getAction(prefKey))
+                    if (config.leftUnlocksRight && config.usesIntentUnlock()) {
+                        if (prefKey == "right_trigger") unlockLeftFromRight(config)
+                        else if (prefKey == "left_trigger") unlockRightFromLeft(config)
+                    }
                     if (
                         prefKey == "right_trigger" &&
                         config.usesIntentUnlock()
@@ -333,6 +337,10 @@ class TriggerRootService : Service() {
                     unlockRightFromLeft(config)
                 }
 
+                if (prefKey == "right_trigger" && config.leftUnlocksRight && config.usesIntentUnlock()) {
+                    unlockLeftFromRight(config)
+                }
+
                 if (!isRepeatable(action)) {
                     return@Thread
                 }
@@ -357,6 +365,10 @@ class TriggerRootService : Service() {
                     }
 
                     performAction(getAction(prefKey))
+                    if (config.leftUnlocksRight && config.usesIntentUnlock()) {
+                        if (prefKey == "right_trigger") unlockLeftFromRight(config)
+                        else if (prefKey == "left_trigger") unlockRightFromLeft(config)
+                    }
                     if (
                         prefKey == "right_trigger" &&
                         config.usesIntentUnlock()
@@ -418,6 +430,14 @@ class TriggerRootService : Service() {
             "TRIGGER",
             "left trigger unlocked right until=$expiresAt"
         )
+    }
+
+    private fun unlockLeftFromRight(config: TriggerSafetyConfig) {
+        val expiresAt = now() + config.unlockTimeoutMs
+        leftUnlockedUntil = expiresAt
+        leftUnlockArmedAt = 0L
+        leftUnlockTapCount = 0
+        android.util.Log.d("TRIGGER", "right trigger unlocked left until=$expiresAt")
     }
 
     private fun handleRightIntentUnlock(
@@ -571,6 +591,9 @@ class TriggerRootService : Service() {
                 getAction("right_trigger")
             )
             if (accepted) {
+                if (config.leftUnlocksRight && config.usesIntentUnlock()) {
+                    unlockLeftFromRight(config)
+                }
                 startRepeater("right_trigger", config)
             }
         }
