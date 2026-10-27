@@ -182,7 +182,17 @@ object LightingTabUi {
                     editor.addView(deps.bodyText("RGB Studio is unavailable on this ROM."), 0)
                     CapabilityUi.disableInteractions(editor)
                 }
-                listOf(editor)
+                val hero = android.widget.ImageView(activity).apply {
+                    setImageResource(com.elitedarkkaiser.redmagic.R.drawable.rgb_studio_hero)
+                    scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                    contentDescription = "Illustration of colorful gaming phone lighting"
+                    background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(20).toFloat())
+                    clipToOutline = true
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(150)).apply {
+                        bottomMargin = deps.dp(14)
+                    }
+                }
+                listOf(hero, editor)
             }),
             InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),
             InsidePages.Page("Charging", "Charging lighting profile", listOf(chargingModeCard)),

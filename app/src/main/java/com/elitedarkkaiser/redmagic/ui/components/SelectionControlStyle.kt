@@ -36,6 +36,9 @@ object SelectionControlStyle {
     fun slider(context: Context): Slider = Slider(context).apply {
         val primary = ColorStateList.valueOf(context.getColor(R.color.redmagic_primary))
         thumbTintList = primary
+        isTickVisible = false
+        thumbRadius = AppTheme.dp(context, 8)
+        trackHeight = AppTheme.dp(context, 4)
         trackActiveTintList = primary
         trackInactiveTintList = ColorStateList.valueOf(context.getColor(R.color.redmagic_surface_variant))
     }

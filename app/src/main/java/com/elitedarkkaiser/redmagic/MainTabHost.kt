@@ -28,18 +28,31 @@ internal class MainTabHost(
     private var currentTab = "home"
     private var dashboardEntry = "home"
 
-    private fun withBack(view: LinearLayout): LinearLayout {
-        val button = android.widget.TextView(activity).apply {
+    private fun withBack(view: LinearLayout, fallbackTitle: String): LinearLayout {
+        val header = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(16))
+        }
+        val back = android.widget.TextView(activity).apply {
             text = "‹"
-            textSize = 30f
+            textSize = 32f
             setTextColor(com.elitedarkkaiser.redmagic.ui.AppTheme.textPrimary)
             contentDescription = "Back"
             isClickable = true
             isFocusable = true
-            setPadding(0, dp(8), 0, dp(14))
             setOnClickListener { if (!handleBack()) select("home") }
         }
-        view.addView(button, 0)
+        val title = android.widget.TextView(activity).apply {
+            text = fallbackTitle
+            textSize = 24f
+            setTypeface(com.elitedarkkaiser.redmagic.ui.AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+            setTextColor(com.elitedarkkaiser.redmagic.ui.AppTheme.textPrimary)
+        }
+        header.addView(back, LinearLayout.LayoutParams(dp(44), dp(48)))
+        header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        com.elitedarkkaiser.redmagic.ui.InsidePages.bindHeader(view) { title.text = it }
+        view.addView(header, 0)
         return view
     }
 
@@ -84,13 +97,11 @@ internal class MainTabHost(
     }
 
     fun refreshBuiltTabs() {
-        tabs.values
-            .filter { it.built }
-            .filterNot { it === tabs["home"] }
-            .forEach { state ->
+        tabs.filter { (id, state) -> id != "home" && state.built }
+            .forEach { (id, state) ->
                 state.view = replace(
                     state.view,
-                    withBack(state.factory()),
+                    withBack(state.factory(), id.replaceFirstChar { it.uppercase() }),
                     preserveVisibility = true
                 )
             }
@@ -107,7 +118,7 @@ internal class MainTabHost(
         if (!selected.built) {
             selected.view = replace(
                 selected.view,
-                withBack(selected.factory()),
+                withBack(selected.factory(), resolved.replaceFirstChar { it.uppercase() }),
                 preserveVisibility = false
             )
             selected.built = true

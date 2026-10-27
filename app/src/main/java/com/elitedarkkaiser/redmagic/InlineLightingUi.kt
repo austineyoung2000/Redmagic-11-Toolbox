@@ -55,7 +55,8 @@ internal object InlineLightingUi {
                     contentDescription = "${listOf("Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Pink")[index]}${if (selected == id) ", selected" else ""}"
                     setOnClickListener { change(id) }
                 }
-                row.addView(item, LinearLayout.LayoutParams(0, deps.dp(32), 1f).apply { marginEnd = deps.dp(5) })
+                if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                row.addView(item, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
             }
             card.addView(row)
         }
@@ -63,16 +64,18 @@ internal object InlineLightingUi {
             label(card, "Effect")
             val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
             val values = if (isFan) listOf("steady", "breathe", "flashing", "rapid", "blink") else listOf("steady", "breathe", "flashing", "rapid")
-            values.forEach { value ->
+            values.forEachIndexed { index, value ->
                 val b = deps.filterChip(value.replaceFirstChar { it.uppercase() }, value == effect) { change(value) }
-                row.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(b, LinearLayout.LayoutParams(0, deps.dp(44), 1f).apply {
+                    if (index > 0) marginStart = deps.dp(4)
+                })
             }
             card.addView(row)
         }
         fun brightness(card: LinearLayout, level: Int, change: (Int) -> Unit) {
             label(card, "Brightness • $level / 255")
-            card.addView(Slider(activity).apply {
-                valueFrom = 32f; valueTo = 255f; stepSize = 1f; value = level.toFloat()
+            card.addView(com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle.slider(activity).apply {
+                valueFrom = 32f; valueTo = 255f; stepSize = 0f; value = level.toFloat()
                 addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
                     override fun onStartTrackingTouch(slider: Slider) = Unit
                     override fun onStopTrackingTouch(slider: Slider) { change(slider.value.toInt()) }
@@ -87,11 +90,25 @@ internal object InlineLightingUi {
             heading(fanCard, "Fan lighting", fan.enabled) { fan = fan.copy(enabled = it); deps.saveInlineFan(fan); redraw() }
             palette(fanCard, "Color", fan.color) { fan = fan.copy(color = it); deps.saveInlineFan(fan); redraw() }
             label(fanCard, "Multicolor palettes")
-            val presets = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-            (0x101..0x108).forEachIndexed { index, id ->
-                presets.addView(deps.filterChip("${index + 1}", fan.color == id) {
+            val paletteSets = listOf(
+                listOf("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00"),
+                listOf("#1565FF", "#00E676", "#22D3EE", "#FF69B4"),
+                listOf("#22D3EE", "#FF0000", "#FFD600", "#FF69B4"),
+                listOf("#00E676", "#FF69B4", "#FF8C00", "#22D3EE"),
+                listOf("#00E676", "#A020F0", "#FF8C00", "#FF69B4"),
+                listOf("#FF0000", "#FF0000", "#FF0000", "#FF0000"),
+                listOf("#22D3EE", "#FF8C00", "#22D3EE", "#A020F0"),
+                listOf("#22D3EE", "#FF0000", "#FF8C00", "#00E676")
+            )
+            val bubbleFactory = com.elitedarkkaiser.redmagic.ui.components.LedControlViewFactory(activity)
+            val presets = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            paletteSets.forEachIndexed { index, colors ->
+                val id = 0x101 + index
+                if (index > 0) presets.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                val bubble = bubbleFactory.fanPresetBubble(colors, { fan.color == id }) {
                     fan = fan.copy(color = id); deps.saveInlineFan(fan); redraw()
-                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                }.apply { contentDescription = "Multicolor palette ${index + 1}${if (fan.color == id) ", selected" else ""}" }
+                presets.addView(bubble, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
             }
             fanCard.addView(presets)
             effects(fanCard, LedBrightness.effect(fan.effect), true) { fan = fan.copy(effect = LedBrightness.withEffect(fan.effect, it)); deps.saveInlineFan(fan); redraw() }
