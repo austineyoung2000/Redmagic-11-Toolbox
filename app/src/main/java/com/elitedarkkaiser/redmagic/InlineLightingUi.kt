@@ -18,7 +18,7 @@ import com.google.android.material.slider.Slider
 /** Inline normal lighting controls backed by the existing saved zone selections. */
 internal object InlineLightingUi {
     private val ids = listOf(1, 3, 4, 5, 6, 7, 8, 9)
-    private val colors = listOf("#FF0000", "#FF8C00", "#FFD600", "#00E676", "#00E5FF", "#1565FF", "#A020F0", "#FF69B4")
+    private val paletteColors = listOf("#FF0000", "#FF8C00", "#FFD600", "#00E676", "#00E5FF", "#1565FF", "#A020F0", "#FF69B4")
 
     fun create(activity: Activity, deps: LightingTabDeps): List<View> {
         var fan = savedFanLedStateStorage(activity)
@@ -48,7 +48,7 @@ internal object InlineLightingUi {
                 val item = View(activity).apply {
                     background = GradientDrawable().apply {
                         shape = GradientDrawable.OVAL
-                        setColor(Color.parseColor(colors[index]))
+                        setColor(Color.parseColor(paletteColors[index]))
                         if (selected == id) setStroke(deps.dp(2), Color.WHITE)
                     }
                     isClickable = true; isFocusable = true
