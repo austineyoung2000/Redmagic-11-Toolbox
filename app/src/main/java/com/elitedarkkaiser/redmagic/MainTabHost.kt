@@ -89,7 +89,7 @@ internal class MainTabHost(
     }
 
     fun handleBack(): Boolean {
-        if (dashboardEntry == "gaming") {
+        if (dashboardEntry == "gaming" || dashboardEntry == "profiles") {
             select("home")
             return true
         }
