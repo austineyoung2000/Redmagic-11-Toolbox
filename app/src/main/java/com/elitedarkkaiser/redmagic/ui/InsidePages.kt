@@ -17,7 +17,7 @@ internal object InsidePages {
     }
     fun back(container: LinearLayout): Boolean = (container.tag as? Navigation)?.back?.invoke() ?: false
 
-    fun install(container: LinearLayout, title: String, pages: List<Page>) {
+    fun install(container: LinearLayout, title: String, pages: List<Page>, prefix: List<View> = emptyList()) {
         val context = container.context
         val dp: (Int) -> Int = { AppTheme.dp(context, it) }
         container.removeAllViews()
@@ -33,6 +33,7 @@ internal object InsidePages {
             if (bold) setTypeface(AppTheme.appTypeface, Typeface.BOLD)
         }
         menu.addView(label(title, 26f, true).apply { setPadding(0, dp(8), 0, dp(18)) })
+        prefix.forEach { menu.addView(it) }
         val menuRows = mutableListOf<View>()
         pages.forEach { page ->
             val row = LinearLayout(context).apply {

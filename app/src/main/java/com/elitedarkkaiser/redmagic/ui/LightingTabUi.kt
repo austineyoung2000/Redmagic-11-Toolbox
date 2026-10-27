@@ -38,27 +38,13 @@ object LightingTabUi {
         }
 
         val zonesCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("✦", "LED ZONES"))
-            addView(deps.bodyText("Configure fan, logo, GAME MODE bar, and trigger lighting."))
+            addView(deps.sectionHeader("✦", "LIGHTING SETTINGS"))
             addView(previewRow)
-            addView(deps.singleRow(deps.actionButton("FAN LED", false) {
-                deps.showFanLedDialog()
-            }))
-            addView(deps.singleRow(deps.actionButton("LOGO LED", false) { deps.showLogoLedDialog() }))
-            addView(deps.singleRow(deps.actionButton("GAME MODE BAR", false) { deps.showGameModeBarDialog() }))
-            addView(deps.singleRow(deps.actionButton("TRIGGER LEDs", false) { deps.showShoulderLedDialog() }))
         }
 
         val rgbStudioStatus = deps.subtleLabel(deps.rgbStudioSummary())
-        val rgbStudioCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("◈", "RGB STUDIO"))
-            addView(deps.bodyText("Synchronize all LED zones or build a selectable color cycle with independent zone speeds."))
-            addView(deps.infoRow("Cycle", rgbStudioStatus))
-            addView(deps.singleRow(deps.actionButton("OPEN RGB STUDIO", false) {
-                deps.showRgbStudioDialog {
-                    rgbStudioStatus.text = deps.rgbStudioSummary()
-                }
-            }))
+        val rgbStudioCard = deps.createRgbStudioPage {
+            rgbStudioStatus.text = deps.rgbStudioSummary()
         }
 
         val gameModeCard = deps.sectionPanel().apply {
@@ -196,26 +182,14 @@ object LightingTabUi {
             )
         }
 
-        fun openZone(action: () -> Unit) {
-            if (deps.capabilities.scanComplete && !deps.capabilities.ledAvailable) {
-                android.widget.Toast.makeText(activity, "LED controls are unavailable on this ROM", android.widget.Toast.LENGTH_SHORT).show()
-            } else action()
-        }
         InsidePages.install(container, "Lighting", listOf(
-            InsidePages.Page("Fan lighting", "Fan color, palette and effect", emptyList(), { openZone(deps.showFanLedDialog) }, "✺", { com.elitedarkkaiser.redmagic.savedFanLedStateStorage(activity).color }),
-            InsidePages.Page("Logo lighting", "Rear logo color and brightness", emptyList(), { openZone(deps.showLogoLedDialog) }, "◆", { com.elitedarkkaiser.redmagic.savedLogoLedStateStorage(activity).color }),
-            InsidePages.Page("GAME MODE bar", "Side bar color and brightness", emptyList(), { openZone(deps.showGameModeBarDialog) }, "▥", { com.elitedarkkaiser.redmagic.LogoBarSelection.from(com.elitedarkkaiser.redmagic.savedLogoLedStateStorage(activity)).barColor }),
-            InsidePages.Page("Trigger lighting", "Top and bottom trigger colors", emptyList(), { openZone(deps.showShoulderLedDialog) }, "⌥", {
-                val state = com.elitedarkkaiser.redmagic.savedShoulderLedStateStorage(activity)
-                if (com.elitedarkkaiser.redmagic.ShoulderLedSplit.decode(state.effect) != null) null else state.color
-            }),
-            InsidePages.Page("Lighting settings", "Real-time preview and zone controls", listOf(zonesCard), icon = "⚙"),
             InsidePages.Page("RGB Studio", "Color sequences and timing", listOf(rgbStudioCard)),
             InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),
             InsidePages.Page("Charging", "Charging lighting profile", listOf(chargingModeCard)),
             InsidePages.Page("Calls", "Incoming call lighting", listOf(callLightingCard)),
-            InsidePages.Page("Notifications", "Screen-off notification lighting", listOf(notificationCard))
-        ))
+            InsidePages.Page("Notifications", "Screen-off notification lighting", listOf(notificationCard)),
+            InsidePages.Page("Lighting settings", "Preview preferences", listOf(zonesCard), icon = "⚙")
+        ), prefix = com.elitedarkkaiser.redmagic.InlineLightingUi.create(activity, deps))
         return container
     }
 }

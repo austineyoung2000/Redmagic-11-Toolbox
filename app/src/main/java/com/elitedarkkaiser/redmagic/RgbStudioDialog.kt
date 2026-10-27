@@ -46,11 +46,11 @@ object RgbStudioDialog {
         ColorChoice(9, "Pink", "#FF69B4")
     )
 
-    fun show(
+    fun createView(
         activity: Activity,
         initial: RgbStudioState,
         deps: Deps
-    ) {
+    ): LinearLayout {
         var enabled = initial.enabled
         var syncZones = initial.syncZones
         var effect = initial.effect
@@ -358,26 +358,18 @@ object RgbStudioDialog {
             )
         }
 
-        val scroll = ScrollView(activity).apply {
-            addView(content)
+        val applyAll = deps.filterChip("Apply to all", false) {
+            deps.onApplyToAll(buildState())
         }
-
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle("RGB Studio")
-            .setView(scroll)
-            .setNegativeButton("CANCEL", null)
-            .setNeutralButton("APPLY TO ALL") { _, _ ->
-                deps.onApplyToAll(buildState())
-            }
-            .setPositiveButton("SAVE & APPLY") { _, _ ->
-                deps.onSaveAndApply(buildState())
-            }
-            .create()
+        val save = deps.filterChip("Save & apply", false) {
+            deps.onSaveAndApply(buildState())
+        }
+        content.addView(applyAll)
+        content.addView(save)
         refreshApplyButton = {
-            dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).visibility =
-                if (splitTriggers) View.GONE else View.VISIBLE
+            applyAll.visibility = if (splitTriggers) View.GONE else View.VISIBLE
         }
-        dialog.setOnShowListener { refreshApplyButton?.invoke() }
-        dialog.show()
+        refreshApplyButton?.invoke()
+        return content
     }
 }
