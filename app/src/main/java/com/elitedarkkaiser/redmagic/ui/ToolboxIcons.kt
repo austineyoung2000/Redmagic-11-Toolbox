@@ -10,6 +10,7 @@ internal object ToolboxIcons {
     fun create(context: Context, name: String): ImageView {
         val key = name.lowercase()
         val icon = when {
+            "pump" in key || "liquid" in key -> R.drawable.ic_toolbox_pump
             "root" in key -> R.drawable.ic_toolbox_root
             "rpm" in key -> R.drawable.ic_toolbox_rpm
             "temp" in key -> R.drawable.ic_toolbox_temp

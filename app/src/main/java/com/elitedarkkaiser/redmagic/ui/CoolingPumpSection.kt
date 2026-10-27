@@ -21,9 +21,22 @@ internal object CoolingPumpSection {
         lateinit var smartPumpSpeedView: TextView
 
         val card = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("◉", "PUMP"))
-            addView(deps.bodyText("Liquid cooling pump control with manual speed, auto temperature control, and live diagnostics."))
-            addView(deps.spacer(deps.dp(10)))
+            val header = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(ToolboxIcons.create(context, "liquid pump"), LinearLayout.LayoutParams(deps.dp(32), deps.dp(32)).apply {
+                    marginEnd = deps.dp(12)
+                })
+                addView(TextView(context).apply {
+                    text = "Liquid cooling"
+                    textSize = 18f
+                    setTextColor(AppTheme.textPrimary)
+                    typeface = Typeface.create(AppTheme.appTypeface, Typeface.BOLD)
+                })
+            }
+            addView(header)
+            addView(deps.subtleLabel("Control the liquid cooling pump and monitor its mode."))
+            addView(deps.spacer(deps.dp(14)))
 
             lateinit var pumpPowerSwitch: MaterialSwitch
             lateinit var autoPumpSwitch: MaterialSwitch
@@ -79,7 +92,7 @@ internal object CoolingPumpSection {
             }
 
             val pumpPowerTitle = TextView(context).apply {
-                text = "Pump Power"
+                text = "Pump power"
                 textSize = 15f
                 setTextColor(AppTheme.textPrimary)
                 typeface = Typeface.create(AppTheme.appTypeface, Typeface.BOLD)
@@ -151,7 +164,7 @@ internal object CoolingPumpSection {
                 orientation = LinearLayout.HORIZONTAL
             }
 
-            val chipParams = LinearLayout.LayoutParams(0, deps.dp(42), 1f)
+            val chipParams = LinearLayout.LayoutParams(0, deps.dp(64), 1f)
             val gapParams = LinearLayout.LayoutParams(deps.dp(6), 1)
 
             lateinit var slowBtn: Button
@@ -208,6 +221,11 @@ internal object CoolingPumpSection {
                 }
             }
 
+            listOf(slowBtn, mediumBtn, quickBtn, experimentalBtn).forEach { button ->
+                button.tag = "pump_preset"
+                com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle.apply(button, button.isSelected)
+            }
+
             speedRow.addView(slowBtn, chipParams)
             speedRow.addView(deps.space(deps.dp(6)), gapParams)
             speedRow.addView(mediumBtn, chipParams)
@@ -220,7 +238,7 @@ internal object CoolingPumpSection {
             addView(deps.spacer(deps.dp(14)))
 
             val autoTitle = TextView(context).apply {
-                text = "Auto Pump Speed"
+                text = "Automatic pump speed"
                 textSize = 15f
                 setTextColor(AppTheme.textPrimary)
                 typeface = Typeface.create(AppTheme.appTypeface, Typeface.BOLD)
@@ -278,7 +296,7 @@ internal object CoolingPumpSection {
 
             addView(autoRow)
             addView(deps.spacer(deps.dp(14)))
-            addView(deps.subtleLabel("Live diagnostics"))
+            addView(deps.bodyText("Pump status"))
 
             smartPumpStatusView = TextView(context).apply {
                 textSize = 12f

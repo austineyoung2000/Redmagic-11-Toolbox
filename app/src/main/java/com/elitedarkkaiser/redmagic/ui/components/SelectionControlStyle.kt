@@ -31,6 +31,13 @@ object SelectionControlStyle {
             button.minHeight = AppTheme.dp(context, 48)
             button.setPadding(AppTheme.dp(context, 8), 0, AppTheme.dp(context, 8), 0)
         }
+        if (button.tag == "pump_preset" && button is MaterialButton) {
+            button.textSize = 12f
+            button.cornerRadius = AppTheme.dp(context, 12)
+            button.strokeWidth = AppTheme.dp(context, 1)
+            button.strokeColor = ColorStateList.valueOf(if (selected) AppTheme.accentColor else AppTheme.borderColor)
+            button.backgroundTintList = ColorStateList.valueOf(if (selected) AppTheme.dangerColor else AppTheme.panelPressed)
+        }
         if (button.tag == "cooling_preset") {
             button.setSingleLine(false)
             button.maxLines = 2
