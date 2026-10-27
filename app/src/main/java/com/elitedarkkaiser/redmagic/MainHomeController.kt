@@ -37,7 +37,11 @@ internal class MainHomeController(
         val tempText = temp?.let { String.format("%.1f°%s", it, if (useFahrenheit) "F" else "C") } ?: "Unavailable"
         val rpm = snapshot.telemetry.fanRpm?.let { "$it RPM" } ?: "RPM unavailable"
         val fan = snapshot.telemetry.fanEnabled?.let { if (it) "On" else "Off" } ?: "Unknown"
-        current.quickStatusText.text = "$tempText     •     $rpm\nFan: $fan"
+        current.coolingTemp.text = tempText
+        current.coolingRpm.text = rpm
+        current.fanLevelBar.visibility = if (snapshot.telemetry.fanLevel == null) android.view.View.INVISIBLE else android.view.View.VISIBLE
+        current.fanLevelBar.progress = snapshot.telemetry.fanLevel?.coerceIn(0, 5) ?: 0
+        current.fanLevelBar.contentDescription = snapshot.telemetry.fanLevel?.let { "Fan level $it of 5" } ?: "Fan level unavailable"
         current.rootChip.text = if (snapshot.dashboardSummary.contains("Root: Granted")) "ROOT\nGranted" else "ROOT\nUnavailable"
         current.fanChip.text = "FAN\n$fan"
         current.rpmChip.text = "RPM\n${snapshot.telemetry.fanRpm ?: "--"}"

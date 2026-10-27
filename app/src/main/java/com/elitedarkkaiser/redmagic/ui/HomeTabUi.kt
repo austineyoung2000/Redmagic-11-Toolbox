@@ -2,6 +2,7 @@ package com.elitedarkkaiser.redmagic.ui
 
 import android.content.res.ColorStateList
 import android.view.Gravity
+import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -14,7 +15,9 @@ object HomeTabUi {
         val deviceCpuValue: TextView,
         val deviceRamValue: TextView,
         val dashboardText: TextView,
-        val quickStatusText: TextView,
+        val coolingTemp: TextView,
+        val coolingRpm: TextView,
+        val fanLevelBar: android.widget.ProgressBar,
         val rootChip: TextView,
         val fanChip: TextView,
         val rpmChip: TextView,
@@ -114,9 +117,10 @@ object HomeTabUi {
                 gravity = Gravity.CENTER_VERTICAL
             }
             row.addView(ImageView(context).apply {
-                setImageResource(R.mipmap.ic_launcher)
+                setImageResource(R.drawable.dashboard_phone)
+                scaleType = ImageView.ScaleType.FIT_CENTER
                 contentDescription = null
-            }, LinearLayout.LayoutParams(deps.dp(56), deps.dp(56)))
+            }, LinearLayout.LayoutParams(deps.dp(56), deps.dp(72)))
             row.addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(deps.dp(14), 0, 0, 0)
@@ -126,17 +130,18 @@ object HomeTabUi {
                     setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
                     setTextColor(AppTheme.textPrimary)
                 })
-                addView(deps.subtitleText("NX809J  •  Device information"))
+                addView(deps.subtitleText(android.os.Build.DISPLAY?.takeIf { it.isNotBlank() } ?: "Android ${android.os.Build.VERSION.RELEASE}").apply {
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
             })
             addView(row)
         }
         fun chip(value: String): TextView = TextView(container.context).apply {
             text = value
-            textSize = 12f
-            gravity = Gravity.CENTER
+            textSize = 11f
+            maxLines = 2
             setTextColor(AppTheme.textPrimary)
-            setPadding(deps.dp(4), deps.dp(12), deps.dp(4), deps.dp(12))
-            background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(14).toFloat())
         }
         val rootChip = chip("ROOT\nChecking")
         val fanChip = chip("FAN\n--")
@@ -144,10 +149,20 @@ object HomeTabUi {
         val tempChip = chip("TEMP\n--")
         val chipRow = LinearLayout(container.context).apply {
             orientation = LinearLayout.HORIZONTAL
-            listOf(rootChip, fanChip, rpmChip, tempChip).forEachIndexed { index, view ->
+            listOf(rootChip to "root", fanChip to "fan", rpmChip to "rpm", tempChip to "temp").forEachIndexed { index, entry ->
+                val item = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(deps.dp(5), deps.dp(10), deps.dp(5), deps.dp(10))
+                    background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(14).toFloat())
+                    addView(ToolboxIcons.create(context, entry.second).apply {
+                        imageTintList = ColorStateList.valueOf(AppTheme.textPrimary)
+                    }, LinearLayout.LayoutParams(deps.dp(18), deps.dp(18)).apply { marginEnd = deps.dp(4) })
+                    addView(entry.first, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                }
                 val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 if (index > 0) lp.marginStart = deps.dp(5)
-                addView(view, lp)
+                addView(item, lp)
             }
             setPadding(0, deps.dp(8), 0, deps.dp(12))
         }
@@ -239,45 +254,61 @@ object HomeTabUi {
             addView(activeModeText)
         }
 
-        val quickStatusText = TextView(container.context).apply {
-            text = "Loading device status…"
-            textSize = 22f
+        fun metric(initial: String, size: Float): TextView = TextView(container.context).apply {
+            text = initial
+            textSize = size
             setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
             setTextColor(AppTheme.textPrimary)
-            setPadding(0, deps.dp(12), 0, deps.dp(12))
+        }
+        val coolingTemp = metric("--", 27f)
+        val coolingRpm = metric("-- RPM", 20f)
+        val fanLevelBar = android.widget.ProgressBar(container.context, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 5
+            progress = 0
+            progressTintList = ColorStateList.valueOf(AppTheme.accentColor)
+            progressBackgroundTintList = ColorStateList.valueOf(AppTheme.panelPressed)
+            contentDescription = "Fan level"
         }
         val quickStatusCard = deps.sectionPanel().apply {
-            background = android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                intArrayOf(android.graphics.Color.rgb(49, 20, 26), AppTheme.panelColor)
-            ).apply {
-                cornerRadius = deps.dp(22).toFloat()
-                setStroke(deps.dp(1), AppTheme.borderColor)
+            setPadding(0, 0, 0, 0)
+            val frame = android.widget.FrameLayout(context)
+            frame.addView(ImageView(context).apply {
+                setImageResource(R.drawable.lighting_hero)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                alpha = 0.38f
+                contentDescription = null
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            frame.addView(View(context).apply {
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(android.graphics.Color.argb(220, 35, 8, 14), android.graphics.Color.argb(130, 5, 8, 12))
+                )
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            val body = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(deps.dp(18), deps.dp(16), deps.dp(18), deps.dp(16))
+                addView(metric("Cooling System  ›", 16f))
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, deps.dp(18), 0, deps.dp(10))
+                    val left = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(coolingTemp)
+                        addView(deps.subtitleText("Current temperature"))
+                    }
+                    val right = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(coolingRpm)
+                        addView(deps.subtitleText("Fan speed"))
+                    }
+                    addView(left, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(right, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                }
+                addView(row)
+                addView(fanLevelBar, LinearLayout.LayoutParams(-1, deps.dp(6)))
             }
-            val top = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(TextView(context).apply {
-                    text = "Cooling System"
-                    textSize = 16f
-                    setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
-                    setTextColor(AppTheme.textPrimary)
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(TextView(context).apply {
-                    text = "›"
-                    textSize = 24f
-                    setTextColor(AppTheme.textSecondary)
-                })
-            }
-            addView(top)
-            val status = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(quickStatusText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(ToolboxIcons.create(context, "fan").apply { alpha = 0.5f },
-                    LinearLayout.LayoutParams(deps.dp(54), deps.dp(54)))
-            }
-            addView(status)
+            frame.addView(body)
+            addView(frame)
             isClickable = true
             isFocusable = true
             contentDescription = "Open cooling controls"
@@ -356,7 +387,9 @@ object HomeTabUi {
                 deviceCpuValue = deviceCpuValue,
                 deviceRamValue = deviceRamValue,
                 dashboardText = dashboardText,
-                quickStatusText = quickStatusText,
+                coolingTemp = coolingTemp,
+                coolingRpm = coolingRpm,
+                fanLevelBar = fanLevelBar,
                 rootChip = rootChip,
                 fanChip = fanChip,
                 rpmChip = rpmChip,

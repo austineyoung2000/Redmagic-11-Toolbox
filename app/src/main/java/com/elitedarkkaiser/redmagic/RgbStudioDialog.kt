@@ -189,35 +189,34 @@ object RgbStudioDialog {
 
         fun addPalette(parent: LinearLayout, selectedColors: MutableList<Int>) {
             val swatches = LedControlViewFactory(activity)
-            colorChoices.chunked(4).forEach { choices ->
-                val row = LinearLayout(activity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    setPadding(0, deps.dp(6), 0, deps.dp(4))
-                }
-                choices.forEachIndexed { index, choice ->
-                    if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(deps.dp(10), 1))
-                    lateinit var dot: View
-                    dot = swatches.colorDot(choice.hex, choice.id in selectedColors) {
-                        if (choice.id in selectedColors) {
-                            if (selectedColors.size > 1) selectedColors.remove(choice.id)
-                            else Toast.makeText(activity, "Keep at least one cycle color", Toast.LENGTH_SHORT).show()
-                        } else {
-                            selectedColors.add(choice.id)
-                            selectedColors.sortBy { id -> colorChoices.indexOfFirst { it.id == id } }
-                        }
-                        val selected = choice.id in selectedColors
-                        dot.background = swatches.colorDotDrawable(choice.hex, selected)
-                        dot.isSelected = selected
-                        dot.contentDescription = "${choice.label}: ${if (selected) "selected" else "not selected"}"
-                    }.apply {
-                        isSelected = choice.id in selectedColors
-                        isFocusable = true
-                        contentDescription = "${choice.label}: ${if (isSelected) "selected" else "not selected"}"
-                    }
-                    row.addView(dot)
-                }
-                parent.addView(row)
+            val row = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, deps.dp(6), 0, deps.dp(4))
             }
+            colorChoices.forEachIndexed { index, choice ->
+                if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                lateinit var dot: View
+                dot = swatches.colorDot(choice.hex, choice.id in selectedColors) {
+                    if (choice.id in selectedColors) {
+                        if (selectedColors.size > 1) selectedColors.remove(choice.id)
+                        else Toast.makeText(activity, "Keep at least one cycle color", Toast.LENGTH_SHORT).show()
+                    } else {
+                        selectedColors.add(choice.id)
+                        selectedColors.sortBy { id -> colorChoices.indexOfFirst { it.id == id } }
+                    }
+                    val selected = choice.id in selectedColors
+                    dot.background = swatches.colorDotDrawable(choice.hex, selected)
+                    dot.isSelected = selected
+                    dot.contentDescription = "${choice.label}: ${if (selected) "selected" else "not selected"}"
+                }.apply {
+                    isSelected = choice.id in selectedColors
+                    isFocusable = true
+                    contentDescription = "${choice.label}: ${if (isSelected) "selected" else "not selected"}"
+                }
+                row.addView(dot, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
+            }
+            parent.addView(row)
         }
         addPalette(content, colors)
         content.addView(label("GAME MODE bar color sequence"))
