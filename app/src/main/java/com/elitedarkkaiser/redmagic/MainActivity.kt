@@ -277,6 +277,12 @@ class MainActivity : Activity() {
         super.onStop()
     }
 
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (::tabHost.isInitialized && tabHost.handleBack()) return
+        super.onBackPressed()
+    }
+
     override fun onDestroy() {
         backgroundReleaseHandler.removeCallbacksAndMessages(null)
         if (::activityRuntime.isInitialized) {

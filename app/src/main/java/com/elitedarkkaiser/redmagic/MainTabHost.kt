@@ -67,14 +67,15 @@ internal class MainTabHost(
         tabs["lighting"] =
             TabState(result.lightingTab, false, createLighting)
 
-        activity.onBackPressedDispatcher.addCallback(activity, object : androidx.activity.OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                val view = tabs[currentTab]?.view
-                if (view != null && com.elitedarkkaiser.redmagic.ui.InsidePages.back(view)) return
-                if (currentTab != "home") select("home") else activity.finish()
-            }
-        })
         select("home")
+    }
+
+    fun handleBack(): Boolean {
+        val view = tabs[currentTab]?.view
+        if (view != null && com.elitedarkkaiser.redmagic.ui.InsidePages.back(view)) return true
+        if (currentTab == "home") return false
+        select("home")
+        return true
     }
 
     fun refreshBuiltTabs() {
