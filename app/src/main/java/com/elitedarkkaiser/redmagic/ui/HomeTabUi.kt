@@ -277,13 +277,13 @@ object HomeTabUi {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 alpha = 0.38f
                 contentDescription = null
-            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(168)))
             frame.addView(View(context).apply {
                 background = android.graphics.drawable.GradientDrawable(
                     android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
                     intArrayOf(android.graphics.Color.argb(220, 35, 8, 14), android.graphics.Color.argb(130, 5, 8, 12))
                 )
-            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(168)))
             val body = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(deps.dp(18), deps.dp(16), deps.dp(18), deps.dp(16))
@@ -308,7 +308,10 @@ object HomeTabUi {
                 addView(fanLevelBar, LinearLayout.LayoutParams(-1, deps.dp(6)))
             }
             frame.addView(body)
-            addView(frame)
+            addView(frame, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
             isClickable = true
             isFocusable = true
             contentDescription = "Open cooling controls"
