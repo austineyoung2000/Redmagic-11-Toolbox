@@ -33,7 +33,7 @@ internal object MainUiLauncher {
 
         val contentFrame = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), topInset + dp(10), dp(16), dp(96))
+            setPadding(dp(16), topInset + dp(10), dp(16), dp(24))
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -69,7 +69,6 @@ internal object MainUiLauncher {
         }
 
         root.addView(contentScroll)
-        root.addView(navWrap)
 
         activity.setContentView(root)
 

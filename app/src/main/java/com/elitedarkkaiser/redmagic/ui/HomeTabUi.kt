@@ -109,13 +109,26 @@ object HomeTabUi {
             })
         }
         val deviceCard = deps.sectionPanel().apply {
-            addView(TextView(context).apply {
-                text = "REDMAGIC 11 Pro"
-                textSize = 18f
-                setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
-                setTextColor(AppTheme.textPrimary)
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            row.addView(ImageView(context).apply {
+                setImageResource(R.mipmap.ic_launcher)
+                contentDescription = null
+            }, LinearLayout.LayoutParams(deps.dp(56), deps.dp(56)))
+            row.addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(deps.dp(14), 0, 0, 0)
+                addView(TextView(context).apply {
+                    text = "REDMAGIC 11 Pro"
+                    textSize = 18f
+                    setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                    setTextColor(AppTheme.textPrimary)
+                })
+                addView(deps.subtitleText("NX809J  •  Device information"))
             })
-            addView(deps.subtitleText("NX809J  •  Device information"))
+            addView(row)
         }
         fun chip(value: String): TextView = TextView(container.context).apply {
             text = value
@@ -150,7 +163,8 @@ object HomeTabUi {
             }
         }
 
-        val navigationCard = deps.sectionPanel().apply {
+        val navigationCard = LinearLayout(container.context).apply {
+            orientation = LinearLayout.VERTICAL
             fun tileRow(first: LinearLayout, second: LinearLayout) {
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
                 row.addView(first, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -160,8 +174,10 @@ object HomeTabUi {
             }
             tileRow(dashboardTile("Cooling", "Fan and pump", "❄", "cooling"),
                 dashboardTile("Lighting", "LED zones and effects", "✦", "lighting"))
-            tileRow(dashboardTile("Gaming & hardware", "Triggers and profiles", "⌥", "hardware"),
-                dashboardTile("System", "Magic Key and controls", "⌘", "controls"))
+            tileRow(dashboardTile("Gaming", "Game controls", "🎮", "gaming"),
+                dashboardTile("Hardware", "Triggers and haptics", "⌥", "hardware"))
+            tileRow(dashboardTile("Profiles", "Saved settings and rules", "◆", "profiles"),
+                dashboardTile("System", "Magic Key and controls", "⚙", "system"))
         }
 
         val deviceRomValue = deps.infoValue()
@@ -210,9 +226,10 @@ object HomeTabUi {
 
         val quickStatusText = TextView(container.context).apply {
             text = "Loading device status…"
-            textSize = 16f
+            textSize = 22f
+            setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
             setTextColor(AppTheme.textPrimary)
-            setPadding(0, deps.dp(8), 0, deps.dp(8))
+            setPadding(0, deps.dp(12), 0, deps.dp(12))
         }
         val quickStatusCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("❄", "COOLING SYSTEM"))

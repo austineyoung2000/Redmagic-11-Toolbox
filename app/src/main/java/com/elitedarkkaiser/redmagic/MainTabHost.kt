@@ -25,6 +25,22 @@ internal class MainTabHost(
 
     private val navigation = MainBottomNavigation(activity, ::select)
     private val tabs = linkedMapOf<String, TabState>()
+    private var currentTab = "home"
+
+    private fun withBack(view: LinearLayout): LinearLayout {
+        val button = android.widget.TextView(activity).apply {
+            text = "‹  Dashboard"
+            textSize = 16f
+            setTextColor(com.elitedarkkaiser.redmagic.ui.AppTheme.textPrimary)
+            contentDescription = "Back to dashboard"
+            isClickable = true
+            isFocusable = true
+            setPadding(0, dp(8), 0, dp(14))
+            setOnClickListener { select("home") }
+        }
+        view.addView(button, 0)
+        return view
+    }
 
     fun launch() {
         val result = MainUiLauncher.launch(
@@ -51,6 +67,13 @@ internal class MainTabHost(
         tabs["lighting"] =
             TabState(result.lightingTab, false, createLighting)
 
+        activity.onBackPressedDispatcher.addCallback(activity, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val view = tabs[currentTab]?.view
+                if (view != null && com.elitedarkkaiser.redmagic.ui.InsidePages.back(view)) return
+                if (currentTab != "home") select("home") else activity.finish()
+            }
+        })
         select("home")
     }
 
@@ -61,19 +84,24 @@ internal class MainTabHost(
             .forEach { state ->
                 state.view = replace(
                     state.view,
-                    state.factory(),
+                    withBack(state.factory()),
                     preserveVisibility = true
                 )
             }
     }
 
     fun select(tabId: String) {
-        val selected = tabs[tabId] ?: return
+        val resolved = when (tabId) {
+            "gaming", "profiles" -> "hardware"
+            "system" -> "controls"
+            else -> tabId
+        }
+        val selected = tabs[resolved] ?: return
 
         if (!selected.built) {
             selected.view = replace(
                 selected.view,
-                selected.factory(),
+                withBack(selected.factory()),
                 preserveVisibility = false
             )
             selected.built = true
@@ -81,9 +109,16 @@ internal class MainTabHost(
 
         tabs.forEach { (id, state) ->
             state.view.visibility =
-                if (id == tabId) View.VISIBLE else View.GONE
+                if (id == resolved) View.VISIBLE else View.GONE
         }
-        navigation.select(tabId)
+        currentTab = resolved
+        navigation.select(resolved)
+        com.elitedarkkaiser.redmagic.ui.InsidePages.back(selected.view)
+        when (tabId) {
+            "gaming" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 0)
+            "profiles" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 5)
+            "system" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 0)
+        }
     }
 
     private fun replace(

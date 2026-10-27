@@ -197,7 +197,11 @@ object LightingTabUi {
         }
 
         InsidePages.install(container, "Lighting", listOf(
-            InsidePages.Page("LED zones", "Fan, logo, GAME MODE bar and triggers", listOf(zonesCard)),
+            InsidePages.Page("Fan lighting", "Fan color, palette and effect", emptyList(), { deps.showFanLedDialog() }, "✺"),
+            InsidePages.Page("Logo lighting", "Rear logo color and brightness", emptyList(), { deps.showLogoLedDialog() }, "◆"),
+            InsidePages.Page("GAME MODE bar", "Side bar color and brightness", emptyList(), { deps.showGameModeBarDialog() }, "▥"),
+            InsidePages.Page("Trigger lighting", "Top and bottom trigger colors", emptyList(), { deps.showShoulderLedDialog() }, "⌥"),
+            InsidePages.Page("Lighting settings", "Real-time preview and zone controls", listOf(zonesCard), icon = "⚙"),
             InsidePages.Page("RGB Studio", "Color sequences and timing", listOf(rgbStudioCard)),
             InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),
             InsidePages.Page("Charging", "Charging lighting profile", listOf(chargingModeCard)),

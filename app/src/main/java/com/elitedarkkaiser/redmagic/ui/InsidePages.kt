@@ -9,7 +9,13 @@ import android.widget.TextView
 
 /** Presents existing control cards as focused pages without changing their handlers. */
 internal object InsidePages {
-    data class Page(val title: String, val subtitle: String, val cards: List<View>)
+    data class Page(val title: String, val subtitle: String, val cards: List<View>, val action: (() -> Unit)? = null, val icon: String = "✦")
+
+    private data class Navigation(val open: (Int) -> Unit, val back: () -> Boolean)
+    fun open(container: LinearLayout, index: Int) {
+        (container.tag as? Navigation)?.open?.invoke(index)
+    }
+    fun back(container: LinearLayout): Boolean = (container.tag as? Navigation)?.back?.invoke() ?: false
 
     fun install(container: LinearLayout, title: String, pages: List<Page>) {
         val context = container.context
@@ -27,6 +33,7 @@ internal object InsidePages {
             if (bold) setTypeface(AppTheme.appTypeface, Typeface.BOLD)
         }
         menu.addView(label(title, 26f, true).apply { setPadding(0, dp(8), 0, dp(18)) })
+        val menuRows = mutableListOf<View>()
         pages.forEach { page ->
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -37,6 +44,10 @@ internal object InsidePages {
                 isFocusable = true
                 contentDescription = "Open ${page.title}"
             }
+            row.addView(label(page.icon, 22f).apply {
+                setTextColor(AppTheme.accentColor)
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(dp(42), ViewGroup.LayoutParams.WRAP_CONTENT))
             val text = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             text.addView(label(page.title, 16f, true))
             text.addView(label(page.subtitle, 13f).apply {
@@ -48,7 +59,12 @@ internal object InsidePages {
             val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             params.bottomMargin = dp(10)
             menu.addView(row, params)
+            menuRows.add(row)
             row.setOnClickListener {
+                if (page.action != null) {
+                    page.action.invoke()
+                    return@setOnClickListener
+                }
                 detail.removeAllViews()
                 val back = label("‹  ${page.title}", 23f, true).apply {
                     setPadding(0, dp(8), 0, dp(18))
@@ -71,5 +87,15 @@ internal object InsidePages {
         }
         container.addView(menu)
         container.addView(detail)
+        container.tag = Navigation(
+            open = { index -> menuRows.getOrNull(index)?.performClick() },
+            back = {
+                if (detail.visibility == View.VISIBLE) {
+                    detail.visibility = View.GONE
+                    menu.visibility = View.VISIBLE
+                    true
+                } else false
+            }
+        )
     }
 }
