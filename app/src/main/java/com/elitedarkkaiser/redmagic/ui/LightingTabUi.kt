@@ -196,11 +196,19 @@ object LightingTabUi {
             )
         }
 
+        fun openZone(action: () -> Unit) {
+            if (deps.capabilities.scanComplete && !deps.capabilities.ledAvailable) {
+                android.widget.Toast.makeText(activity, "LED controls are unavailable on this ROM", android.widget.Toast.LENGTH_SHORT).show()
+            } else action()
+        }
         InsidePages.install(container, "Lighting", listOf(
-            InsidePages.Page("Fan lighting", "Fan color, palette and effect", emptyList(), { deps.showFanLedDialog() }, "✺"),
-            InsidePages.Page("Logo lighting", "Rear logo color and brightness", emptyList(), { deps.showLogoLedDialog() }, "◆"),
-            InsidePages.Page("GAME MODE bar", "Side bar color and brightness", emptyList(), { deps.showGameModeBarDialog() }, "▥"),
-            InsidePages.Page("Trigger lighting", "Top and bottom trigger colors", emptyList(), { deps.showShoulderLedDialog() }, "⌥"),
+            InsidePages.Page("Fan lighting", "Fan color, palette and effect", emptyList(), { openZone(deps.showFanLedDialog) }, "✺", { com.elitedarkkaiser.redmagic.savedFanLedStateStorage(activity).color }),
+            InsidePages.Page("Logo lighting", "Rear logo color and brightness", emptyList(), { openZone(deps.showLogoLedDialog) }, "◆", { com.elitedarkkaiser.redmagic.savedLogoLedStateStorage(activity).color }),
+            InsidePages.Page("GAME MODE bar", "Side bar color and brightness", emptyList(), { openZone(deps.showGameModeBarDialog) }, "▥", { com.elitedarkkaiser.redmagic.LogoBarSelection.from(com.elitedarkkaiser.redmagic.savedLogoLedStateStorage(activity)).barColor }),
+            InsidePages.Page("Trigger lighting", "Top and bottom trigger colors", emptyList(), { openZone(deps.showShoulderLedDialog) }, "⌥", {
+                val state = com.elitedarkkaiser.redmagic.savedShoulderLedStateStorage(activity)
+                if (com.elitedarkkaiser.redmagic.ShoulderLedSplit.decode(state.effect) != null) null else state.color
+            }),
             InsidePages.Page("Lighting settings", "Real-time preview and zone controls", listOf(zonesCard), icon = "⚙"),
             InsidePages.Page("RGB Studio", "Color sequences and timing", listOf(rgbStudioCard)),
             InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),

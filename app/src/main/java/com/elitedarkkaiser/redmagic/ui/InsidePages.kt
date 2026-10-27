@@ -9,7 +9,7 @@ import android.widget.TextView
 
 /** Presents existing control cards as focused pages without changing their handlers. */
 internal object InsidePages {
-    data class Page(val title: String, val subtitle: String, val cards: List<View>, val action: (() -> Unit)? = null, val icon: String = "✦")
+    data class Page(val title: String, val subtitle: String, val cards: List<View>, val action: (() -> Unit)? = null, val icon: String = "✦", val palette: (() -> Int?)? = null)
 
     private data class Navigation(val open: (Int) -> Unit, val back: () -> Boolean)
     fun open(container: LinearLayout, index: Int) {
@@ -53,6 +53,36 @@ internal object InsidePages {
                 setTextColor(AppTheme.textSecondary)
                 setPadding(0, dp(4), 0, 0)
             })
+            page.palette?.let { selectedColor ->
+                val palette = object : LinearLayout(context) {
+                    private val ids = listOf(1, 3, 4, 5, 6, 7, 8, 9)
+                    private val colors = listOf("#FF0000", "#FF8C00", "#FFD600", "#00E676", "#00E5FF", "#1565FF", "#A020F0", "#FF69B4")
+                    init {
+                        orientation = HORIZONTAL
+                        setPadding(0, dp(10), 0, 0)
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                        repeat(ids.size) {
+                            addView(View(context), LayoutParams(dp(20), dp(20)).apply { marginEnd = dp(5) })
+                        }
+                        refresh()
+                    }
+                    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+                        super.onWindowFocusChanged(hasWindowFocus)
+                        if (hasWindowFocus) refresh()
+                    }
+                    private fun refresh() {
+                        val selected = selectedColor()
+                        ids.forEachIndexed { index, id ->
+                            getChildAt(index).background = android.graphics.drawable.GradientDrawable().apply {
+                                shape = android.graphics.drawable.GradientDrawable.OVAL
+                                setColor(android.graphics.Color.parseColor(colors[index]))
+                                if (selected == id) setStroke(dp(2), android.graphics.Color.WHITE)
+                            }
+                        }
+                    }
+                }
+                text.addView(palette)
+            }
             row.addView(text, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             row.addView(label("›", 26f))
             val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
