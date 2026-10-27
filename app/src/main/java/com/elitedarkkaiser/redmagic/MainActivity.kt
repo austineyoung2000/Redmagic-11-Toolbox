@@ -160,6 +160,11 @@ class MainActivity : Activity() {
         )
     }
 
+    internal fun openMagicKeyFromGaming() {
+        tabHost.select("controls")
+        tabHost.openControlsPage(1)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppTheme.configure(this)

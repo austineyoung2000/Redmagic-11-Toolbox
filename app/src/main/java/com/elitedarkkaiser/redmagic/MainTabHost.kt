@@ -84,6 +84,10 @@ internal class MainTabHost(
         select("home")
     }
 
+    fun openControlsPage(index: Int) {
+        tabs["controls"]?.view?.let { com.elitedarkkaiser.redmagic.ui.InsidePages.open(it, index) }
+    }
+
     fun handleBack(): Boolean {
         if (dashboardEntry == "gaming") {
             select("home")

@@ -33,7 +33,7 @@ internal class MainGameModeActions(
         }
     }
 
-    private fun showProfileEditor(pkg: String?, label: String) {
+    fun showProfileEditor(pkg: String?, label: String) {
         GameModeUi.showGameModeProfileDialog(
             activity = activity,
             current = if (pkg == null) getSavedGameModeProfileStorage(activity)

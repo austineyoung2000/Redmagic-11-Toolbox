@@ -14,7 +14,7 @@ object HardwareTabUi {
         val performance = HardwarePerformanceSections.createCards(activity, deps)
         val profiles = HardwareProfileSections.createCards(activity, deps)
         InsidePages.install(container, "Hardware & gaming", listOf(
-            InsidePages.Page("Gaming", "Trigger mapping and game performance", triggers + performance.subList(1, 4), icon = "🎮"),
+            InsidePages.Page("Gaming", "Trigger mapping and game performance", emptyList(), icon = "🎮", factory = { listOf(GamingHubUi.create(activity, deps)) }),
             InsidePages.Page("Shoulder triggers", "Mapping, controls and safety", triggers, icon = "⌥"),
             InsidePages.Page("Gaming performance", "Refresh rate, touch response and performance mode", performance.subList(1, 4), icon = "🎮"),
             InsidePages.Page("Haptic feedback", "Vibration controls", listOf(performance[4]), icon = "〰"),

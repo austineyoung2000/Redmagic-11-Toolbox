@@ -21,7 +21,7 @@ object TouchTuningProfileDialog {
         val label: String
     )
 
-    fun show(activity: Activity) {
+    fun show(activity: Activity, selectedPackage: String? = null, selectedLabel: String? = null) {
         AppTheme.configure(activity)
         val probe = TouchTuningController.probe(activity)
         if (!probe.compatible) {
@@ -365,6 +365,10 @@ object TouchTuningProfileDialog {
         }
 
         renderProfiles()
+        if (selectedPackage != null && selectedLabel != null) {
+            showEditor(LaunchableApp(selectedPackage, selectedLabel), TouchTuningStorage.getProfile(activity, selectedPackage))
+            return
+        }
         MaterialAlertDialogBuilder(activity)
             .setView(ScrollView(activity).apply {
                 isFillViewport = true

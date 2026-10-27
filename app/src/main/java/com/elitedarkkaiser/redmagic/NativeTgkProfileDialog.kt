@@ -28,7 +28,7 @@ object NativeTgkProfileDialog {
         val label: String
     )
 
-    fun show(activity: Activity) {
+    fun show(activity: Activity, selectedPackage: String? = null) {
         AppTheme.configure(activity)
 
         val root = LinearLayout(activity).apply {
@@ -1127,6 +1127,9 @@ object NativeTgkProfileDialog {
             .create()
 
         managerDialog.show()
+        if (selectedPackage != null) {
+            NativeTgkStorage.getProfile(activity, selectedPackage)?.let { showOrientationPicker(it) }
+        }
     }
 
     private fun actionButton(
