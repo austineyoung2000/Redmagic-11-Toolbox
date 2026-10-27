@@ -52,13 +52,19 @@ object NativeTgkProfileDialog {
             gravity = Gravity.CENTER_VERTICAL
             background = panelBackground(activity)
         }
-        val addButton = actionButton(activity, "+ Add game", primary = false)
-        val importButton = actionButton(activity, "Import", primary = false)
-        val exportAllButton = actionButton(activity, "Export", primary = false)
-        listOf(addButton, importButton, exportAllButton).forEach { button ->
-            button.isAllCaps = false
-            button.textSize = 12f
-            toolbar.addView(button, LinearLayout.LayoutParams(0, dp(activity, 48), 1f))
+        fun toolbarItem(label: String) = TextView(activity).apply {
+            text = label
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(AppTheme.textPrimary)
+            isClickable = true
+            isFocusable = true
+        }
+        val addButton = toolbarItem("+ Add game")
+        val importButton = toolbarItem("Import")
+        val exportAllButton = toolbarItem("Export")
+        listOf(addButton, importButton, exportAllButton).forEach { item ->
+            toolbar.addView(item, LinearLayout.LayoutParams(0, dp(activity, 48), 1f))
         }
         root.addView(toolbar, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(activity, 12) })
 
@@ -1058,10 +1064,13 @@ object NativeTgkProfileDialog {
                 header.addView(identity, LinearLayout.LayoutParams(0, -2, 1f))
                 selectLayoutButton.text = activeLayout?.name ?: "Default"
                 selectLayoutButton.isAllCaps = false
-                header.addView(selectLayoutButton, LinearLayout.LayoutParams(dp(activity, 86), dp(activity, 44)))
+                selectLayoutButton.minWidth = 0
+                selectLayoutButton.minimumWidth = 0
+                selectLayoutButton.setPadding(0, 0, 0, 0)
+                header.addView(selectLayoutButton, LinearLayout.LayoutParams(dp(activity, 74), dp(activity, 44)))
                 enabledSwitch.text = ""
                 enabledSwitch.contentDescription = "Enable mapping for ${profile.appLabel}"
-                header.addView(enabledSwitch)
+                header.addView(enabledSwitch, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
                 card.addView(header)
                 fun divider() = card.addView(View(activity).apply { setBackgroundColor(AppTheme.borderColor) },
                     LinearLayout.LayoutParams(-1, dp(activity, 1)).apply { topMargin = dp(activity, 8); bottomMargin = dp(activity, 8) })
