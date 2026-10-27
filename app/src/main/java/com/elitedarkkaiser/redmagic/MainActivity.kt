@@ -72,6 +72,7 @@ class MainActivity : Activity() {
             activity = this,
             uiKit = uiKit,
             requestStatusRefresh = ::refreshStatus,
+            openSection = { id -> tabHost.select(id) },
             gameModeActions = gameModeActions
         )
     }

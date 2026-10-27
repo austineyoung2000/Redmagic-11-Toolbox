@@ -258,9 +258,11 @@ object ControlsTabUi {
             CapabilityUi.disableInteractions(sliderCard)
         }
 
-        container.addView(systemCard)
-        container.addView(stockFunctionsCard)
-        container.addView(sliderCard)
+        InsidePages.install(container, "Controls & system", listOf(
+            InsidePages.Page("System", "Root and device controls", listOf(systemCard)),
+            InsidePages.Page("Magic Key", "Button functions", listOf(stockFunctionsCard)),
+            InsidePages.Page("Slider", "App launch actions", listOf(sliderCard))
+        ))
 
         return Result(
             view = container,

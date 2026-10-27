@@ -126,15 +126,13 @@ object LightingTabUi {
             }
         }
 
-        container.addView(zonesCard)
-        container.addView(rgbStudioCard)
-        container.addView(deps.sectionPanel().apply {
+        val notificationCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("✉", "SCREEN-OFF NOTIFICATIONS"))
             addView(deps.bodyText("Choose a color and a limited lighting window for each app. Incoming calls and charging take priority."))
             addView(deps.singleRow(deps.actionButton("NOTIFICATION LIGHTING", false) {
                 com.elitedarkkaiser.redmagic.NotificationLightingDialog.show(activity)
             }))
-        })
+        }
         val callLightingCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("☎", "CALL LIGHTING"))
             addView(deps.bodyText("Applies while an incoming call is ringing; answering or dismissing restores the previous lighting. Priority: Incoming Call > Charging > Notification > Game Mode > Normal LEDs."))
@@ -198,10 +196,14 @@ object LightingTabUi {
             )
         }
 
-        container.addView(gameModeCard)
-        container.addView(callLightingCard)
-        container.addView(chargingModeCard)
-
+        InsidePages.install(container, "Lighting", listOf(
+            InsidePages.Page("LED zones", "Fan, logo, GAME MODE bar and triggers", listOf(zonesCard)),
+            InsidePages.Page("RGB Studio", "Color sequences and timing", listOf(rgbStudioCard)),
+            InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),
+            InsidePages.Page("Charging", "Charging lighting profile", listOf(chargingModeCard)),
+            InsidePages.Page("Calls", "Incoming call lighting", listOf(callLightingCard)),
+            InsidePages.Page("Notifications", "Screen-off notification lighting", listOf(notificationCard))
+        ))
         return container
     }
 }

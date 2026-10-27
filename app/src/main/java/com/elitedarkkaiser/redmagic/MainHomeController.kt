@@ -13,6 +13,7 @@ internal class MainHomeController(
     private val activity: MainActivity,
     private val uiKit: MainActivityUiKit,
     private val requestStatusRefresh: () -> Unit,
+    private val openSection: (String) -> Unit,
     private val gameModeActions: MainGameModeActions
 ) {
     private var refs: HomeTabUi.Refs? = null
@@ -32,6 +33,11 @@ internal class MainHomeController(
         current.deviceCpuValue.text = snapshot.deviceInfo.cpu
         current.deviceRamValue.text = snapshot.deviceInfo.ram
         current.dashboardText.text = snapshot.dashboardSummary
+        val temp = if (useFahrenheit) snapshot.telemetry.temperatureF else snapshot.telemetry.temperatureC
+        val tempText = temp?.let { String.format("%.1f°%s", it, if (useFahrenheit) "F" else "C") } ?: "Unavailable"
+        val rpm = snapshot.telemetry.fanRpm?.let { "$it RPM" } ?: "RPM unavailable"
+        val fan = snapshot.telemetry.fanEnabled?.let { if (it) "On" else "Off" } ?: "Unknown"
+        current.quickStatusText.text = "$tempText     •     $rpm\nFan: $fan"
         current.activeModeText.text = snapshot.activeModeSummary
         current.thermalHistoryView.setHistory(
             snapshot.temperatureHistory,
@@ -64,6 +70,7 @@ internal class MainHomeController(
             space = { width -> uiKit.space(width) },
             dp = { value -> uiKit.dp(value) },
             requestStatusRefresh = requestStatusRefresh,
+            openSection = openSection,
             hasUsageStatsPermission = {
                 PermissionActions.hasUsageStatsPermission(activity)
             },

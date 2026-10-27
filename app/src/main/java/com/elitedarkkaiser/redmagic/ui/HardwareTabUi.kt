@@ -9,16 +9,17 @@ object HardwareTabUi {
         activity: Activity,
         deps: HardwareTabDeps
     ): LinearLayout {
-        return deps.scrollTabContainer().apply {
-            HardwareTriggerSections
-                .createCards(activity, deps)
-                .forEach(::addView)
-            HardwarePerformanceSections
-                .createCards(activity, deps)
-                .forEach(::addView)
-            HardwareProfileSections
-                .createCards(activity, deps)
-                .forEach(::addView)
-        }
+        val container = deps.scrollTabContainer()
+        val triggers = HardwareTriggerSections.createCards(activity, deps)
+        val performance = HardwarePerformanceSections.createCards(activity, deps)
+        val profiles = HardwareProfileSections.createCards(activity, deps)
+        InsidePages.install(container, "Hardware & gaming", listOf(
+            InsidePages.Page("Shoulder triggers", "Mapping, controls and safety", triggers),
+            InsidePages.Page("Gaming performance", "Refresh rate, touch response and performance mode", performance.subList(1, 4)),
+            InsidePages.Page("Haptic feedback", "Vibration controls", listOf(performance[4])),
+            InsidePages.Page("Charge separation", "Charging controls", listOf(performance[0])),
+            InsidePages.Page("Profiles & automation", "Master profiles and rules", profiles)
+        ))
+        return container
     }
 }

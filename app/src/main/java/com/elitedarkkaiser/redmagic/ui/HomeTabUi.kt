@@ -14,6 +14,7 @@ object HomeTabUi {
         val deviceCpuValue: TextView,
         val deviceRamValue: TextView,
         val dashboardText: TextView,
+        val quickStatusText: TextView,
         val activeModeText: TextView,
         val thermalHistoryView: ThermalHistoryView,
         val gameModeStatusText: TextView?
@@ -125,30 +126,30 @@ object HomeTabUi {
             addView(deps.subtitleText("Cooling, lighting, triggers and hardware controls for Redmagic 11 Pro"))
         }
 
-        val summaryCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("⌂", "WELCOME"))
-            addView(deps.bodyText("RedMagic HW Controls is a root-powered control center for RedMagic 11 Pro that brings key hardware features into one place with a cleaner interface than stock tools."))
-            addView(deps.bodyText("It lets you manage cooling behavior, fan profiles, micropump control, fan LED effects, logo lighting, shoulder LED strips, trigger tools, and slider actions directly from the app."))
-            addView(deps.bodyText("The app is built around real device paths and behavior confirmed on hardware so the controls feel practical, focused, and close to an OEM-style utility."))
-
-            val linksRow = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(0, deps.dp(14), 0, 0)
+        fun dashboardTile(title: String, description: String, icon: String, tab: String): LinearLayout {
+            return deps.sectionPanel().apply {
+                isClickable = true
+                isFocusable = true
+                contentDescription = "$title, $description"
+                setOnClickListener { deps.openSection(tab) }
+                addView(deps.sectionHeader(icon, title))
+                addView(deps.subtitleText(description))
             }
+        }
 
-            val githubBtn = deps.segmentedChip("GitHub", false) {
-                deps.openUrl("https://github.com/austineyoung2000/Red")
+        val navigationCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("◈", "EXPLORE"))
+            fun tileRow(first: LinearLayout, second: LinearLayout) {
+                val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+                row.addView(first, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(deps.space(deps.dp(8)))
+                row.addView(second, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(row)
             }
-
-            val referenceBtn = deps.segmentedChip("Reference", false) {
-                deps.openUrl("https://www.reddit.com/r/RedMagic/comments/1rtoako/red_magic_11_pro_hardware_control_guide_for/")
-            }
-
-            linksRow.addView(githubBtn)
-            linksRow.addView(deps.space(deps.dp(8)))
-            linksRow.addView(referenceBtn)
-
-            addView(linksRow)
+            tileRow(dashboardTile("Cooling", "Fan and pump", "❄", "cooling"),
+                dashboardTile("Lighting", "LED zones and effects", "✦", "lighting"))
+            tileRow(dashboardTile("Gaming & hardware", "Triggers and profiles", "⌥", "hardware"),
+                dashboardTile("System", "Magic Key and controls", "⌘", "controls"))
         }
 
         val deviceRomValue = deps.infoValue()
@@ -191,6 +192,21 @@ object HomeTabUi {
                 )
             )
             addView(activeModeText)
+        }
+
+        val quickStatusText = TextView(container.context).apply {
+            text = "Loading device status…"
+            textSize = 16f
+            setTextColor(AppTheme.textPrimary)
+            setPadding(0, deps.dp(8), 0, deps.dp(8))
+        }
+        val quickStatusCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("❄", "COOLING SYSTEM"))
+            addView(quickStatusText)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open cooling controls"
+            setOnClickListener { deps.openSection("cooling") }
         }
 
         val dashboardCard = deps.sectionPanel().apply {
@@ -242,9 +258,10 @@ object HomeTabUi {
 
         }
 
-        container.addView(summaryCard)
-        container.addView(activeModeCard)
+        container.addView(quickStatusCard)
+        container.addView(navigationCard)
         container.addView(dashboardCard)
+        container.addView(activeModeCard)
         container.addView(diagnosticsCard)
 
         return Result(
@@ -254,6 +271,7 @@ object HomeTabUi {
                 deviceCpuValue = deviceCpuValue,
                 deviceRamValue = deviceRamValue,
                 dashboardText = dashboardText,
+                quickStatusText = quickStatusText,
                 activeModeText = activeModeText,
                 thermalHistoryView = thermalHistoryView,
                 gameModeStatusText = gameModeStatusText
