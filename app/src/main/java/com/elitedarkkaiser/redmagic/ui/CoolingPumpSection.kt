@@ -218,14 +218,20 @@ internal object CoolingPumpSection {
                 }
             }
 
-            listOf(slowBtn, mediumBtn, quickBtn, experimentalBtn).forEach { button ->
+            listOf(slowBtn, mediumBtn, quickBtn, experimentalBtn).forEachIndexed { index, button ->
                 button.tag = "pump_preset"
                 com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle.apply(button, button.isSelected)
-                val icon = androidx.core.content.ContextCompat.getDrawable(context, com.elitedarkkaiser.redmagic.R.drawable.ic_toolbox_pump)?.mutate()
+                val iconResource = listOf(
+                    com.elitedarkkaiser.redmagic.R.drawable.ic_pump_preset_1,
+                    com.elitedarkkaiser.redmagic.R.drawable.ic_pump_preset_2,
+                    com.elitedarkkaiser.redmagic.R.drawable.ic_pump_preset_3,
+                    com.elitedarkkaiser.redmagic.R.drawable.ic_pump_preset_5
+                )[index]
+                val icon = androidx.core.content.ContextCompat.getDrawable(context, iconResource)?.mutate()
                 icon?.setTint(AppTheme.accentColor)
-                icon?.setBounds(0, 0, deps.dp(24), deps.dp(24))
+                icon?.setBounds(0, 0, deps.dp(36), deps.dp(36))
                 button.setCompoundDrawables(null, icon, null, null)
-                button.compoundDrawablePadding = deps.dp(6)
+                button.compoundDrawablePadding = deps.dp(4)
             }
 
             speedRow.addView(slowBtn, chipParams)

@@ -33,6 +33,8 @@ object SelectionControlStyle {
         }
         if (button.tag == "pump_preset" && button is MaterialButton) {
             button.textSize = 12f
+            button.gravity = android.view.Gravity.CENTER
+            button.setPadding(AppTheme.dp(context, 4), AppTheme.dp(context, 10), AppTheme.dp(context, 4), AppTheme.dp(context, 10))
             button.cornerRadius = AppTheme.dp(context, 12)
             button.strokeWidth = AppTheme.dp(context, 1)
             button.strokeColor = ColorStateList.valueOf(if (selected) AppTheme.accentColor else AppTheme.borderColor)

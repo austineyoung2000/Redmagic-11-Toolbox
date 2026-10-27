@@ -182,15 +182,18 @@ object LightingTabUi {
                     editor.addView(deps.bodyText("RGB Studio is unavailable on this ROM."), 0)
                     CapabilityUi.disableInteractions(editor)
                 }
-                val hero = android.widget.ImageView(activity).apply {
-                    setImageResource(com.elitedarkkaiser.redmagic.R.drawable.rgb_studio_hero)
-                    scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                    contentDescription = "Illustration of colorful gaming phone lighting"
-                    background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(20).toFloat())
-                    clipToOutline = true
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(150)).apply {
-                        bottomMargin = deps.dp(14)
-                    }
+                val hero = android.widget.FrameLayout(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))
+                    addView(android.widget.ImageView(context).apply {
+                        setImageResource(com.elitedarkkaiser.redmagic.R.drawable.rgb_silver_hero)
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        contentDescription = "Silver REDMAGIC phone with illuminated triggers and logo"
+                    }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                    addView(android.view.View(context).apply {
+                        background = android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                            intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+                    }, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 }
                 listOf(hero, editor)
             }),
