@@ -227,11 +227,13 @@ class TriggerRootService : Service() {
 
     private fun performInitialAction(
         prefKey: String,
-        action: String
+        action: String,
+        unlockedPress: Boolean = false
     ): Boolean {
         val current = now()
         val previous = lastActionAt[prefKey] ?: 0L
-        if (current - previous < ACTION_COOLDOWN_MS) {
+        val cooldown = if (unlockedPress) INPUT_DEBOUNCE_MS else ACTION_COOLDOWN_MS
+        if (current - previous < cooldown) {
             android.util.Log.d(
                 "TRIGGER",
                 "$prefKey action ignored by cooldown"
@@ -547,9 +549,11 @@ class TriggerRootService : Service() {
         } else {
             val accepted = performInitialAction(
                 "left_trigger",
-                getAction("left_trigger")
+                getAction("left_trigger"),
+                unlockedPress = config.usesHold() && alreadyUnlocked
             )
             if (accepted) {
+                if (config.usesIntentUnlock()) leftUnlockedUntil = now() + config.unlockTimeoutMs
                 if (config.leftUnlocksRight) {
                     unlockRightFromLeft(config)
                 }
@@ -590,7 +594,8 @@ class TriggerRootService : Service() {
         } else {
             val accepted = performInitialAction(
                 "right_trigger",
-                getAction("right_trigger")
+                getAction("right_trigger"),
+                unlockedPress = config.usesHold() && alreadyUnlocked
             )
             if (accepted) {
                 if (config.leftUnlocksRight && config.usesIntentUnlock()) {
