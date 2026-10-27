@@ -189,7 +189,19 @@ object LightingTabUi {
             InsidePages.Page("Calls", "Incoming call lighting", listOf(callLightingCard)),
             InsidePages.Page("Notifications", "Screen-off notification lighting", listOf(notificationCard)),
             InsidePages.Page("Lighting settings", "Preview preferences", listOf(zonesCard), icon = "⚙")
-        ), prefix = { com.elitedarkkaiser.redmagic.InlineLightingUi.create(activity, deps) })
+        ), prefix = {
+            val hero = android.widget.ImageView(activity).apply {
+                setImageResource(com.elitedarkkaiser.redmagic.R.drawable.lighting_hero)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                contentDescription = "Illustration of gaming phone lighting"
+                background = AppTheme.roundedBg(AppTheme.panelColor, AppTheme.borderColor, deps.dp(20).toFloat())
+                clipToOutline = true
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(150)).apply {
+                    bottomMargin = deps.dp(14)
+                }
+            }
+            listOf(hero) + com.elitedarkkaiser.redmagic.InlineLightingUi.create(activity, deps)
+        })
         return container
     }
 }
