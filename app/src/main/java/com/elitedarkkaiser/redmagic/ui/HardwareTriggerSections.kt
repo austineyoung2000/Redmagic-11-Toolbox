@@ -154,6 +154,15 @@ internal object HardwareTriggerSections {
         return card
     }
 
+    private fun compactChoice(button: Button, deps: HardwareTabDeps) {
+        button.minHeight = deps.dp(40)
+        button.minimumHeight = deps.dp(40)
+        button.setPadding(deps.dp(3), 0, deps.dp(3), 0)
+        if (button is com.google.android.material.button.MaterialButton) {
+            button.cornerRadius = deps.dp(12)
+        }
+    }
+
     private fun createQuickActions(activity: Activity, deps: HardwareTabDeps): LinearLayout {
         val prefs = activity.getSharedPreferences("triggers", android.content.Context.MODE_PRIVATE)
         val values = listOf("NONE", "VOL_UP", "VOL_DOWN", "MEDIA_PLAY_PAUSE", "MEDIA_NEXT", "MEDIA_PREVIOUS")
@@ -166,7 +175,7 @@ internal object HardwareTriggerSections {
             listOf(Triple("Left / Top trigger", "left_trigger", "VOL_DOWN"), Triple("Right / Bottom trigger", "right_trigger", "VOL_UP")).forEach { (title, key, default) ->
                 card.addView(deps.subtleLabel(title))
                 val selected = prefs.getString(key, default) ?: default
-                labels.indices.toList().chunked(2).forEach { indices ->
+                labels.indices.toList().chunked(3).forEach { indices ->
                     val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
                     indices.forEachIndexed { index, i ->
                         val button = deps.actionButton(labels[i], false) {
@@ -175,7 +184,8 @@ internal object HardwareTriggerSections {
                         }
                         button.isAllCaps = false
                         SelectionControlStyle.apply(button, values[i] == selected)
-                        row.addView(button, LinearLayout.LayoutParams(0, deps.dp(48), 1f).apply { if (index > 0) marginStart = deps.dp(6) })
+                        compactChoice(button, deps)
+                        row.addView(button, LinearLayout.LayoutParams(0, deps.dp(40), 1f).apply { if (index > 0) marginStart = deps.dp(6); bottomMargin = deps.dp(6) })
                     }
                     card.addView(row)
                 }
@@ -193,13 +203,14 @@ internal object HardwareTriggerSections {
         lateinit var render: () -> Unit
         fun <T> choices(title: String, options: List<Pair<T, String>>, selected: T, choose: (T) -> Unit) {
             card.addView(deps.subtleLabel(title))
-            options.chunked(2).forEach { group ->
+            options.chunked(if (title == "Protection mode") 2 else 4).forEach { group ->
                 val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
                 group.forEachIndexed { index, (value, label) ->
                     val button = deps.actionButton(label, false) { choose(value); render() }
                     button.isAllCaps = false
                     SelectionControlStyle.apply(button, value == selected)
-                    row.addView(button, LinearLayout.LayoutParams(0, deps.dp(48), 1f).apply { if (index > 0) marginStart = deps.dp(6) })
+                    compactChoice(button, deps)
+                    row.addView(button, LinearLayout.LayoutParams(0, deps.dp(40), 1f).apply { if (index > 0) marginStart = deps.dp(6); bottomMargin = deps.dp(6) })
                 }
                 card.addView(row)
             }
@@ -245,8 +256,26 @@ internal object HardwareTriggerSections {
             }
         }
         card.addView(deps.sectionHeader("⌥", "BACKEND DIAGNOSTICS"))
-        card.addView(report)
-        card.addView(deps.row(refresh, copy))
+        val details = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.GONE
+            addView(report)
+            addView(deps.row(refresh, copy))
+        }
+        val expand = TextView(activity).apply {
+            text = "Show report  ›"
+            textSize = 13f
+            setTextColor(AppTheme.accentColor)
+            setPadding(0, deps.dp(10), 0, deps.dp(6))
+            isClickable = true; isFocusable = true
+            setOnClickListener {
+                val showing = details.visibility == android.view.View.VISIBLE
+                details.visibility = if (showing) android.view.View.GONE else android.view.View.VISIBLE
+                text = if (showing) "Show report  ›" else "Hide report  ∨"
+            }
+        }
+        card.addView(expand)
+        card.addView(details)
         card.addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(view: android.view.View) { refresh.performClick() }
             override fun onViewDetachedFromWindow(view: android.view.View) = Unit
