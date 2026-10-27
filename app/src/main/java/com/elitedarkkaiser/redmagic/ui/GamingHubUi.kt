@@ -64,7 +64,6 @@ internal object GamingHubUi {
             row(parent, "Game overlay", "Manage overlay permission") {
                 runCatching { activity.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${activity.packageName}"))) }
             }
-            row(parent, "Magic Key", "Set button functions") { (activity as? MainActivity)?.openMagicKeyFromGaming() }
             val heading = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0,d(12),0,d(8)) }
             heading.addView(label("Per-app game profiles", true), LinearLayout.LayoutParams(0, -2, 1f))
             heading.addView(label("See all").apply { setTextColor(AppTheme.accentColor); setOnClickListener { gameActions.showProfileDialog() } })
