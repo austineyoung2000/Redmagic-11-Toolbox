@@ -80,7 +80,7 @@ internal class MainCoolingTabActions(
     }
 
     fun applyFanRpm(rpm: Int?) {
-        refs?.rpmText?.text = rpm?.let { "Fan speed: $it RPM" } ?: "Fan speed: unavailable"
+        refs?.rpmText?.text = rpm?.let { "$it RPM" } ?: "Unavailable"
     }
 
     fun applyTemperature(temperatureF: Float?) {
@@ -310,14 +310,14 @@ internal class MainCoolingTabActions(
         trend: String
     ) {
         refs?.tempText?.text = if (temperatureF != null) {
-            "Current temp: ${
+            "${
                 TempFormat.formatDisplayTempFromF(
                     temperatureF,
                     useFahrenheit()
                 )
             }$trend"
         } else {
-            "Current temp: --"
+            "--"
         }
     }
 

@@ -7,6 +7,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import android.widget.LinearLayout
 import com.google.android.material.slider.Slider
 import android.widget.TextView
+import android.graphics.Typeface
 import com.elitedarkkaiser.redmagic.HardwareController
 
 object CoolingTabUi {
@@ -32,15 +33,17 @@ object CoolingTabUi {
         val container = deps.scrollTabContainer()
 
         val tempText = TextView(container.context).apply {
-            text = "Current temp: --"
-            textSize = 13f
-            setTextColor(AppTheme.textSecondary)
+            text = "--"
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(AppTheme.textPrimary)
             setPadding(0, deps.dp(6), 0, deps.dp(4))
         }
 
         val rpmText = TextView(container.context).apply {
-            text = "Fan speed: -- RPM"
-            textSize = 16f
+            text = "-- RPM"
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
             setTextColor(AppTheme.textPrimary)
             setPadding(0, deps.dp(4), 0, deps.dp(8))
         }
@@ -156,28 +159,30 @@ object CoolingTabUi {
         }
 
         quietChip = deps.segmentedChip(
-            "Quiet",
+            "♧\nQuiet\nLow noise",
             deps.getSelectedCurve() == "quiet"
         ) {
             applyFanCurve("quiet", "Quiet")
         }
 
         balancedChip = deps.segmentedChip(
-            "Balanced",
+            "✿\nBalanced\nEveryday use",
             deps.getSelectedCurve() == "balanced"
         ) {
             applyFanCurve("balanced", "Balanced")
         }
 
         turboChip = deps.segmentedChip(
-            "Turbo",
+            "✣\nTurbo\nMaximum cooling",
             deps.getSelectedCurve() == "turbo"
         ) {
             applyFanCurve("turbo", "Turbo")
         }
 
         listOf(quietChip, balancedChip, turboChip).forEach { button ->
-            button.minHeight = deps.dp(72)
+            button.maxLines = 3
+            button.textSize = 12f
+            button.minHeight = deps.dp(88)
             button.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         modeRow.addView(quietChip)
@@ -220,11 +225,28 @@ object CoolingTabUi {
         val smartPumpSpeedView = pumpSection.speedView
         val pumpCard = pumpSection.card
 
+        val telemetryCard = deps.sectionPanel().apply {
+            val metrics = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                fun metric(iconName: String, value: TextView, label: String) {
+                    val column = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(value)
+                        addView(deps.subtleLabel(label))
+                    }
+                    val icon = ToolboxIcons.create(context, iconName)
+                    addView(icon, LinearLayout.LayoutParams(deps.dp(32), deps.dp(32)).apply {
+                        marginEnd = deps.dp(8)
+                    })
+                    addView(column, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                }
+                metric("temp", tempText, "Current temperature")
+                metric("fan", rpmText, "Fan speed")
+            }
+            addView(metrics)
+        }
+
         val coolingCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("❄", "COOLING SYSTEM"))
-            addView(tempText)
-            addView(rpmText)
-            addView(deps.spacer(deps.dp(12)))
             addView(deps.sectionHeader("▦", "FAN PRESET"))
             addView(modeRow)
             addView(curveStatusText)
@@ -232,6 +254,11 @@ object CoolingTabUi {
             addView(deps.spacer(deps.dp(12)))
             addView(autoCurveCheck)
             addView(deps.subtleLabel("Automatically adjust fan speed based on temperature"))
+            addView(deps.spacer(deps.dp(12)))
+            addView(deps.subtleLabel("Automatic fan curve • estimated RPM by temperature (°F)"))
+            addView(AutoFanCurveView(context), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(150)))
+            addView(deps.subtleLabel("Estimated RPM; actual speed varies. Fan levels drop after a 5°F cooldown buffer."))
             addView(deps.spacer(deps.dp(12)))
             addView(deps.subtleLabel("Manual fan level"))
             addView(fanSeek)
@@ -290,6 +317,8 @@ object CoolingTabUi {
             CapabilityUi.disableInteractions(pumpCard)
         }
 
+        container.addView(telemetryCard)
+        container.addView(deps.spacer(deps.dp(12)))
         container.addView(coolingCard)
         container.addView(deps.spacer(deps.dp(16)))
         container.addView(pumpCard)
