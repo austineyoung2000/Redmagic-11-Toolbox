@@ -21,9 +21,14 @@ internal object InlineLightingUi {
     private val paletteColors = listOf("#FF0000", "#FF8C00", "#FFD600", "#00E676", "#00E5FF", "#1565FF", "#A020F0", "#FF69B4")
 
     fun create(activity: Activity, deps: LightingTabDeps): List<View> {
-        var fan = savedFanLedStateStorage(activity)
-        var logo = savedLogoLedStateStorage(activity)
-        var trigger = savedShoulderLedStateStorage(activity)
+        return createProfiles(activity, deps, savedFanLedStateStorage(activity), savedLogoLedStateStorage(activity), savedShoulderLedStateStorage(activity), deps.saveInlineFan, deps.saveInlineLogo, deps.saveInlineShoulder)
+    }
+
+    fun createProfiles(activity: Activity, deps: LightingTabDeps, initialFan: LedState, initialLogo: LedState, initialTrigger: LedState,
+        saveFan: (LedState) -> Unit, saveLogo: (LedState) -> Unit, saveTrigger: (LedState) -> Unit): List<View> {
+        var fan = initialFan
+        var logo = initialLogo
+        var trigger = initialTrigger
         val cards = listOf(deps.sectionPanel(), deps.sectionPanel(), deps.sectionPanel(), deps.sectionPanel())
         val available = !deps.capabilities.scanComplete || deps.capabilities.ledAvailable
         fun text(value: String, size: Float = 13f, bold: Boolean = false) = TextView(activity).apply {
@@ -87,8 +92,8 @@ internal object InlineLightingUi {
         fun render() {
             cards.forEach { it.removeAllViews() }
             val fanCard = cards[0]
-            heading(fanCard, "Fan lighting", fan.enabled) { fan = fan.copy(enabled = it); deps.saveInlineFan(fan); redraw() }
-            palette(fanCard, "Color", fan.color) { fan = fan.copy(color = it); deps.saveInlineFan(fan); redraw() }
+            heading(fanCard, "Fan lighting", fan.enabled) { fan = fan.copy(enabled = it); saveFan(fan); redraw() }
+            palette(fanCard, "Color", fan.color) { fan = fan.copy(color = it); saveFan(fan); redraw() }
             label(fanCard, "Multicolor palettes")
             val paletteSets = listOf(
                 listOf("#FF69B4", "#FF0000", "#FF8C00", "#FF8C00"),
@@ -106,15 +111,15 @@ internal object InlineLightingUi {
                 val id = 0x101 + index
                 if (index > 0) presets.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
                 val bubble = bubbleFactory.fanPresetBubble(colors, { fan.color == id }) {
-                    fan = fan.copy(color = id); deps.saveInlineFan(fan); redraw()
+                    fan = fan.copy(color = id); saveFan(fan); redraw()
                 }.apply { contentDescription = "Multicolor palette ${index + 1}${if (fan.color == id) ", selected" else ""}" }
                 presets.addView(bubble, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
             }
             fanCard.addView(presets)
-            effects(fanCard, LedBrightness.effect(fan.effect), true) { fan = fan.copy(effect = LedBrightness.withEffect(fan.effect, it)); deps.saveInlineFan(fan); redraw() }
-            brightness(fanCard, LedBrightness.level(fan.effect)) { fan = fan.copy(effect = LedBrightness.encode(it, fan.effect)); deps.saveInlineFan(fan); redraw() }
+            effects(fanCard, LedBrightness.effect(fan.effect), true) { fan = fan.copy(effect = LedBrightness.withEffect(fan.effect, it)); saveFan(fan); redraw() }
+            brightness(fanCard, LedBrightness.level(fan.effect)) { fan = fan.copy(effect = LedBrightness.encode(it, fan.effect)); saveFan(fan); redraw() }
             val pair = LogoBarSelection.from(logo)
-            fun updatePair(next: LogoBarSelection, color: Int = logo.color) { logo = next.state(color); deps.saveInlineLogo(logo); redraw() }
+            fun updatePair(next: LogoBarSelection, color: Int = logo.color) { logo = next.state(color); saveLogo(logo); redraw() }
             val logoCard = cards[1]
             heading(logoCard, "Logo lighting", pair.logoEnabled) { updatePair(pair.copy(logoEnabled = it)) }
             palette(logoCard, "Color", logo.color) { updatePair(pair, it) }
@@ -134,7 +139,7 @@ internal object InlineLightingUi {
             fun updateTrigger(enabled: Boolean = trigger.enabled, color: Int = trigger.color, mode: String = effect, top: Int? = split?.topRgb, bottom: Int? = split?.bottomRgb, brightness: Int = level) {
                 val base = if (top != null && bottom != null) ShoulderLedSplit.encode(mode, top, bottom) else mode
                 trigger = LedState(enabled, LedBrightness.encode(brightness, base), color)
-                deps.saveInlineShoulder(trigger); redraw()
+                saveTrigger(trigger); redraw()
             }
             heading(tr, "Trigger lighting", trigger.enabled) { updateTrigger(enabled = it) }
             palette(tr, if (split == null) "Color" else "Top trigger", if (split == null) trigger.color else rgbId(split.topRgb)) {

@@ -42,16 +42,6 @@ object LightingTabUi {
             addView(previewRow)
         }
 
-        val gameModeCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("🎮", "GAME MODE"))
-            addView(deps.bodyText("Select apps, then edit cooling and lighting separately for each app. Profiles apply only while that app is foreground."))
-            addView(deps.infoRow("Apps", deps.subtleLabel(deps.gameModeAppsSummary())))
-            addView(deps.row(
-                deps.actionButton("SELECT APPS", false) { deps.showGameModeAppPicker() },
-                deps.actionButton("APP PROFILES", false) { deps.showGameModeProfileDialog() }
-            ))
-        }
-
         val chargingModeCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("⚡", "CHARGING MODE"))
             addView(deps.bodyText("Applies only while the device is plugged in and charging. Charging Mode takes LED priority over Game Mode and normal LED profiles."))
@@ -75,15 +65,6 @@ object LightingTabUi {
             }
 
             addView(chargingRow)
-            addView(deps.infoRow("Priority", deps.subtleLabel("Incoming Call > Charging > Game Mode > Normal LEDs")))
-            addView(deps.singleRow(deps.actionButton("CHARGING FAN LED", false) {
-                deps.showChargingFanLedDialog()
-            }))
-            addView(deps.row(
-                deps.actionButton("CHARGING LOGO LED", false) { deps.showChargingLogoLedDialog() },
-                deps.actionButton("CHARGING SHOULDER LEDS", false) { deps.showChargingShoulderLedDialog() }
-            ))
-            addView(deps.singleRow(deps.actionButton("CHARGING GAME MODE BAR", false) { deps.showChargingGameModeBarDialog() }))
         }
 
         if (
@@ -156,7 +137,6 @@ object LightingTabUi {
             addView(callRow)
             addView(pauseFanRow)
             addView(deps.bodyText("Temporarily turns the fan off while an incoming call rings, then restores it when answered or dismissed."))
-            addView(deps.singleRow(deps.actionButton("INCOMING CALL PROFILE", false) { deps.showIncomingCallProfileDialog() }))
         }
 
         if (
@@ -197,10 +177,9 @@ object LightingTabUi {
                 }
                 listOf(hero, editor)
             }),
-            InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),
-            InsidePages.Page("Charging", "Charging lighting profile", listOf(chargingModeCard)),
-            InsidePages.Page("Calls", "Incoming call lighting", listOf(callLightingCard)),
-            InsidePages.Page("Notifications", "Screen-off notification lighting", listOf(notificationCard)),
+            InsidePages.Page("Charging", "Charging lighting profile", emptyList(), factory = { listOf(chargingModeCard) + com.elitedarkkaiser.redmagic.ModeLightingUi.charging(activity, deps) }),
+            InsidePages.Page("Calls", "Incoming call lighting", emptyList(), factory = { listOf(callLightingCard) + com.elitedarkkaiser.redmagic.ModeLightingUi.calls(activity, deps) }),
+            InsidePages.Page("Notifications", "Screen-off notification lighting", emptyList(), factory = { listOf(com.elitedarkkaiser.redmagic.NotificationLightingPage.create(activity, deps)) }),
             InsidePages.Page("Lighting settings", "Preview preferences", listOf(zonesCard), icon = "⚙")
         ), prefix = {
             val hero = android.widget.FrameLayout(activity).apply {
