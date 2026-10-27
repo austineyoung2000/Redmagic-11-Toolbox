@@ -79,7 +79,7 @@ class ThermalHistoryView(
     private var useFahrenheit = true
 
     init {
-        minimumHeight = ((if (compact) 40f else 180f) * density).toInt()
+        minimumHeight = ((if (compact) 32f else 180f) * density).toInt()
         contentDescription =
             "Thermal history is collecting samples"
     }
@@ -98,7 +98,7 @@ class ThermalHistoryView(
         widthMeasureSpec: Int,
         heightMeasureSpec: Int
     ) {
-        val desiredHeight = ((if (compact) 40f else 180f) * density).toInt()
+        val desiredHeight = ((if (compact) 32f else 180f) * density).toInt()
         setMeasuredDimension(
             MeasureSpec.getSize(widthMeasureSpec),
             resolveSize(

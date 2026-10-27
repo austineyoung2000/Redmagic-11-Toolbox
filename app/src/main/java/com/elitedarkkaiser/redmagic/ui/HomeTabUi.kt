@@ -22,6 +22,7 @@ object HomeTabUi {
         val tempChip: TextView,
         val activeModeText: TextView,
         val thermalHistoryView: ThermalHistoryView,
+        val historySummary: TextView,
         val gameModeStatusText: TextView?
     )
 
@@ -249,6 +250,13 @@ object HomeTabUi {
         val coolingTemp = metric("--", 27f)
         val coolingRpm = metric("-- RPM", 20f)
         val thermalHistoryView = ThermalHistoryView(container.context, compact = true)
+        val historySummary = TextView(container.context).apply {
+            text = "Now --   Min --   Max --"
+            textSize = 11f
+            setTextColor(AppTheme.textSecondary)
+            maxLines = 1
+            contentDescription = "Temperature history is collecting samples"
+        }
         val quickStatusCard = deps.sectionPanel().apply {
             setPadding(0, 0, 0, 0)
             val frame = android.widget.FrameLayout(context)
@@ -285,7 +293,8 @@ object HomeTabUi {
                     addView(right, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 }
                 addView(row)
-                addView(thermalHistoryView, LinearLayout.LayoutParams(-1, deps.dp(40)))
+                addView(thermalHistoryView, LinearLayout.LayoutParams(-1, deps.dp(32)))
+                addView(historySummary)
             }
             frame.addView(body)
             addView(frame, LinearLayout.LayoutParams(
@@ -336,6 +345,7 @@ object HomeTabUi {
                 tempChip = tempChip,
                 activeModeText = activeModeText,
                 thermalHistoryView = thermalHistoryView,
+                historySummary = historySummary,
                 gameModeStatusText = gameModeStatusText
             )
         )

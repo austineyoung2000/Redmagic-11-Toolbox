@@ -47,6 +47,20 @@ internal class MainHomeController(
             snapshot.temperatureHistory,
             useFahrenheit
         )
+        val temperatures = snapshot.temperatureHistory.map {
+            if (useFahrenheit) it.temperatureC * 9f / 5f + 32f else it.temperatureC
+        }
+        val latest = temperatures.lastOrNull()
+        if (latest == null) {
+            current.historySummary.text = "Now --   Min --   Max --"
+            current.historySummary.contentDescription = "Temperature history is collecting samples"
+        } else {
+            val unit = if (useFahrenheit) "°F" else "°C"
+            val summary = String.format(java.util.Locale.getDefault(), "Now %.1f%s   Min %.1f%s   Max %.1f%s",
+                latest, unit, temperatures.minOrNull() ?: latest, unit, temperatures.maxOrNull() ?: latest, unit)
+            current.historySummary.text = summary
+            current.historySummary.contentDescription = summary
+        }
     }
 
     private fun createDependencies(): HomeTabDeps {
