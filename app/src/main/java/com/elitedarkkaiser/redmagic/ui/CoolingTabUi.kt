@@ -266,8 +266,7 @@ object CoolingTabUi {
             addView(AutoFanCurveView(context), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(150)))
             addView(deps.subtleLabel("Estimated RPM; actual speed varies. Fan levels drop after a 5°F cooldown buffer."))
-        }
-        val manualCard = deps.sectionPanel().apply {
+            addView(deps.spacer(deps.dp(12)))
             addView(deps.bodyText("Manual fan control"))
             addView(deps.subtleLabel("Manual fan level"))
             addView(fanSeek)
@@ -348,8 +347,6 @@ object CoolingTabUi {
         container.addView(coolingCard)
         container.addView(deps.spacer(deps.dp(12)))
         container.addView(pumpCard)
-        container.addView(deps.spacer(deps.dp(12)))
-        container.addView(manualCard)
 
         return Result(
             view = container,
