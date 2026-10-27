@@ -14,7 +14,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 class ThermalHistoryView(
-    context: Context
+    context: Context,
+    private val compact: Boolean = false
 ) : View(context) {
     private val density =
         resources.displayMetrics.density
@@ -31,7 +32,7 @@ class ThermalHistoryView(
     private val linePaint = Paint(
         Paint.ANTI_ALIAS_FLAG
     ).apply {
-        color = context.getColor(
+        color = if (compact) AppTheme.accentColor else context.getColor(
             com.elitedarkkaiser.redmagic.R.color.redmagic_graph_line
         )
         strokeWidth = 2.25f * density
@@ -78,7 +79,7 @@ class ThermalHistoryView(
     private var useFahrenheit = true
 
     init {
-        minimumHeight = (180f * density).toInt()
+        minimumHeight = ((if (compact) 40f else 180f) * density).toInt()
         contentDescription =
             "Thermal history is collecting samples"
     }
@@ -97,7 +98,7 @@ class ThermalHistoryView(
         widthMeasureSpec: Int,
         heightMeasureSpec: Int
     ) {
-        val desiredHeight = (180f * density).toInt()
+        val desiredHeight = ((if (compact) 40f else 180f) * density).toInt()
         setMeasuredDimension(
             MeasureSpec.getSize(widthMeasureSpec),
             resolveSize(
@@ -112,23 +113,17 @@ class ThermalHistoryView(
 
         val viewWidth = width.toFloat()
         val viewHeight = height.toFloat()
-        val left = 8f * density
-        val right = viewWidth - 8f * density
-        val top = 32f * density
-        val bottom = viewHeight - 28f * density
+        val left = (if (compact) 4f else 8f) * density
+        val right = viewWidth - (if (compact) 4f else 8f) * density
+        val top = (if (compact) 4f else 32f) * density
+        val bottom = viewHeight - (if (compact) 4f else 28f) * density
 
-        drawGrid(
-            canvas,
-            left,
-            right,
-            top,
-            bottom
-        )
+        if (!compact) drawGrid(canvas, left, right, top, bottom)
 
         if (samples.isEmpty()) {
             val message =
                 "Collecting temperature history…"
-            canvas.drawText(
+            if (!compact) canvas.drawText(
                 message,
                 (
                     viewWidth -
@@ -210,8 +205,8 @@ class ThermalHistoryView(
             top,
             0f,
             bottom,
-            Color.argb(100, 143, 163, 191),
-            Color.argb(8, 143, 163, 191),
+            if (compact) Color.argb(105, 243, 53, 77) else Color.argb(100, 143, 163, 191),
+            if (compact) Color.argb(8, 243, 53, 77) else Color.argb(8, 143, 163, 191),
             Shader.TileMode.CLAMP
         )
         canvas.drawPath(fillPath, fillPaint)
@@ -222,6 +217,8 @@ class ThermalHistoryView(
             3.5f * density,
             pointPaint
         )
+
+        if (compact) return
 
         val current = temperatures.last()
         val summary = String.format(

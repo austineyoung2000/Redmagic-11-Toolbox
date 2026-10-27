@@ -14,10 +14,8 @@ object HomeTabUi {
         val deviceRomValue: TextView,
         val deviceCpuValue: TextView,
         val deviceRamValue: TextView,
-        val dashboardText: TextView,
         val coolingTemp: TextView,
         val coolingRpm: TextView,
-        val fanLevelBar: android.widget.ProgressBar,
         val rootChip: TextView,
         val fanChip: TextView,
         val rpmChip: TextView,
@@ -223,18 +221,6 @@ object HomeTabUi {
         container.addView(deviceCard)
         container.addView(chipRow)
 
-        val dashboardText =
-            TextView(container.context).apply {
-                text = "Loading dashboard…"
-                textSize = 13f
-                setTextColor(AppTheme.textPrimary)
-                setLineSpacing(0f, 1.15f)
-                setPadding(0, 0, 0, deps.dp(12))
-            }
-
-        lateinit var thermalHistoryView:
-            ThermalHistoryView
-
         val activeModeText =
             TextView(container.context).apply {
                 text = deps.activeModeSummary()
@@ -262,13 +248,7 @@ object HomeTabUi {
         }
         val coolingTemp = metric("--", 27f)
         val coolingRpm = metric("-- RPM", 20f)
-        val fanLevelBar = android.widget.ProgressBar(container.context, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 5
-            progress = 0
-            progressTintList = ColorStateList.valueOf(AppTheme.accentColor)
-            progressBackgroundTintList = ColorStateList.valueOf(AppTheme.panelPressed)
-            contentDescription = "Fan level"
-        }
+        val thermalHistoryView = ThermalHistoryView(container.context, compact = true)
         val quickStatusCard = deps.sectionPanel().apply {
             setPadding(0, 0, 0, 0)
             val frame = android.widget.FrameLayout(context)
@@ -277,13 +257,13 @@ object HomeTabUi {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 alpha = 0.38f
                 contentDescription = null
-            }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(168)))
+            }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(180)))
             frame.addView(View(context).apply {
                 background = android.graphics.drawable.GradientDrawable(
                     android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
                     intArrayOf(android.graphics.Color.argb(220, 35, 8, 14), android.graphics.Color.argb(130, 5, 8, 12))
                 )
-            }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(168)))
+            }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(180)))
             val body = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(deps.dp(18), deps.dp(16), deps.dp(18), deps.dp(16))
@@ -305,7 +285,7 @@ object HomeTabUi {
                     addView(right, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 }
                 addView(row)
-                addView(fanLevelBar, LinearLayout.LayoutParams(-1, deps.dp(6)))
+                addView(thermalHistoryView, LinearLayout.LayoutParams(-1, deps.dp(40)))
             }
             frame.addView(body)
             addView(frame, LinearLayout.LayoutParams(
@@ -318,68 +298,27 @@ object HomeTabUi {
             setOnClickListener { deps.openSection("cooling") }
         }
 
-        val dashboardCard = deps.sectionPanel().apply {
-            addView(
-                deps.sectionHeader(
-                    "◈",
-                    "LIVE DASHBOARD"
-                )
-            )
-
-            val refreshBtn = deps.actionButton(
-                "REFRESH DASHBOARD",
-                false
-            ) {
-                deps.requestStatusRefresh()
-            }
-
-            addView(dashboardText)
-            addView(
-                deps.sectionHeader(
-                    "⌁",
-                    "THERMAL HISTORY"
-                )
-            )
-            thermalHistoryView =
-                ThermalHistoryView(context)
-            addView(thermalHistoryView)
-            addView(deps.space(deps.dp(12)))
-            addView(
-                deps.infoRow(
-                    "ROM",
-                    deviceRomValue
-                )
-            )
-            addView(
-                deps.infoRow(
-                    "CPU",
-                    deviceCpuValue
-                )
-            )
-            addView(
-                deps.infoRow(
-                    "RAM",
-                    deviceRamValue
-                )
-            )
-            addView(deps.space(deps.dp(8)))
-            addView(deps.singleRow(refreshBtn))
-
+        val deviceInfoCard = deps.sectionPanel().apply {
+            addView(deps.sectionHeader("⌁", "DEVICE INFORMATION"))
+            addView(deps.infoRow("ROM", deviceRomValue))
+            addView(deps.infoRow("CPU", deviceCpuValue))
+            addView(deps.infoRow("RAM", deviceRamValue))
+            addView(deps.singleRow(deps.actionButton("REFRESH", false) { deps.requestStatusRefresh() }))
         }
 
         container.addView(quickStatusCard)
         container.addView(navigationCard)
         val details = deps.actionButton("DEVICE DETAILS & DIAGNOSTICS", false) {
-            val visible = dashboardCard.visibility != android.view.View.VISIBLE
-            dashboardCard.visibility = if (visible) android.view.View.VISIBLE else android.view.View.GONE
-            activeModeCard.visibility = dashboardCard.visibility
-            diagnosticsCard.visibility = dashboardCard.visibility
+            val visible = deviceInfoCard.visibility != android.view.View.VISIBLE
+            deviceInfoCard.visibility = if (visible) android.view.View.VISIBLE else android.view.View.GONE
+            activeModeCard.visibility = deviceInfoCard.visibility
+            diagnosticsCard.visibility = deviceInfoCard.visibility
         }
-        dashboardCard.visibility = android.view.View.GONE
+        deviceInfoCard.visibility = android.view.View.GONE
         activeModeCard.visibility = android.view.View.GONE
         diagnosticsCard.visibility = android.view.View.GONE
         container.addView(deps.singleRow(details))
-        container.addView(dashboardCard)
+        container.addView(deviceInfoCard)
         container.addView(activeModeCard)
         container.addView(diagnosticsCard)
 
@@ -389,10 +328,8 @@ object HomeTabUi {
                 deviceRomValue = deviceRomValue,
                 deviceCpuValue = deviceCpuValue,
                 deviceRamValue = deviceRamValue,
-                dashboardText = dashboardText,
                 coolingTemp = coolingTemp,
                 coolingRpm = coolingRpm,
-                fanLevelBar = fanLevelBar,
                 rootChip = rootChip,
                 fanChip = fanChip,
                 rpmChip = rpmChip,
