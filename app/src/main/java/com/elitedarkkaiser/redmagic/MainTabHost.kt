@@ -26,6 +26,7 @@ internal class MainTabHost(
     private val navigation = MainBottomNavigation(activity, ::select)
     private val tabs = linkedMapOf<String, TabState>()
     private var currentTab = "home"
+    private var dashboardEntry = "home"
 
     private fun withBack(view: LinearLayout): LinearLayout {
         val button = android.widget.TextView(activity).apply {
@@ -71,6 +72,10 @@ internal class MainTabHost(
     }
 
     fun handleBack(): Boolean {
+        if (dashboardEntry == "gaming") {
+            select("home")
+            return true
+        }
         val view = tabs[currentTab]?.view
         if (view != null && com.elitedarkkaiser.redmagic.ui.InsidePages.back(view)) return true
         if (currentTab == "home") return false
@@ -113,12 +118,12 @@ internal class MainTabHost(
                 if (id == resolved) View.VISIBLE else View.GONE
         }
         currentTab = resolved
+        dashboardEntry = tabId
         navigation.select(resolved)
         com.elitedarkkaiser.redmagic.ui.InsidePages.back(selected.view)
         when (tabId) {
             "gaming" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 0)
             "profiles" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 5)
-            "system" -> com.elitedarkkaiser.redmagic.ui.InsidePages.open(selected.view, 0)
         }
     }
 

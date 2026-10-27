@@ -19,7 +19,7 @@ internal object ToolboxIcons {
             "charging" in key || "charge" in key -> R.drawable.ic_toolbox_charge
             "studio" in key -> R.drawable.ic_toolbox_palette
             "light" in key -> R.drawable.ic_toolbox_light
-            "game" in key -> R.drawable.ic_toolbox_game
+            ("game" in key || "gaming" in key) -> R.drawable.ic_toolbox_game
             "hardware" in key -> R.drawable.ic_toolbox_hardware
             "profile" in key || "automation" in key -> R.drawable.ic_toolbox_profiles
             "haptic" in key -> R.drawable.ic_toolbox_wave
