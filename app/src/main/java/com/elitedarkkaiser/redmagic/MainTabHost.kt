@@ -27,6 +27,7 @@ internal class MainTabHost(
     private val tabs = linkedMapOf<String, TabState>()
     private var currentTab = "home"
     private var dashboardEntry = "home"
+    private var magicKeyReturnToHardware = false
 
     private fun withBack(view: LinearLayout, fallbackTitle: String): LinearLayout {
         val header = LinearLayout(activity).apply {
@@ -88,7 +89,17 @@ internal class MainTabHost(
         tabs["controls"]?.view?.let { com.elitedarkkaiser.redmagic.ui.InsidePages.open(it, index) }
     }
 
+    fun openMagicKeyFromHardware() {
+        select("controls")
+        openControlsPage(1)
+        magicKeyReturnToHardware = true
+    }
+
     fun handleBack(): Boolean {
+        if (magicKeyReturnToHardware && currentTab == "controls") {
+            select("hardware")
+            return true
+        }
         if (dashboardEntry == "gaming" || dashboardEntry == "profiles") {
             select("home")
             return true
@@ -112,6 +123,7 @@ internal class MainTabHost(
     }
 
     fun select(tabId: String) {
+        magicKeyReturnToHardware = false
         val resolved = when (tabId) {
             "gaming", "profiles" -> "hardware"
             "system" -> "controls"

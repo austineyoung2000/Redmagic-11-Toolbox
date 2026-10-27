@@ -161,8 +161,7 @@ class MainActivity : Activity() {
     }
 
     internal fun openMagicKeyFromGaming() {
-        tabHost.select("controls")
-        tabHost.openControlsPage(1)
+        tabHost.openMagicKeyFromHardware()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
