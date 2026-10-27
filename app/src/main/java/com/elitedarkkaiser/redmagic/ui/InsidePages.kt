@@ -123,6 +123,15 @@ internal object InsidePages {
                 }
                 menu.visibility = View.GONE
                 detail.visibility = View.VISIBLE
+                fun resetScroll(view: View?) {
+                    if (view == null) return
+                    if (view is android.widget.ScrollView) {
+                        view.post { view.scrollTo(0, 0) }
+                        return
+                    }
+                    resetScroll(view.parent as? View)
+                }
+                resetScroll(container)
             }
         }
         container.addView(menu)

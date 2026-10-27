@@ -41,37 +41,62 @@ internal object NotificationLightingPage {
             var profile = NotificationLightingState.read(activity, pkg) ?: NotificationLightingState.Profile()
             val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(deps.dp(16), deps.dp(8), deps.dp(16), deps.dp(20)) }
             lateinit var repaint: () -> Unit
-            fun update(next: NotificationLightingState.Profile) { profile = next; repaint() }
+            fun update(next: NotificationLightingState.Profile) {
+                val scroll = content.parent as? ScrollView
+                val previousY = scroll?.scrollY ?: 0
+                profile = next
+                repaint()
+                scroll?.post { scroll.scrollTo(0, previousY) }
+            }
             repaint = {
                 content.removeAllViews()
-                val card = deps.sectionPanel()
-                card.addView(TextView(activity).apply { text = name; textSize = 18f; setTextColor(AppTheme.textPrimary); setTypeface(null, android.graphics.Typeface.BOLD) })
-                card.addView(label("Color"))
+                val durationCard = deps.sectionPanel()
+                durationCard.addView(TextView(activity).apply { text = name; textSize = 18f; setTextColor(AppTheme.textPrimary); setTypeface(null, android.graphics.Typeface.BOLD) })
+                durationCard.addView(label("Lighting window"))
+                val durations = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+                listOf(3, 5, 10, 15, 30).forEachIndexed { i, seconds ->
+                    durations.addView(deps.filterChip("$seconds s", profile.seconds == seconds) { update(profile.copy(seconds = seconds)) }, LinearLayout.LayoutParams(0, deps.dp(44), 1f).apply { if (i > 0) marginStart = deps.dp(4) })
+                }
+                durationCard.addView(durations)
+                durationCard.addView(label("Notifications use the device's stock brightness."))
+                content.addView(durationCard)
                 val colors = listOf(1 to "#FF0000", 3 to "#FF8C00", 4 to "#FFD600", 5 to "#00E676", 6 to "#00E5FF", 7 to "#1565FF", 8 to "#A020F0", 9 to "#FF69B4")
-                val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-                val factory = LedControlViewFactory(activity)
-                colors.forEachIndexed { index, (id, hex) ->
-                    if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-                    row.addView(factory.colorDot(hex, profile.color == id) { update(profile.copy(color = id)) }.apply { contentDescription = "Notification color $hex" }, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
+                fun zone(title: String, type: Int) {
+                    val enabled = when (type) { 0 -> profile.fan; 1 -> profile.logo; else -> profile.triggers }
+                    val saved = when (type) { 0 -> profile.fanState; 1 -> profile.logoState; else -> profile.triggerState }
+                    val validEffects = listOf("steady", "breathe", "flashing", "rapid")
+                    val color = saved?.color?.takeIf { c -> colors.any { it.first == c } } ?: profile.color
+                    val effect = saved?.effect?.takeIf { it in validEffects } ?: profile.effect
+                    fun setZone(nextEnabled: Boolean = enabled, nextColor: Int = color, nextEffect: String = effect) {
+                        val state = com.elitedarkkaiser.redmagic.state.LedState(nextEnabled, nextEffect, nextColor)
+                        update(when (type) {
+                            0 -> profile.copy(fan = nextEnabled, fanState = state)
+                            1 -> profile.copy(logo = nextEnabled, logoState = state)
+                            else -> profile.copy(triggers = nextEnabled, triggerState = state)
+                        })
+                    }
+                    val card = deps.sectionPanel()
+                    heading(card, title, enabled) { setZone(nextEnabled = it) }
+                    card.addView(label("Color"))
+                    val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                    val factory = LedControlViewFactory(activity)
+                    colors.forEachIndexed { index, (id, hex) ->
+                        if (index > 0) row.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                        row.addView(factory.colorDot(hex, color == id) { setZone(nextColor = id) }.apply { contentDescription = "$title color $hex" }, LinearLayout.LayoutParams(deps.dp(29), deps.dp(29)))
+                    }
+                    card.addView(row)
+                    card.addView(label("Effect"))
+                    val effects = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+                    validEffects.forEachIndexed { i, value ->
+                        effects.addView(deps.filterChip(value.replaceFirstChar { it.uppercase() }, effect == value) { setZone(nextEffect = value) }, LinearLayout.LayoutParams(0, deps.dp(44), 1f).apply { if (i > 0) marginStart = deps.dp(4) })
+                    }
+                    card.addView(effects)
+                    if (type == 1) card.addView(label("Logo and GAME MODE bar use the same notification setting."))
+                    content.addView(card)
                 }
-                card.addView(row)
-                card.addView(label("Effect"))
-                val effects = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-                listOf("steady", "breathe", "flashing", "rapid").forEachIndexed { i, value ->
-                    effects.addView(deps.filterChip(value.replaceFirstChar { it.uppercase() }, profile.effect == value) { update(profile.copy(effect = value)) }, LinearLayout.LayoutParams(0, deps.dp(44), 1f).apply { if (i > 0) marginStart = deps.dp(4) })
-                }
-                card.addView(effects)
-                card.addView(label("Lighting window"))
-                listOf(listOf(3, 5, 10), listOf(15, 30)).forEach { values ->
-                    val r = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-                    values.forEachIndexed { i, seconds -> r.addView(deps.filterChip("$seconds s", profile.seconds == seconds) { update(profile.copy(seconds = seconds)) }, LinearLayout.LayoutParams(0, deps.dp(44), 1f).apply { if (i > 0) marginStart = deps.dp(4) }) }
-                    card.addView(r)
-                }
-                card.addView(label("Notifications use the device's stock brightness."))
-                listOf(Triple("Logo / GAME MODE bar", profile.logo, 0), Triple("Trigger lighting", profile.triggers, 1), Triple("Fan lighting", profile.fan, 2)).forEach { (title, enabled, zone) ->
-                    heading(card, title, enabled) { value -> update(when (zone) { 0 -> profile.copy(logo = value); 1 -> profile.copy(triggers = value); else -> profile.copy(fan = value) }) }
-                }
-                content.addView(card)
+                zone("Fan lighting", 0)
+                zone("Logo / GAME MODE bar", 1)
+                zone("Trigger lighting", 2)
                 content.addView(deps.actionButton("Save profile", true) {
                     val toSave = profile
                     worker.execute {

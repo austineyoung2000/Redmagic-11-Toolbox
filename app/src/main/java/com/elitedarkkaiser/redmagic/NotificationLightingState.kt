@@ -8,7 +8,8 @@ internal object NotificationLightingState {
     data class Profile(val color: Int = 7, val effect: String = "breathe", val seconds: Int = 10,
         val brightness: Int = 128, val logo: Boolean = true, val triggers: Boolean = false, val fan: Boolean = false,
         val logoState: com.elitedarkkaiser.redmagic.state.LedState? = null,
-        val triggerState: com.elitedarkkaiser.redmagic.state.LedState? = null)
+        val triggerState: com.elitedarkkaiser.redmagic.state.LedState? = null,
+        val fanState: com.elitedarkkaiser.redmagic.state.LedState? = null)
     private fun prefs(c: Context) = c.getSharedPreferences("notification_lighting", Context.MODE_PRIVATE)
     fun enabled(c: Context) = prefs(c).getBoolean("enabled", false)
     fun setEnabled(c: Context, value: Boolean): Boolean =
@@ -23,7 +24,7 @@ internal object NotificationLightingState {
         val raw = prefs(c).getString("app:$pkg", null) ?: return null
         val j = JSONObject(raw)
         Profile(j.getInt("color"), j.getString("effect"), j.getInt("seconds").coerceIn(3,30),
-            j.optInt("brightness",128).coerceIn(32,255),j.optBoolean("logo",true),j.optBoolean("triggers"),j.optBoolean("fan"), readLed(j,"logoState"), readLed(j,"triggerState"))
+            j.optInt("brightness",128).coerceIn(32,255),j.optBoolean("logo",true),j.optBoolean("triggers"),j.optBoolean("fan"), readLed(j,"logoState"), readLed(j,"triggerState"), readLed(j,"fanState"))
             .takeIf { it.color in listOf(1,3,4,5,6,7,8,9) && it.effect in listOf("steady","breathe","flashing","rapid") }
     }.getOrNull()
     fun save(c: Context, pkg: String, p: Profile): Boolean {
@@ -32,7 +33,7 @@ internal object NotificationLightingState {
         fun writeLed(key: String, state: com.elitedarkkaiser.redmagic.state.LedState?) {
             if (state != null) j.put(key, JSONObject().put("enabled",state.enabled).put("effect",state.effect).put("color",state.color))
         }
-        writeLed("logoState",p.logoState); writeLed("triggerState",p.triggerState)
+        writeLed("logoState",p.logoState); writeLed("triggerState",p.triggerState); writeLed("fanState",p.fanState)
         return prefs(c).edit().putString("app:$pkg",j.toString()).commit()
     }
     private fun readLed(j: JSONObject, key: String): com.elitedarkkaiser.redmagic.state.LedState? {
