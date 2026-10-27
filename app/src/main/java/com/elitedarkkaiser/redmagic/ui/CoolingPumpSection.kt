@@ -45,7 +45,7 @@ internal object CoolingPumpSection {
             fun syncPumpSwitches() {
                 updatingPumpSwitches = true
                 try {
-                    pumpPowerSwitch.isChecked = deps.getPumpEnabled()
+                    pumpPowerSwitch.isChecked = deps.getPumpEnabled() || deps.getAutoPumpEnabled()
                     autoPumpSwitch.isChecked = deps.getAutoPumpEnabled()
                 } finally {
                     updatingPumpSwitches = false
@@ -87,9 +87,6 @@ internal object CoolingPumpSection {
                 }
             }
 
-            fun setManualControlsEnabled(enabled: Boolean) {
-                pumpPowerSwitch.isEnabled = enabled
-            }
 
             val pumpPowerTitle = TextView(context).apply {
                 text = "Pump power"
@@ -106,7 +103,7 @@ internal object CoolingPumpSection {
             }
 
             pumpPowerSwitch = MaterialSwitch(context).apply {
-                isChecked = deps.getPumpEnabled()
+                isChecked = deps.getPumpEnabled() || deps.getAutoPumpEnabled()
                 setOnCheckedChangeListener { _, checked ->
                     if (updatingPumpSwitches) {
                         return@setOnCheckedChangeListener
@@ -164,7 +161,7 @@ internal object CoolingPumpSection {
                 orientation = LinearLayout.HORIZONTAL
             }
 
-            val chipParams = LinearLayout.LayoutParams(0, deps.dp(64), 1f)
+            val chipParams = LinearLayout.LayoutParams(0, deps.dp(88), 1f)
             val gapParams = LinearLayout.LayoutParams(deps.dp(6), 1)
 
             lateinit var slowBtn: Button
@@ -224,6 +221,11 @@ internal object CoolingPumpSection {
             listOf(slowBtn, mediumBtn, quickBtn, experimentalBtn).forEach { button ->
                 button.tag = "pump_preset"
                 com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle.apply(button, button.isSelected)
+                val icon = androidx.core.content.ContextCompat.getDrawable(context, com.elitedarkkaiser.redmagic.R.drawable.ic_toolbox_pump)?.mutate()
+                icon?.setTint(AppTheme.accentColor)
+                icon?.setBounds(0, 0, deps.dp(24), deps.dp(24))
+                button.setCompoundDrawables(null, icon, null, null)
+                button.compoundDrawablePadding = deps.dp(6)
             }
 
             speedRow.addView(slowBtn, chipParams)
@@ -277,7 +279,6 @@ internal object CoolingPumpSection {
                     }
 
                     syncPumpSwitches()
-                    setManualControlsEnabled(!checked)
                     refreshPumpDiagnostics()
                     deps.refreshSmartPumpStatusViews()
                 }
@@ -313,7 +314,6 @@ internal object CoolingPumpSection {
             addView(smartPumpStatusView)
             addView(smartPumpSpeedView)
 
-            setManualControlsEnabled(!deps.getAutoPumpEnabled())
             refreshPumpDiagnostics()
         }
 

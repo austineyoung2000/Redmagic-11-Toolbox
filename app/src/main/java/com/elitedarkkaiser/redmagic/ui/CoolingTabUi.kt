@@ -254,6 +254,20 @@ object CoolingTabUi {
         }
 
         val coolingCard = deps.sectionPanel().apply {
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                addView(ToolboxIcons.create(context, "fan"), LinearLayout.LayoutParams(deps.dp(32), deps.dp(32)).apply {
+                    marginEnd = deps.dp(12)
+                })
+                addView(TextView(context).apply {
+                    text = "Fan cooling"
+                    textSize = 18f
+                    setTextColor(AppTheme.textPrimary)
+                    typeface = Typeface.create(AppTheme.appTypeface, Typeface.BOLD)
+                })
+            })
+            addView(deps.spacer(deps.dp(8)))
             addView(fanPowerSwitch)
             addView(deps.bodyText("Fan preset"))
             addView(modeRow)
