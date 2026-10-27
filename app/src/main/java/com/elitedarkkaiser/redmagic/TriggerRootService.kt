@@ -10,13 +10,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class TriggerRootService : Service() {
 
-    private var rightCrossUnlockedUntil: Long = 0L
+    @Volatile private var rightCrossUnlockedUntil: Long = 0L
 
     @Volatile
     private var running = true
 
     private var leftUnlockArmedAt = 0L
-    private var leftUnlockedUntil = 0L
+    @Volatile private var leftUnlockedUntil = 0L
     private var leftUnlockTapCount = 0
     private val held = ConcurrentHashMap<String, AtomicBoolean>()
     private val repeatThreads = ConcurrentHashMap<String, Thread>()
@@ -28,7 +28,7 @@ class TriggerRootService : Service() {
     private var initializationThread: Thread? = null
     private var rightUnlockArmedAt = 0L
     private var rightUnlockTapCount = 0
-    private var rightUnlockedUntil = 0L
+    @Volatile private var rightUnlockedUntil = 0L
 
     private val INTENT_UNLOCK_TAP_WINDOW_MS = 450L
     private val INPUT_DEBOUNCE_MS = 80L
@@ -317,17 +317,14 @@ class TriggerRootService : Service() {
                     return@Thread
                 }
 
-                if (
-                    prefKey == "right_trigger" &&
-                    config.usesIntentUnlock() &&
-                    !isRightUnlocked(config)
-                ) {
-                    return@Thread
-                }
-
                 val action = getAction(prefKey)
                 if (!performInitialAction(prefKey, action)) {
                     return@Thread
+                }
+
+                if (config.usesIntentUnlock()) {
+                    if (prefKey == "left_trigger") leftUnlockedUntil = now() + config.unlockTimeoutMs
+                    else if (prefKey == "right_trigger") extendRightUnlock(config)
                 }
 
                 if (
@@ -545,6 +542,7 @@ class TriggerRootService : Service() {
         }
 
         if (config.usesHold() && !alreadyUnlocked) {
+            if (config.usesIntentUnlock()) leftUnlockedUntil = 0L
             startHeldAction("left_trigger", config)
         } else {
             val accepted = performInitialAction(
@@ -587,6 +585,7 @@ class TriggerRootService : Service() {
         }
 
         if (config.usesHold() && !alreadyUnlocked) {
+            if (config.usesIntentUnlock()) rightUnlockedUntil = 0L
             startHeldAction("right_trigger", config)
         } else {
             val accepted = performInitialAction(
