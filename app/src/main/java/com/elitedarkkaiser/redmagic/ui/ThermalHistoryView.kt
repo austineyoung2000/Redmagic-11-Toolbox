@@ -142,15 +142,13 @@ class ThermalHistoryView(
             ?: return
         val actualMax = temperatures.maxOrNull()
             ?: return
-        val padding = if (useFahrenheit) 3f else 2f
-        val graphMin = min(
-            actualMin - padding,
-            displayTemperature(35f)
-        )
-        val graphMax = max(
-            actualMax + padding,
-            displayTemperature(55f)
-        )
+        val (graphMin, graphMax) = if (compact) {
+            ThermalGraphBounds.compact(actualMin, actualMax, useFahrenheit)
+        } else {
+            val padding = if (useFahrenheit) 3f else 2f
+            min(actualMin - padding, displayTemperature(35f)) to
+                max(actualMax + padding, displayTemperature(55f))
+        }
         val range = (graphMax - graphMin)
             .coerceAtLeast(1f)
 

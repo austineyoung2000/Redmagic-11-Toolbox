@@ -272,6 +272,10 @@ object HomeTabUi {
                     intArrayOf(android.graphics.Color.argb(220, 35, 8, 14), android.graphics.Color.argb(130, 5, 8, 12))
                 )
             }, android.widget.FrameLayout.LayoutParams(-1, deps.dp(180)))
+            frame.addView(thermalHistoryView, android.widget.FrameLayout.LayoutParams(-1, -1).apply {
+                topMargin = deps.dp(86)
+                bottomMargin = deps.dp(8)
+            })
             val body = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(deps.dp(18), deps.dp(16), deps.dp(18), deps.dp(16))
@@ -293,10 +297,10 @@ object HomeTabUi {
                     addView(right, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 }
                 addView(row)
-                addView(thermalHistoryView, LinearLayout.LayoutParams(-1, deps.dp(32)))
+                addView(android.widget.Space(context), LinearLayout.LayoutParams(1, 0, 1f))
                 addView(historySummary)
             }
-            frame.addView(body)
+            frame.addView(body, android.widget.FrameLayout.LayoutParams(-1, -1))
             addView(frame, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
