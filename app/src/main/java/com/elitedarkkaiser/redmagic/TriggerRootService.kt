@@ -538,12 +538,13 @@ class TriggerRootService : Service() {
             return
         }
 
+        val alreadyUnlocked = config.usesIntentUnlock() && now() <= leftUnlockedUntil
         if (!handleLeftIntentUnlock(config)) {
             stopRepeater("left_trigger")
             return
         }
 
-        if (config.usesHold()) {
+        if (config.usesHold() && !alreadyUnlocked) {
             startHeldAction("left_trigger", config)
         } else {
             val accepted = performInitialAction(
@@ -570,6 +571,8 @@ class TriggerRootService : Service() {
         val crossUnlocked =
             config.leftUnlocksRight &&
                 now() <= rightCrossUnlockedUntil
+        val alreadyUnlocked = config.usesIntentUnlock() &&
+            (crossUnlocked || now() <= rightUnlockedUntil)
 
         if (
             !crossUnlocked &&
@@ -583,7 +586,7 @@ class TriggerRootService : Service() {
             extendRightUnlock(config)
         }
 
-        if (config.usesHold()) {
+        if (config.usesHold() && !alreadyUnlocked) {
             startHeldAction("right_trigger", config)
         } else {
             val accepted = performInitialAction(
