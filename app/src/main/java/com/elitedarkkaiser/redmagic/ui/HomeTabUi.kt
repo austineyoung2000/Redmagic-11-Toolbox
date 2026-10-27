@@ -204,9 +204,9 @@ object HomeTabUi {
             tileRow(dashboardTile("Cooling", "Fan and pump", "❄", "cooling"),
                 dashboardTile("Lighting", "LED zones and effects", "✦", "lighting"))
             tileRow(dashboardTile("Gaming", "Game controls", "🎮", "gaming"),
-                dashboardTile("Hardware", "Triggers and haptics", "⌥", "hardware"))
+                dashboardTile("Hardware", "Triggers, Magic Key, and haptics", "⌥", "hardware"))
             tileRow(dashboardTile("Profiles", "Saved settings and rules", "◆", "profiles"),
-                dashboardTile("System", "Magic Key and controls", "⚙", "system"))
+                dashboardTile("System", "System controls", "⚙", "system"))
         }
 
         val deviceRomValue = deps.infoValue()
