@@ -66,17 +66,9 @@ internal object InsidePages {
                     return@setOnClickListener
                 }
                 detail.removeAllViews()
-                val back = label("‹  ${page.title}", 23f, true).apply {
+                detail.addView(label(page.title, 26f, true).apply {
                     setPadding(0, dp(8), 0, dp(18))
-                    contentDescription = "Back to $title"
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener {
-                        detail.visibility = View.GONE
-                        menu.visibility = View.VISIBLE
-                    }
-                }
-                detail.addView(back)
+                })
                 page.cards.forEach { card ->
                     (card.parent as? ViewGroup)?.removeView(card)
                     detail.addView(card)

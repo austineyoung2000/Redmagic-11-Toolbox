@@ -170,7 +170,10 @@ object HomeTabUi {
                 row.addView(first, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 row.addView(deps.space(deps.dp(8)))
                 row.addView(second, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(row)
+                addView(row, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = deps.dp(10) })
             }
             tileRow(dashboardTile("Cooling", "Fan and pump", "❄", "cooling"),
                 dashboardTile("Lighting", "LED zones and effects", "✦", "lighting"))

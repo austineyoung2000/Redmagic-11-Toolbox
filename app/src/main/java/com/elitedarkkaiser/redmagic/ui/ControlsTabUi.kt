@@ -259,9 +259,9 @@ object ControlsTabUi {
         }
 
         InsidePages.install(container, "Controls & system", listOf(
-            InsidePages.Page("System", "Root and device controls", listOf(systemCard)),
-            InsidePages.Page("Magic Key", "Button functions", listOf(stockFunctionsCard)),
-            InsidePages.Page("Slider", "App launch actions", listOf(sliderCard))
+            InsidePages.Page("System", "Root and device controls", listOf(systemCard), icon = "⚙"),
+            InsidePages.Page("Magic Key", "Button functions", listOf(stockFunctionsCard), icon = "⌘"),
+            InsidePages.Page("Slider", "App launch actions", listOf(sliderCard), icon = "↕")
         ))
 
         return Result(

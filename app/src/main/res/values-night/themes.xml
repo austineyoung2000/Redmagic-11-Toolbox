@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.RedMagicRootControl" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.RedMagicRootControl" parent="Theme.Material3.NoActionBar">
         <item name="colorPrimary">@color/redmagic_primary</item>
         <item name="colorOnPrimary">@color/redmagic_on_primary</item>
         <item name="colorPrimaryContainer">@color/redmagic_primary_container</item>

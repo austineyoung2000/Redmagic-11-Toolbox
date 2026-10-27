@@ -29,14 +29,14 @@ internal class MainTabHost(
 
     private fun withBack(view: LinearLayout): LinearLayout {
         val button = android.widget.TextView(activity).apply {
-            text = "‹  Dashboard"
-            textSize = 16f
+            text = "‹"
+            textSize = 30f
             setTextColor(com.elitedarkkaiser.redmagic.ui.AppTheme.textPrimary)
-            contentDescription = "Back to dashboard"
+            contentDescription = "Back"
             isClickable = true
             isFocusable = true
             setPadding(0, dp(8), 0, dp(14))
-            setOnClickListener { select("home") }
+            setOnClickListener { if (!handleBack()) select("home") }
         }
         view.addView(button, 0)
         return view

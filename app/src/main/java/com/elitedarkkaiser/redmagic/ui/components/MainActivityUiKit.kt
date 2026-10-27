@@ -177,8 +177,8 @@ class MainActivityUiKit(
 
             val iconView = TextView(activity).apply {
                 this.text = icon
-                textSize = 11f
-                setTextColor(AppTheme.textSecondary)
+                textSize = 16f
+                setTextColor(AppTheme.accentColor)
                 gravity = Gravity.CENTER
                 background = roundedFill(
                     AppTheme.panelPressed,
@@ -189,10 +189,10 @@ class MainActivityUiKit(
 
             val labelView = TextView(activity).apply {
                 this.text = text
-                textSize = 11f
-                setTextColor(AppTheme.accentColor)
+                textSize = 14f
+                setTextColor(AppTheme.textPrimary)
                 setTypeface(typeface, Typeface.BOLD)
-                letterSpacing = 0.06f
+                letterSpacing = 0.01f
                 setPadding(dp(8), 0, 0, 0)
             }
 
@@ -211,14 +211,14 @@ class MainActivityUiKit(
             fillColor = ColorStateList.valueOf(AppTheme.panelColor)
             strokeWidth = dp(1).toFloat()
             strokeColor = ColorStateList.valueOf(AppTheme.borderColor)
-            elevation = dp(2).toFloat()
+            elevation = 0f
         }
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(18))
             background = panelBackground
-            elevation = dp(2).toFloat()
+            elevation = 0f
             clipToOutline = true
 
             layoutParams = LinearLayout.LayoutParams(
