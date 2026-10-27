@@ -9,7 +9,7 @@ import android.widget.TextView
 
 /** Presents existing control cards as focused pages without changing their handlers. */
 internal object InsidePages {
-    data class Page(val title: String, val subtitle: String, val cards: List<View>, val action: (() -> Unit)? = null, val icon: String = "✦", val palette: (() -> Int?)? = null)
+    data class Page(val title: String, val subtitle: String, val cards: List<View>, val action: (() -> Unit)? = null, val icon: String = "✦", val palette: (() -> Int?)? = null, val factory: (() -> List<View>)? = null)
 
     private data class Navigation(val open: (Int) -> Unit, val back: () -> Boolean, val refresh: () -> Unit)
     fun open(container: LinearLayout, index: Int) {
@@ -109,7 +109,7 @@ internal object InsidePages {
                 detail.addView(label(page.title, 26f, true).apply {
                     setPadding(0, dp(8), 0, dp(18))
                 })
-                page.cards.forEach { card ->
+                (page.factory?.invoke() ?: page.cards).forEach { card ->
                     (card.parent as? ViewGroup)?.removeView(card)
                     detail.addView(card)
                 }

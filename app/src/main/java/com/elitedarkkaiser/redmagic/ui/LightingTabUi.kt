@@ -42,11 +42,6 @@ object LightingTabUi {
             addView(previewRow)
         }
 
-        val rgbStudioStatus = deps.subtleLabel(deps.rgbStudioSummary())
-        val rgbStudioCard = deps.createRgbStudioPage {
-            rgbStudioStatus.text = deps.rgbStudioSummary()
-        }
-
         val gameModeCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("🎮", "GAME MODE"))
             addView(deps.bodyText("Select apps, then edit cooling and lighting separately for each app. Profiles apply only while that app is foreground."))
@@ -99,8 +94,6 @@ object LightingTabUi {
                 zonesCard to
                     "LED controls unavailable: required vendor " +
                     "interfaces were not detected.",
-                rgbStudioCard to
-                    "RGB Studio is unavailable on this ROM.",
                 chargingModeCard to
                     "Charging lighting is unavailable on this ROM."
             ).forEach { (card, message) ->
@@ -183,7 +176,14 @@ object LightingTabUi {
         }
 
         InsidePages.install(container, "Lighting", listOf(
-            InsidePages.Page("RGB Studio", "Color sequences and timing", listOf(rgbStudioCard)),
+            InsidePages.Page("RGB Studio", "Color sequences and timing", emptyList(), factory = {
+                val editor = deps.createRgbStudioPage { }
+                if (deps.capabilities.scanComplete && !deps.capabilities.ledAvailable) {
+                    editor.addView(deps.bodyText("RGB Studio is unavailable on this ROM."), 0)
+                    CapabilityUi.disableInteractions(editor)
+                }
+                listOf(editor)
+            }),
             InsidePages.Page("Game Mode", "Per-app lighting and cooling", listOf(gameModeCard)),
             InsidePages.Page("Charging", "Charging lighting profile", listOf(chargingModeCard)),
             InsidePages.Page("Calls", "Incoming call lighting", listOf(callLightingCard)),
