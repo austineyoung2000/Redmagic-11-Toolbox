@@ -323,6 +323,26 @@ object CoolingTabUi {
             CapabilityUi.disableInteractions(pumpCard)
         }
 
+        val hero = android.widget.FrameLayout(container.context).apply {
+            val image = android.widget.ImageView(context).apply {
+                setImageResource(com.elitedarkkaiser.redmagic.R.drawable.cooling_hero)
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Ice-covered REDMAGIC 11 Pro"
+            }
+            addView(image, android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT))
+            val fade = android.view.View(context).apply {
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+            }
+            addView(fade, android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        container.addView(hero, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, deps.dp(130)))
         container.addView(telemetryCard)
         container.addView(deps.spacer(deps.dp(12)))
         container.addView(coolingCard)
