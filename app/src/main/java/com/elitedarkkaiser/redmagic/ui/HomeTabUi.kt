@@ -261,7 +261,7 @@ object HomeTabUi {
             setPadding(0, 0, 0, 0)
             val frame = android.widget.FrameLayout(context)
             frame.addView(ImageView(context).apply {
-                setImageResource(R.drawable.lighting_hero)
+                setImageResource(R.drawable.cooling_hero)
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 alpha = 0.38f
                 contentDescription = null
