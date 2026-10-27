@@ -151,6 +151,22 @@ object ControlsTabUi {
             deps.applyStockMagicKeyMode("Voice Recorder", { HardwareController.setSliderVoiceRecorder() }, magicKeyStatusLabel, sliderAppBtnRef, sliderShortcutBtnRef)
         }
 
+        val actionIcons = listOf(
+            cameraBtn to android.R.drawable.ic_menu_camera,
+            gameSpaceBtn to com.elitedarkkaiser.redmagic.R.drawable.ic_toolbox_game,
+            soundModeBtn to android.R.drawable.ic_lock_silent_mode_off,
+            flashlightBtn to com.elitedarkkaiser.redmagic.R.drawable.ic_toolbox_light,
+            recorderBtn to android.R.drawable.ic_btn_speak_now
+        )
+        actionIcons.forEach { (button, resource) ->
+            val icon = androidx.core.content.ContextCompat.getDrawable(activity, resource)?.mutate()
+            icon?.setTint(AppTheme.accentColor)
+            icon?.setBounds(0, 0, deps.dp(22), deps.dp(22))
+            button.setCompoundDrawables(icon, null, null, null)
+            button.compoundDrawablePadding = deps.dp(8)
+            button.isAllCaps = false
+        }
+
         val stockFunctionsCard = deps.sectionPanel().apply {
             addView(deps.sectionHeader("⌘", "MAGIC KEY FUNCTIONS"))
             addView(deps.bodyText("Choose one stock Magic Key action. Selecting a stock action disables app launch mode."))
@@ -258,9 +274,23 @@ object ControlsTabUi {
             CapabilityUi.disableInteractions(sliderCard)
         }
 
+        fun magicKeyHero(): android.view.View = android.widget.FrameLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))
+            addView(android.widget.ImageView(activity).apply {
+                setImageResource(com.elitedarkkaiser.redmagic.R.drawable.magic_key_hero)
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Silver phone side with Magic Key highlighted"
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+            addView(android.view.View(activity).apply {
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT, AppTheme.bgColor))
+            }, android.widget.FrameLayout.LayoutParams(-1, -1))
+        }
+
         InsidePages.install(container, "Controls & system", listOf(
             InsidePages.Page("System", "Root and device controls", listOf(systemCard), icon = "⚙"),
-            InsidePages.Page("Magic Key", "Button functions", listOf(stockFunctionsCard), icon = "⌘"),
+            InsidePages.Page("Magic Key", "Button and slider functions", emptyList(), icon = "⌘", factory = { listOf(magicKeyHero(), stockFunctionsCard, sliderCard) }),
             InsidePages.Page("Slider", "App launch actions", listOf(sliderCard), icon = "↕")
         ))
 
