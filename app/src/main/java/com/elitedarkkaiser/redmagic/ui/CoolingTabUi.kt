@@ -86,8 +86,13 @@ object CoolingTabUi {
             isEnabled = false // Enabled when the first real fan state arrives.
             setOnCheckedChangeListener { button, checked ->
                 if (button.tag == "rendering") return@setOnCheckedChangeListener
+                if (autoCurveCheck.isChecked) autoCurveCheck.isChecked = false
                 deps.runBackground {
-                    HardwareController.enableFan(checked)
+                    if (checked && (HardwareController.readFanLevel() ?: 0) == 0) {
+                        HardwareController.setFanLevel(1)
+                    } else {
+                        HardwareController.enableFan(checked)
+                    }
                     deps.refreshStatus()
                 }
             }
@@ -176,10 +181,10 @@ object CoolingTabUi {
             applyFanCurve("turbo", "Turbo")
         }
 
-        listOf(quietChip, balancedChip, turboChip).forEach { button ->
+        listOf(quietChip, balancedChip, turboChip).forEachIndexed { index, button ->
             button.tag = "cooling_preset"
             SelectionControlStyle.apply(button, button.isSelected)
-            val icon = androidx.core.content.ContextCompat.getDrawable(container.context, com.elitedarkkaiser.redmagic.R.drawable.ic_toolbox_fan)?.mutate()
+            val icon = androidx.core.content.ContextCompat.getDrawable(container.context, listOf(com.elitedarkkaiser.redmagic.R.drawable.ic_preset_quiet, com.elitedarkkaiser.redmagic.R.drawable.ic_preset_balanced, com.elitedarkkaiser.redmagic.R.drawable.ic_preset_turbo)[index])?.mutate()
             icon?.setTint(AppTheme.accentColor)
             icon?.setBounds(0, 0, deps.dp(24), deps.dp(24))
             button.setCompoundDrawables(null, icon, null, null)
@@ -236,7 +241,7 @@ object CoolingTabUi {
                         addView(deps.subtleLabel(label))
                     }
                     val icon = ToolboxIcons.create(context, iconName)
-                    addView(icon, LinearLayout.LayoutParams(deps.dp(32), deps.dp(32)).apply {
+                    addView(icon, LinearLayout.LayoutParams(deps.dp(42), deps.dp(42)).apply {
                         marginEnd = deps.dp(8)
                     })
                     addView(column, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
