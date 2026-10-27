@@ -41,99 +41,26 @@ object NativeTgkProfileDialog {
             )
         }
 
-        root.addView(
-            TextView(activity).apply {
-                text = "Game Trigger Mapping"
-                textSize = 20f
-                setTextColor(AppTheme.textPrimary)
-                setTypeface(typeface, Typeface.BOLD)
-            }
-        )
+        root.addView(android.widget.ImageView(activity).apply {
+            setImageResource(R.drawable.rgb_silver_hero)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            contentDescription = "REDMAGIC 11 Pro with illuminated shoulder triggers"
+        }, LinearLayout.LayoutParams(-1, dp(activity, 130)))
 
-        root.addView(
-            TextView(activity).apply {
-                text =
-                    "Use REDMAGIC’s native touch-game-key engine " +
-                    "for independent per-app L and R targets. " +
-                    "Mappings work without opening Game Space."
-                textSize = 13f
-                setTextColor(AppTheme.textSecondary)
-                setPadding(
-                    0,
-                    dp(activity, 5),
-                    0,
-                    dp(activity, 14)
-                )
-            }
-        )
-
-        val addButton = actionButton(
-            activity,
-            "ADD APP MAPPING",
-            primary = true
-        )
-
-        root.addView(addButton)
-
-        val transferRow = LinearLayout(activity).apply {
+        val toolbar = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = panelBackground(activity)
         }
-
-        val importButton = actionButton(
-            activity,
-            "IMPORT",
-            primary = false
-        )
-        val exportAllButton = actionButton(
-            activity,
-            "EXPORT ALL",
-            primary = false
-        )
-
-        transferRow.addView(
-            importButton,
-            LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-            ).apply {
-                topMargin = dp(activity, 8)
-            }
-        )
-        transferRow.addView(
-            View(activity),
-            LinearLayout.LayoutParams(
-                dp(activity, 8),
-                1
-            )
-        )
-        transferRow.addView(
-            exportAllButton,
-            LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-            ).apply {
-                topMargin = dp(activity, 8)
-            }
-        )
-
-        root.addView(transferRow)
-
-        root.addView(
-            TextView(activity).apply {
-                text = "SAVED APP MAPPINGS"
-                textSize = 12f
-                setTextColor(AppTheme.textSecondary)
-                setTypeface(typeface, Typeface.BOLD)
-                setPadding(
-                    0,
-                    dp(activity, 18),
-                    0,
-                    dp(activity, 8)
-                )
-            }
-        )
+        val addButton = actionButton(activity, "+ Add game", primary = false)
+        val importButton = actionButton(activity, "Import", primary = false)
+        val exportAllButton = actionButton(activity, "Export", primary = false)
+        listOf(addButton, importButton, exportAllButton).forEach { button ->
+            button.isAllCaps = false
+            button.textSize = 12f
+            toolbar.addView(button, LinearLayout.LayoutParams(0, dp(activity, 48), 1f))
+        }
+        root.addView(toolbar, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(activity, 12) })
 
         val profilesContainer = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -1105,6 +1032,88 @@ object NativeTgkProfileDialog {
                     }
                 )
 
+                // Recompose the existing, connected controls as one compact card per game.
+                // Keep their original listeners and storage paths intact.
+                fun detach(view: View) { (view.parent as? ViewGroup)?.removeView(view) }
+                listOf(selectLayoutButton, newLayoutButton, deleteLayoutButton, enabledSwitch,
+                    hapticsSwitch, bridgeFeedbackSwitch, savedTargetsSwitch, opacityButton,
+                    leftRapidButton, rightRapidButton, landscapeButton, portraitButton,
+                    exportButton, deleteButton).forEach(::detach)
+                card.removeAllViews()
+                val header = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                }
+                header.addView(android.widget.ImageView(activity).apply {
+                    setImageDrawable(runCatching { activity.packageManager.getApplicationIcon(profile.packageName) }.getOrNull())
+                    contentDescription = "${profile.appLabel} icon"
+                }, LinearLayout.LayoutParams(dp(activity, 42), dp(activity, 42)).apply { marginEnd = dp(activity, 10) })
+                val identity = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+                identity.addView(TextView(activity).apply {
+                    text = profile.appLabel; textSize = 16f; setTextColor(AppTheme.textPrimary); setTypeface(typeface, Typeface.BOLD); maxLines = 1
+                })
+                identity.addView(TextView(activity).apply {
+                    text = profile.packageName; textSize = 11f; setTextColor(AppTheme.textSecondary); maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+                header.addView(identity, LinearLayout.LayoutParams(0, -2, 1f))
+                selectLayoutButton.text = activeLayout?.name ?: "Default"
+                selectLayoutButton.isAllCaps = false
+                header.addView(selectLayoutButton, LinearLayout.LayoutParams(dp(activity, 86), dp(activity, 44)))
+                enabledSwitch.text = ""
+                enabledSwitch.contentDescription = "Enable mapping for ${profile.appLabel}"
+                header.addView(enabledSwitch)
+                card.addView(header)
+                fun divider() = card.addView(View(activity).apply { setBackgroundColor(AppTheme.borderColor) },
+                    LinearLayout.LayoutParams(-1, dp(activity, 1)).apply { topMargin = dp(activity, 8); bottomMargin = dp(activity, 8) })
+                fun navigationRow(title: String, detail: String, status: String, icon: Int, onClick: () -> Unit) {
+                    divider()
+                    val row = LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                        setPadding(0, dp(activity, 5), 0, dp(activity, 5))
+                        isClickable = true; isFocusable = true; setOnClickListener { onClick() }
+                    }
+                    row.addView(android.widget.ImageView(activity).apply {
+                        setImageResource(icon); setColorFilter(AppTheme.accentColor)
+                    }, LinearLayout.LayoutParams(dp(activity, 26), dp(activity, 26)).apply { marginEnd = dp(activity, 12) })
+                    val labels = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+                    labels.addView(TextView(activity).apply { text = title; textSize = 15f; setTextColor(AppTheme.textPrimary); setTypeface(typeface, Typeface.BOLD) })
+                    labels.addView(TextView(activity).apply { text = detail; textSize = 12f; setTextColor(AppTheme.textSecondary) })
+                    row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
+                    row.addView(TextView(activity).apply { text = status; textSize = 12f; setTextColor(AppTheme.textSecondary); maxLines = 1 })
+                    row.addView(TextView(activity).apply { text = "  ›"; textSize = 22f; setTextColor(AppTheme.textPrimary) })
+                    card.addView(row)
+                }
+                navigationRow("Landscape", "Edit landscape targets", if (landscapeStatus == "Landscape configured") "Configured" else "Not configured", R.drawable.ic_toolbox_game) { landscapeButton.performClick() }
+                navigationRow("Portrait", "Edit portrait targets", if (portraitStatus == "Portrait configured") "Configured" else "Not configured", R.drawable.ic_toolbox_game) { portraitButton.performClick() }
+                navigationRow("Trigger behavior", "Choose left and right actions", "${behaviorLabel("L", profile.effectiveLeftBehavior(), profile.effectiveLeftRapidFireCount())} · ${behaviorLabel("R", profile.effectiveRightBehavior(), profile.effectiveRightRapidFireCount())}", R.drawable.ic_toolbox_shoulder) {
+                    MaterialAlertDialogBuilder(activity).setTitle("Trigger behavior")
+                        .setItems(arrayOf("Left trigger", "Right trigger")) { _, which ->
+                            if (which == 0) leftRapidButton.performClick() else rightRapidButton.performClick()
+                        }.setNegativeButton("Cancel", null).show()
+                }
+                divider()
+                hapticsSwitch.text = "Trigger haptics"
+                card.addView(hapticsSwitch)
+                savedTargetsSwitch.text = "Show targets"
+                card.addView(savedTargetsSwitch)
+                val more = TextView(activity).apply {
+                    text = "More options  ›"; textSize = 13f; setTextColor(AppTheme.textSecondary)
+                    setPadding(0, dp(activity, 10), 0, dp(activity, 4)); isClickable = true; isFocusable = true
+                    setOnClickListener {
+                        val labels = arrayOf("New layout", "Delete layout", "Target opacity", "Trigger Bridge edge highlights", "Export app", "Remove mapping")
+                        MaterialAlertDialogBuilder(activity).setTitle("${profile.appLabel} options").setItems(labels) { _, which ->
+                            when (which) {
+                                0 -> if (newLayoutButton.isEnabled) newLayoutButton.performClick()
+                                1 -> if (deleteLayoutButton.isEnabled) deleteLayoutButton.performClick()
+                                2 -> opacityButton.performClick()
+                                3 -> { bridgeFeedbackSwitch.isChecked = !bridgeFeedbackSwitch.isChecked; renderProfiles() }
+                                4 -> exportButton.performClick()
+                                5 -> deleteButton.performClick()
+                            }
+                        }.setNegativeButton("Cancel", null).show()
+                    }
+                }
+                card.addView(more)
                 profilesContainer.addView(card)
             }
         }
