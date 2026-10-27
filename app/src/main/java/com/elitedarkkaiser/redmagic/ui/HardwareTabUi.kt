@@ -21,7 +21,7 @@ object HardwareTabUi {
             InsidePages.Page("Gaming performance", "Refresh rate, touch response and performance mode", performance.subList(1, 4), icon = "🎮", hidden = true),
             InsidePages.Page("Haptic feedback", "Vibration controls", listOf(performance[4]), icon = "〰"),
             InsidePages.Page("Charge separation", "Charging controls", listOf(performance[0]), icon = "⚡"),
-            InsidePages.Page("Profiles & automation", "Master profiles and rules", profiles, icon = "◆")
+            InsidePages.Page("Profiles & automation", "Master profiles and rules", profiles, icon = "◆", hidden = true)
         ), prefix = {
             listOf(android.widget.FrameLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, deps.dp(130))

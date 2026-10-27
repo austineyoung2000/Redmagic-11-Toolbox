@@ -288,11 +288,11 @@ object ControlsTabUi {
             }, android.widget.FrameLayout.LayoutParams(-1, -1))
         }
 
-        InsidePages.install(container, "Controls & system", listOf(
-            InsidePages.Page("System", "Root and device controls", listOf(systemCard), icon = "⚙"),
-            InsidePages.Page("Magic Key", "Button and slider functions", emptyList(), icon = "⌘", factory = { listOf(magicKeyHero(), stockFunctionsCard, sliderCard) }),
-            InsidePages.Page("Slider", "App launch actions", listOf(sliderCard), icon = "↕")
-        ))
+        InsidePages.install(container, "System", listOf(
+            InsidePages.Page("System", "Root and device controls", emptyList(), icon = "⚙", hidden = true),
+            InsidePages.Page("Magic Key", "Button and slider functions", emptyList(), icon = "⌘", factory = { listOf(magicKeyHero(), stockFunctionsCard, sliderCard) }, hidden = true),
+            InsidePages.Page("Slider", "App launch actions", listOf(sliderCard), icon = "↕", hidden = true)
+        ), prefix = { listOf(systemCard) })
 
         return Result(
             view = container,
