@@ -247,8 +247,37 @@ object HomeTabUi {
             setPadding(0, deps.dp(12), 0, deps.dp(12))
         }
         val quickStatusCard = deps.sectionPanel().apply {
-            addView(deps.sectionHeader("❄", "COOLING SYSTEM"))
-            addView(quickStatusText)
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(android.graphics.Color.rgb(49, 20, 26), AppTheme.panelColor)
+            ).apply {
+                cornerRadius = deps.dp(22).toFloat()
+                setStroke(deps.dp(1), AppTheme.borderColor)
+            }
+            val top = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(context).apply {
+                    text = "Cooling System"
+                    textSize = 16f
+                    setTypeface(AppTheme.appTypeface, android.graphics.Typeface.BOLD)
+                    setTextColor(AppTheme.textPrimary)
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(TextView(context).apply {
+                    text = "›"
+                    textSize = 24f
+                    setTextColor(AppTheme.textSecondary)
+                })
+            }
+            addView(top)
+            val status = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(quickStatusText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(ToolboxIcons.create(context, "fan").apply { alpha = 0.5f },
+                    LinearLayout.LayoutParams(deps.dp(54), deps.dp(54)))
+            }
+            addView(status)
             isClickable = true
             isFocusable = true
             contentDescription = "Open cooling controls"

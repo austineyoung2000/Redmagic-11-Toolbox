@@ -2,8 +2,8 @@ package com.elitedarkkaiser.redmagic.ui
 
 import com.elitedarkkaiser.redmagic.ui.components.SelectionControlStyle
 import android.widget.Button
-import android.widget.CheckBox
-import com.google.android.material.checkbox.MaterialCheckBox
+import android.widget.CompoundButton
+import com.google.android.material.materialswitch.MaterialSwitch
 import android.widget.LinearLayout
 import com.google.android.material.slider.Slider
 import android.widget.TextView
@@ -15,7 +15,7 @@ object CoolingTabUi {
         val rpmText: TextView,
         val curveStatusText: TextView,
         val fanSeek: Slider,
-        val autoCurveCheck: CheckBox,
+        val autoCurveCheck: CompoundButton,
         val quietCurveButton: Button,
         val balancedCurveButton: Button,
         val turboCurveButton: Button,
@@ -45,7 +45,7 @@ object CoolingTabUi {
             setPadding(0, deps.dp(4), 0, deps.dp(8))
         }
         lateinit var curveStatusText: TextView
-        lateinit var autoCurveCheck: CheckBox
+        lateinit var autoCurveCheck: CompoundButton
 
         val fanSeek = SelectionControlStyle.slider(container.context).apply {
             valueFrom = 0f
@@ -193,7 +193,7 @@ object CoolingTabUi {
             setPadding(0, deps.dp(6), 0, deps.dp(4))
         }
 
-        autoCurveCheck = MaterialCheckBox(container.context).apply {
+        autoCurveCheck = MaterialSwitch(container.context).apply {
             text = "Automatic fan control based on temperature"
             setTextColor(AppTheme.textPrimary)
             textSize = 13f
