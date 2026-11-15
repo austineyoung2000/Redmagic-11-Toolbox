@@ -27,6 +27,7 @@ open class BootReceiver : BroadcastReceiver() {
 
         val appContext = context.applicationContext
         BootDiagnostics.record(appContext, "Received $event")
+        BootDiagnostics.request(appContext, "Boot recovery scheduling") { BootRecoveryWorker.schedule(appContext) }
         BootDiagnostics.request(appContext, "Gameplay runtime") {
             GameplayRuntimeService.ensureRunning(appContext)
         }

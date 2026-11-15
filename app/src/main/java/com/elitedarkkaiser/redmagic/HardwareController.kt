@@ -546,8 +546,7 @@ object HardwareController {
     fun applyFanCurve(curve: String): Int? {
         val tempF = readTemperatureF() ?: return null
         val level = chooseFanLevelForTempF(tempF, curve)
-        setFanLevel(level)
-        return level
+        return if (setFanLevel(level)) level else null
     }
 
     fun applyAutoFanCurve(): Int? {

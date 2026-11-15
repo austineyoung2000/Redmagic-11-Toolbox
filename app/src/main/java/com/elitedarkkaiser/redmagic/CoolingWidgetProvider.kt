@@ -184,11 +184,10 @@ class CoolingWidgetProvider : AppWidgetProvider() {
             telemetry.fanLevel?.let {
                 WidgetState.saveFanLevel(context, it)
             }
-            HardwareController.setFanLevel(0)
+            if (HardwareController.setFanLevel(0)) ManualFanStorage.save(context, 0)
         } else {
-            HardwareController.setFanLevel(
-                WidgetState.lastFanLevel(context)
-            )
+            val level = WidgetState.lastFanLevel(context)
+            if (HardwareController.setFanLevel(level)) ManualFanStorage.save(context, level)
         }
     }
 

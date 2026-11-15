@@ -32,6 +32,7 @@ fun savePumpStateStorage(context: Context, enabled: Boolean, profile: String) {
         .putBoolean(AppPrefs.PUMP_ENABLED, enabled)
         .putString(AppPrefs.PUMP_PROFILE, profile)
         .apply()
+    BootCoolingRestore.markUserChange(context, "pump")
 }
 
 fun setPumpExperimentalAcceptedStorage(context: Context, accepted: Boolean) {

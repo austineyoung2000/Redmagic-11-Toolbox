@@ -26,7 +26,12 @@ internal object BootSessionStorage {
         return true
     }
 
-    private fun currentBootId(): String {
+    @Synchronized
+    fun hasClaimedCurrentBoot(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(CORE_STARTED_BOOT_ID, null) == currentBootId()
+
+    internal fun currentBootId(): String {
         val kernelBootId = runCatching {
             File("/proc/sys/kernel/random/boot_id")
                 .readText()
