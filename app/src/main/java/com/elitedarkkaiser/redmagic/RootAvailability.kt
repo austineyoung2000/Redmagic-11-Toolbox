@@ -23,6 +23,20 @@ internal object RootAvailability {
         return verified
     }
 
+    fun checkFromHelper(context: Context): Boolean {
+        val app = context.applicationContext
+        val verified = RootShell.hasRoot()
+        synchronized(this) {
+            val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val boot = BootSessionStorage.currentBootId()
+            val alreadySignaled = prefs.getString("helper_boot", null) == boot
+            val force = RootAvailabilityPolicy.shouldForceHelper(verified, alreadySignaled)
+            if (force) prefs.edit().putString("helper_boot", boot).apply()
+            observe(app, verified, force)
+        }
+        return verified
+    }
+
     fun observe(context: Context, verified: Boolean, force: Boolean = false) {
         val app = context.applicationContext
         if (!DeviceCompatibility.isSupportedDevice()) return
@@ -49,6 +63,7 @@ internal object RootAvailability {
         // Recheck current preferences at execution time; keep existing ownership and safety policies.
         BootDiagnostics.request(context, "Root recovery telemetry") { HardwareTelemetry.invalidateHardwareCache() }
         BootDiagnostics.request(context, "Root recovery gameplay") { GameplayRuntimeService.ensureRunning(context) }
+        BootDiagnostics.request(context, "Root recovery supervisor") { GameplayRuntimeSupervisor.ensureInstalled(context) }
         if (isAutoFanEnabledStorage(context))
             BootDiagnostics.request(context, "Root recovery auto fan") { HardwareServiceActions.startAutoFan(context) }
         if (savedPumpStateStorage(context).autoEnabled)

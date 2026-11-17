@@ -13,6 +13,12 @@ class RootAvailabilityPolicyTest {
         assertFalse(RootAvailabilityPolicy.shouldRecover(true, true, false))
     }
 
+    @Test fun duplicateRootHelpersDoNotForceRecoveryTwice() {
+        assertTrue(RootAvailabilityPolicy.shouldForceHelper(true, false))
+        assertFalse(RootAvailabilityPolicy.shouldForceHelper(true, true))
+        assertFalse(RootAvailabilityPolicy.shouldForceHelper(false, false))
+    }
+
     @Test fun manualRecheckOnlyRecoversAfterVerification() {
         assertTrue(RootAvailabilityPolicy.shouldRecover(null, true, true))
         assertTrue(RootAvailabilityPolicy.shouldRecover(true, true, true))
