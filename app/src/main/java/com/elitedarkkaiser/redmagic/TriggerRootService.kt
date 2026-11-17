@@ -27,6 +27,7 @@ class TriggerRootService : Service() {
     private val lastActionAt = ConcurrentHashMap<String, Long>()
 
     private var initializationThread: Thread? = null
+    private var initializationRetryPending = false
     private var rightUnlockArmedAt = 0L
     private var rightUnlockTapCount = 0
     @Volatile private var rightUnlockedUntil = 0L
@@ -66,24 +67,39 @@ class TriggerRootService : Service() {
 
     @Synchronized
     private fun initializeMissingReaders() {
-        if (!running || initializationThread?.isAlive == true) return
-        initializationThread = Thread({
-            if (!running || triggersDisabledUntilRestartStorage(this)) return@Thread
-            HardwareController.enableTriggers()
-            if (readerThreads["left_trigger"]?.isAlive != true) {
-                val device = findTriggerEvent("nubia_tgk_aw_sar0_ch0")
-                if (running && device != null && readerThreads["left_trigger"]?.isAlive != true)
-                    startReader(device, "left_trigger")
-            }
-            if (readerThreads["right_trigger"]?.isAlive != true) {
-                val device = findTriggerEvent("nubia_tgk_aw_sar1_ch0")
-                if (running && device != null && readerThreads["right_trigger"]?.isAlive != true)
-                    startReader(device, "right_trigger")
+        if (!running) return
+        if (initializationThread?.isAlive == true) {
+            initializationRetryPending = true
+            return
+        }
+        val thread = Thread({
+            try {
+                if (!running || triggersDisabledUntilRestartStorage(this)) return@Thread
+                HardwareController.enableTriggers()
+                if (readerThreads["left_trigger"]?.isAlive != true) {
+                    val device = findTriggerEvent("nubia_tgk_aw_sar0_ch0")
+                    if (running && device != null && readerThreads["left_trigger"]?.isAlive != true)
+                        startReader(device, "left_trigger")
+                }
+                if (readerThreads["right_trigger"]?.isAlive != true) {
+                    val device = findTriggerEvent("nubia_tgk_aw_sar1_ch0")
+                    if (running && device != null && readerThreads["right_trigger"]?.isAlive != true)
+                        startReader(device, "right_trigger")
+                }
+            } finally {
+                val retry = synchronized(this) {
+                    initializationThread = null
+                    val requested = initializationRetryPending
+                    initializationRetryPending = false
+                    requested && running
+                }
+                if (retry) initializeMissingReaders()
             }
         }, "RedMagicTriggerInit").apply {
             priority = Thread.NORM_PRIORITY - 1
-            start()
         }
+        initializationThread = thread
+        thread.start()
     }
 
 

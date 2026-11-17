@@ -184,7 +184,7 @@ class SettingsActivity : AppCompatActivity() {
                                     if (!isFinishing && !isDestroyed) {
                                         isEnabled = true
                                         android.widget.Toast.makeText(this@SettingsActivity,
-                                            if (verified) "Root verified; recovery requested" else "Root unavailable or not granted to Toolbox",
+                                            if (verified) "Root verified; recovery requested" else "Root not verified; check root access and Boot diagnostics",
                                             android.widget.Toast.LENGTH_LONG).show()
                                     }
                                 }
