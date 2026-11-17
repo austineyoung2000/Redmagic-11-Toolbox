@@ -181,6 +181,7 @@ internal class MainActivityRuntime(
 
     private fun collectStatusSnapshot(): MainStatusSnapshot {
         val rooted = RootShell.hasRoot()
+        RootAvailability.observe(appContext, rooted)
         val telemetry = HardwareTelemetry.read()
         val deviceInfo =
             loadDeviceInfoCacheStorage(appContext)

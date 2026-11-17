@@ -20,6 +20,7 @@ class BootRecoveryWorker(context: Context, params: WorkerParameters) : Worker(co
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             return am.getRunningServices(100).any { it.service.className == type.name && it.started }
         }
+        if (runAttemptCount == 0) RootAvailability.check(ctx)
         NotificationLightingService.ensureConnected(ctx)
         var missing = !BootCoolingRestore.restore(ctx)
         fun ensure(name: String, type: Class<*>, enabled: Boolean, start: () -> Unit) {

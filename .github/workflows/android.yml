@@ -9,6 +9,7 @@ on:
       - test/logo-game-mode-bar
       - test/bridge-edge-feedback
       - test/boot-restoration
+      - test/late-root
     tags:
       - 'v*'
   pull_request:

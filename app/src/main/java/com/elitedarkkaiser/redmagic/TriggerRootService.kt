@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 class TriggerRootService : Service() {
+    companion object { const val ACTION_ROOT_AVAILABLE = "com.elitedarkkaiser.redmagic.TRIGGER_ROOT_AVAILABLE" }
 
     @Volatile private var rightCrossUnlockedUntil: Long = 0L
 
@@ -53,19 +54,31 @@ class TriggerRootService : Service() {
 
         android.util.Log.d("TRIGGER", "TriggerRootService onCreate")
 
+        initializeMissingReaders()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_ROOT_AVAILABLE && !triggersDisabledUntilRestartStorage(this)) {
+            initializeMissingReaders()
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    @Synchronized
+    private fun initializeMissingReaders() {
+        if (!running || initializationThread?.isAlive == true) return
         initializationThread = Thread({
+            if (!running || triggersDisabledUntilRestartStorage(this)) return@Thread
             HardwareController.enableTriggers()
-
-            val leftDevice =
-                findTriggerEvent("nubia_tgk_aw_sar0_ch0")
-            if (running && leftDevice != null) {
-                startReader(leftDevice, "left_trigger")
+            if (readerThreads["left_trigger"]?.isAlive != true) {
+                val device = findTriggerEvent("nubia_tgk_aw_sar0_ch0")
+                if (running && device != null && readerThreads["left_trigger"]?.isAlive != true)
+                    startReader(device, "left_trigger")
             }
-
-            val rightDevice =
-                findTriggerEvent("nubia_tgk_aw_sar1_ch0")
-            if (running && rightDevice != null) {
-                startReader(rightDevice, "right_trigger")
+            if (readerThreads["right_trigger"]?.isAlive != true) {
+                val device = findTriggerEvent("nubia_tgk_aw_sar1_ch0")
+                if (running && device != null && readerThreads["right_trigger"]?.isAlive != true)
+                    startReader(device, "right_trigger")
             }
         }, "RedMagicTriggerInit").apply {
             priority = Thread.NORM_PRIORITY - 1

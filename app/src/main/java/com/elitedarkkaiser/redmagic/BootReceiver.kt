@@ -60,7 +60,7 @@ open class BootReceiver : BroadcastReceiver() {
         // The boot claim deduplicates one-time setup, not receiver liveness.
         HardwareServiceActions.ensureLightingServices(appContext)
 
-        if (!decision.needsAsyncWork) return
+        if (!decision.needsAsyncWork && event != BootEvent.ROOT_STARTUP) return
 
         val pendingResult = goAsync()
         Thread(
@@ -70,6 +70,9 @@ open class BootReceiver : BroadcastReceiver() {
                 )
 
                 try {
+                    if (event == BootEvent.ROOT_STARTUP) {
+                        BootDiagnostics.record(appContext, "Root helper recheck: ${RootAvailability.check(appContext)}")
+                    }
                     if (decision.runUnlockAutomation) {
                         AutomationRuleExecutor.applyNow(
                             appContext,
