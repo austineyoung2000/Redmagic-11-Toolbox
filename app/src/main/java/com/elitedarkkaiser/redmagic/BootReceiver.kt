@@ -71,7 +71,7 @@ open class BootReceiver : BroadcastReceiver() {
 
                 try {
                     if (event == BootEvent.ROOT_STARTUP) {
-                        BootDiagnostics.record(appContext, "Root helper recheck: ${RootAvailability.check(appContext)}")
+                        BootDiagnostics.record(appContext, "Root helper recheck: ${RootAvailability.check(appContext, force = true)}")
                     }
                     if (decision.runUnlockAutomation) {
                         AutomationRuleExecutor.applyNow(
