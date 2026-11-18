@@ -27,6 +27,7 @@ open class BootReceiver : BroadcastReceiver() {
 
         val appContext = context.applicationContext
         BootDiagnostics.record(appContext, "Received $event")
+        BootDiagnostics.request(appContext, "Boot recovery scheduling") { BootRecoveryWorker.schedule(appContext) }
         BootDiagnostics.request(appContext, "Gameplay runtime") {
             GameplayRuntimeService.ensureRunning(appContext)
         }
@@ -59,7 +60,7 @@ open class BootReceiver : BroadcastReceiver() {
         // The boot claim deduplicates one-time setup, not receiver liveness.
         HardwareServiceActions.ensureLightingServices(appContext)
 
-        if (!decision.needsAsyncWork) return
+        if (!decision.needsAsyncWork && event != BootEvent.ROOT_STARTUP) return
 
         val pendingResult = goAsync()
         Thread(
@@ -69,6 +70,9 @@ open class BootReceiver : BroadcastReceiver() {
                 )
 
                 try {
+                    if (event == BootEvent.ROOT_STARTUP) {
+                        BootDiagnostics.record(appContext, "Root helper recheck: ${RootAvailability.checkFromHelper(appContext)}")
+                    }
                     if (decision.runUnlockAutomation) {
                         AutomationRuleExecutor.applyNow(
                             appContext,

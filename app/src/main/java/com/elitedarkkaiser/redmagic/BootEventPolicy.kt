@@ -28,7 +28,7 @@ internal object BootEventPolicy {
         return BootEventDecision(
             startCoreServices = startCore,
             resetManualTriggerPause =
-                event == BootEvent.BOOT_COMPLETED || startCore,
+                startCore,
             startTriggers = startCore && triggersAutoStart,
             runUnlockAutomation =
                 event == BootEvent.USER_UNLOCKED &&

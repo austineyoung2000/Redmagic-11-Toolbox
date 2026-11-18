@@ -3,7 +3,7 @@
 PATH=/system/bin:/system_ext/bin:/vendor/bin:/product/bin
 export PATH
 
-SUPERVISOR_VERSION=5
+SUPERVISOR_VERSION=6
 PACKAGE_NAME="com.elitedarkkaiser.redmagic"
 ACCESSIBILITY_COMPONENT="com.elitedarkkaiser.redmagic/com.elitedarkkaiser.redmagic.TriggerAccessibilityService"
 ACCESSIBILITY_COMPONENT_SHORT="com.elitedarkkaiser.redmagic/.TriggerAccessibilityService"
@@ -121,6 +121,29 @@ trap release_lock EXIT
 trap handle_termination INT TERM
 
 log_message "supervisor v$SUPERVISOR_VERSION started pid=$$"
+
+# One bounded root-ready notification per supervisor start. This also runs
+# when KernelSU late-load invokes service.d after temporary root becomes ready.
+# Keep it independent from the watchdog loop and never change hardware here.
+notify_toolbox_root_ready() {
+    attempt=1
+    while [ "$attempt" -le 10 ]; do
+        state="$(timeout 8 su 2000 -c 'am get-started-user-state 0' 2>/dev/null)"
+        case "$state" in
+            *RUNNING_UNLOCKED*)
+                output="$(timeout 12 su 2000 -c "am broadcast --user 0 --include-stopped-packages -a com.elitedarkkaiser.redmagic.ROOT_BOOT_STARTUP -n $PACKAGE_NAME/.RootBootReceiver" 2>&1)"
+                status=$?
+                log_message "root-ready broadcast attempt=$attempt status=$status output=$output"
+                case "$output" in *'Broadcast completed'*) [ "$status" -eq 0 ] && return 0 ;; esac
+                ;;
+        esac
+        attempt=$((attempt + 1))
+        sleep 15
+    done
+    log_message "root-ready broadcast not confirmed after bounded retries"
+    return 1
+}
+notify_toolbox_root_ready &
 
 # Package Manager and credential-encrypted settings may not be ready when
 # service.d first starts during boot.

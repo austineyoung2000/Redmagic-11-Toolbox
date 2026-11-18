@@ -174,6 +174,25 @@ class SettingsActivity : AppCompatActivity() {
             addView(panel().apply {
                 addView(text("DIAGNOSTICS", 12f, secondary = true, bold = true))
                 addView(MaterialButton(this@SettingsActivity).apply {
+                    text = "Recheck root"
+                    setOnClickListener {
+                        isEnabled = false
+                        runCatching {
+                            backupExecutor.execute {
+                                val verified = runCatching { RootAvailability.check(applicationContext, force = true) }.getOrDefault(false)
+                                runOnUiThread {
+                                    if (!isFinishing && !isDestroyed) {
+                                        isEnabled = true
+                                        android.widget.Toast.makeText(this@SettingsActivity,
+                                            if (verified) "Root verified; recovery requested" else "Root not verified; check root access and Boot diagnostics",
+                                            android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                        }.onFailure { isEnabled = true }
+                    }
+                })
+                addView(MaterialButton(this@SettingsActivity).apply {
                     text = "Boot diagnostics"
                     setOnClickListener { BootDiagnosticsDialog.show(this@SettingsActivity) }
                 })

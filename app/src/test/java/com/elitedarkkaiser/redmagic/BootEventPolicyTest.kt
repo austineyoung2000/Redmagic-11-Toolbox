@@ -47,7 +47,7 @@ class BootEventPolicyTest {
     }
 
     @Test
-    fun bootCompletedAlwaysClearsManualRestartPause() {
+    fun duplicateBootCompletedDoesNotClearManualPause() {
         val decision = BootEventPolicy.decide(
             event = BootEvent.BOOT_COMPLETED,
             coreServicesAlreadyStarted = true,
@@ -55,7 +55,7 @@ class BootEventPolicyTest {
             hasUnlockAutomation = false
         )
 
-        assertTrue(decision.resetManualTriggerPause)
+        assertFalse(decision.resetManualTriggerPause)
         assertFalse(decision.needsAsyncWork)
     }
 

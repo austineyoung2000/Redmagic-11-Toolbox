@@ -20,6 +20,6 @@ internal object CoolingStateMatch {
         if (expected == 0) enabled == false else enabled == true && level == expected
     fun pump(enabled: String?, frequency: String?, speed: String?, expected: String): Boolean =
         if (expected == "off") enabled == "0" else enabled == "1" && frequency == "4" && speed == when (expected) {
-            "slow" -> "40"; "medium" -> "60"; "quick" -> "80"; else -> null
+            "slow" -> "40"; "medium" -> "60"; "quick" -> "80"; "experimental" -> "90"; else -> null
         }
 }

@@ -56,6 +56,9 @@ class FanLedService : Service() {
                 Intent.ACTION_SCREEN_ON,
                 Intent.ACTION_USER_PRESENT -> {
                     scheduleLedReapply(delayMs = 1_500L)
+                    if (BootCoolingRestore.pending(this@FanLedService)) {
+                        BootRecoveryWorker.schedule(this@FanLedService)
+                    }
                 }
                 Intent.ACTION_POWER_CONNECTED,
                 Intent.ACTION_POWER_DISCONNECTED -> {

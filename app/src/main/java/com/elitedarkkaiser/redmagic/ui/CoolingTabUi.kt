@@ -9,6 +9,7 @@ import com.google.android.material.slider.Slider
 import android.widget.TextView
 import android.graphics.Typeface
 import com.elitedarkkaiser.redmagic.HardwareController
+import com.elitedarkkaiser.redmagic.ManualFanStorage
 
 object CoolingTabUi {
     data class Refs(
@@ -72,7 +73,7 @@ object CoolingTabUi {
 
                         val level = slider.value.toInt()
                         deps.runBackground {
-                            HardwareController.setFanLevel(level)
+                            if (HardwareController.setFanLevel(level)) ManualFanStorage.save(container.context, level)
                             deps.refreshStatus()
                         }
                     }
@@ -88,11 +89,11 @@ object CoolingTabUi {
                 if (button.tag == "rendering") return@setOnCheckedChangeListener
                 if (autoCurveCheck.isChecked) autoCurveCheck.isChecked = false
                 deps.runBackground {
-                    if (checked && (HardwareController.readFanLevel() ?: 0) == 0) {
-                        HardwareController.setFanLevel(1)
-                    } else {
-                        HardwareController.enableFan(checked)
-                    }
+                    val current = HardwareController.readFanLevel() ?: 0
+                    val level = if (checked) current.coerceAtLeast(1) else 0
+                    val applied = if (checked && current == 0) HardwareController.setFanLevel(1)
+                        else HardwareController.enableFan(checked)
+                    if (applied) ManualFanStorage.save(container.context, level)
                     deps.refreshStatus()
                 }
             }
@@ -130,6 +131,7 @@ object CoolingTabUi {
                 val level =
                     HardwareController.applyFanCurve(curve)
 
+                if (level != null) ManualFanStorage.save(container.context, level)
                 curveStatusText.post {
                     /*
                      * Ignore a completion from an older queued request

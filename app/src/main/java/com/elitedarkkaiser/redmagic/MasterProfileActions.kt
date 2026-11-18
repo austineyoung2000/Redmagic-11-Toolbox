@@ -259,8 +259,10 @@ object MasterProfileActions {
 
     private fun applyHardwareAndServices(context: Context, profile: MasterProfile) {
         val hardware = profile.hardware
-        if (hardware.fanEnabled) HardwareController.setFanLevel(hardware.fanLevel)
-        else HardwareController.enableFan(false)
+        val manualLevel = if (hardware.fanEnabled) hardware.fanLevel else 0
+        val appliedFan = if (hardware.fanEnabled) HardwareController.setFanLevel(manualLevel)
+            else HardwareController.enableFan(false)
+        if (appliedFan) ManualFanStorage.save(context, manualLevel)
         if (hardware.autoFanEnabled) HardwareServiceActions.startAutoFan(context)
         else HardwareServiceActions.stopAutoFan(context)
 

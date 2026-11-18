@@ -281,7 +281,13 @@ internal object CoolingPumpSection {
                             deps.refreshStatus()
                         }
                     } else {
+                        deps.setPumpEnabled(false)
+                        deps.savePumpState()
                         deps.stopAutoPumpService()
+                        deps.runBackground {
+                            HardwareController.enablePump(false)
+                            deps.refreshStatus()
+                        }
                     }
 
                     syncPumpSwitches()

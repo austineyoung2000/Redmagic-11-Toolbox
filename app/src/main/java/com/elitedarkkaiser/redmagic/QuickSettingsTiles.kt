@@ -178,11 +178,10 @@ class FanTileService : RedMagicTileService() {
             telemetry.fanLevel?.let {
                 QuickSettingsTileStorage.saveFanLevel(this, it)
             }
-            HardwareController.setFanLevel(0)
+            if (HardwareController.setFanLevel(0)) ManualFanStorage.save(this, 0)
         } else {
-            HardwareController.setFanLevel(
-                QuickSettingsTileStorage.lastFanLevel(this)
-            )
+            val level = QuickSettingsTileStorage.lastFanLevel(this)
+            if (HardwareController.setFanLevel(level)) ManualFanStorage.save(this, level)
         }
     }
 }

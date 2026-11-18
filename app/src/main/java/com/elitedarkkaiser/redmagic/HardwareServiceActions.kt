@@ -119,6 +119,14 @@ object HardwareServiceActions {
         return enabled
     }
 
+    fun recoverTriggersAfterRoot(context: Context) {
+        if (!DeviceCompatibility.isSupportedDevice() ||
+            !readTriggerPrefsSnapshot(context).triggersAutoStart ||
+            triggersDisabledUntilRestartStorage(context)) return
+        context.startService(Intent(context, TriggerRootService::class.java)
+            .setAction(TriggerRootService.ACTION_ROOT_AVAILABLE))
+    }
+
     fun stopTriggers(context: Context) {
         context.stopService(
             Intent(context, TriggerRootService::class.java)
